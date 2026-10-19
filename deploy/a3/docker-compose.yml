@@ -1,0 +1,18 @@
+services:
+  daogov-mainnet:
+    image: local/flon-daogov:${IMAGE_TAG:-latest}
+    container_name: flon-daogov-mainnet
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:20101:80"
+    volumes:
+      - ./config.mainnet.js:/usr/share/nginx/html/config.js:ro
+
+  daogov-testnet:
+    image: local/flon-daogov:${IMAGE_TAG:-latest}
+    container_name: flon-daogov-testnet
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:20102:80"
+    volumes:
+      - ./config.testnet.js:/usr/share/nginx/html/config.js:ro

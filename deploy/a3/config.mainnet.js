@@ -1,0 +1,6 @@
+window.__DAO_GOV_CONFIG__ = {
+  network: "mainnet",
+  networkName: "FullOn 主网",
+  chainId: "d4019d7d8633a337973408c6c00e5c4888933ad1b6ce10edddea8145317d8d12",
+  rpcUrl: "https://m.flonscan.io"
+};
