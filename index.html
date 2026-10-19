@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f5f6f7">
+  <meta name="description" content="FullOn Governance · HuFu H5 DApp">
+  <link rel="icon" href="data:,">
+  <title>FullOn Governance · HuFu</title>
+  <link rel="stylesheet" href="/src/styles.css">
+  <script src="/config.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4.5 6v5.5c0 4.8 3.2 8 7.5 9.5 4.3-1.5 7.5-4.7 7.5-9.5V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="m4 11 8-7 8 7v9h-6v-6h-4v6H4z"/></symbol>
+    <symbol id="i-node" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="m10.8 7.2-4.5 8M13.2 7.2l4.5 8M7.5 18h9"/></symbol>
+    <symbol id="i-vote" viewBox="0 0 24 24"><path d="M6 4h12v5H6zM4 10h16v10H4z"/><path d="m9 14 2 2 4-4"/></symbol>
+    <symbol id="i-dao" viewBox="0 0 24 24"><path d="M4 9h16M6 9v8M10 9v8M14 9v8M18 9v8M3 20h18M12 3l9 4H3z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-reward" viewBox="0 0 24 24"><path d="M5 8h14v12H5zM3 5h18v4H3zM12 5v15M8 5c-2-3 2-4 4 0M16 5c2-3-2-4-4 0"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4zM13 7l4 4"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v6H5V6h6"/></symbol>
+  </svg>
+
+  <div id="app-frame">
+    <header class="topbar">
+      <button class="icon-button" type="button" aria-label="返回 HuFu"><svg><use href="#i-back"/></svg></button>
+      <div class="top-title"><strong>治理中心</strong><button class="network" type="button" data-action="network"><i></i><span data-network-name>FullOn 测试网</span></button></div>
+      <div class="top-actions">
+        <label class="language-picker" aria-label="语言"><span>文</span><select data-language><option value="zh-CN">中文</option><option value="en">EN</option></select></label>
+        <button class="icon-button notify" type="button" aria-label="治理通知" data-action="toast" data-message="你有 3 项治理任务"><svg><use href="#i-bell"/></svg><span>3</span></button>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="view is-active" data-view="overview">
+        <div class="content overview-content">
+          <section class="governance-hero">
+            <div class="identity-row"><span><small>当前治理账户</small><strong>flonian</strong></span><button type="button" data-action="account">日常钱包 <svg><use href="#i-chevron"/></svg></button></div>
+            <div class="power-row"><span><small>我的治理权</small><strong class="din">1,200.00000000 <em>GLON</em></strong></span><span class="power-status"><i></i>全部已生效</span></div>
+            <div class="hero-stats"><span><small>已投 FLON</small><strong class="din">1,200.00</strong></span><span><small>已选 BP</small><strong class="din">6 / 30</strong></span><span><small>待领取</small><strong class="din">18.42 FLON</strong></span></div>
+          </section>
+
+          <section class="epoch-card">
+            <div class="epoch-head"><span><i class="live-dot"></i>Epoch 1,248 进行中</span><strong class="din" data-countdown>02:17:36</strong></div>
+            <div class="progress"><i style="width:62%"></i></div>
+            <div class="epoch-foot"><span>当前席位 <strong>3 / 21</strong></span><span>Standby <strong>30</strong></span><span>区块 <strong>#21,723,341</strong></span></div>
+          </section>
+
+          <section class="section">
+            <div class="section-title"><h2>需要你处理</h2><button type="button" data-view-target="mine">全部</button></div>
+            <div class="task-list">
+              <button class="task" type="button" data-action="proposal-detail"><span class="task-icon blue"><svg><use href="#i-dao"/></svg></span><span><strong>FIP-0002 正式投票</strong><small>剩余 18 小时 · 你有 1,200 GLON 票权</small></span><em>去投票</em></button>
+              <button class="task" type="button" data-view-target="overview" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><span><strong>投票奖励已结算</strong><small>Epoch 1,246–1,247 · 18.42 FLON</small></span><em>领取</em></button>
+              <button class="task" type="button" data-view-target="nodes"><span class="task-icon amber"><svg><use href="#i-node"/></svg></span><span><strong>1 个所投节点进入 Standby</strong><small>建议检查节点状态与待生效排名</small></span><em>查看</em></button>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-title"><h2>网络概况</h2><button type="button" data-view-target="nodes">节点排名</button></div>
+            <div class="metric-grid">
+              <article><small>Active BP</small><strong class="din">3</strong><span>目标 21</span></article>
+              <article><small>网络出块率</small><strong class="din">99.96%</strong><span class="positive">近 24 小时</span></article>
+              <article><small>总投票本金</small><strong class="din">8.42M</strong><span>FLON</span></article>
+              <article><small>活跃投票人</small><strong class="din">2,486</strong><span>近 7 天 +6.2%</span></article>
+            </div>
+          </section>
+
+          <section class="section proposal-preview">
+            <div class="section-title"><h2>社区治理</h2><button type="button" data-view-target="dao">查看全部</button></div>
+            <button class="proposal-card" type="button" data-action="proposal-detail">
+              <div><span class="status voting">投票中</span><span class="proposal-id">FIP-0002</span><time>剩余 18 小时</time></div>
+              <h3>将 Active BP 席位从 3 个扩展至 7 个</h3>
+              <p>根据候选节点稳定性和网络负载，分阶段扩大出块节点集合。</p>
+              <div class="vote-result"><span><i style="width:71%"></i></span><small><b>赞成 71%</b><em>Quorum 54%</em></small></div>
+            </button>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" data-view="nodes" hidden>
+        <div class="content">
+          <div class="page-heading"><span><small>网络节点</small><h1>BP 竞选</h1></span><button class="outline-button" type="button" data-action="candidate">申请竞选</button></div>
+          <div class="rank-summary"><div><small>当前席位</small><strong class="din">3 / 21</strong></div><div><small>Standby</small><strong class="din">30</strong></div><div><small>候选节点</small><strong class="din">47</strong></div></div>
+          <div class="tabs" role="tablist"><button class="is-active" data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-filter="all">全部候选</button></div>
+          <label class="search"><svg><use href="#i-search"/></svg><input type="search" placeholder="搜索账户、名称或地区" data-node-search></label>
+          <div class="node-list">
+            <button class="node-card" type="button" data-status="active" data-name="flon.alpha alpha singapore"><span class="rank din">01</span><span class="node-logo blue-logo">FA</span><span class="node-main"><strong>FullOn Alpha <i class="verified">✓</i></strong><small>flon.alpha · 新加坡</small><span><b>99.99% 在线</b><em>分享 40%</em></span></span><span class="node-votes"><strong class="din">1.84M</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></span></button>
+            <button class="node-card" type="button" data-status="active" data-name="dragonmaster dragon tokyo"><span class="rank din">02</span><span class="node-logo purple-logo">DM</span><span class="node-main"><strong>Dragon Master <i class="verified">✓</i></strong><small>dragonmaster · 东京</small><span><b>99.97% 在线</b><em>分享 35%</em></span></span><span class="node-votes"><strong class="din">1.46M</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></span></button>
+            <button class="node-card selected" type="button" data-status="active" data-name="bp.one one frankfurt"><span class="rank din">03</span><span class="node-logo green-logo">BO</span><span class="node-main"><strong>BP One</strong><small>bp.one · 法兰克福</small><span><b>99.93% 在线</b><em>分享 45%</em></span></span><span class="node-votes"><strong class="din">1.21M</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></span></button>
+            <button class="node-card" type="button" data-status="standby" data-name="hashquark hash hong kong"><span class="rank din">04</span><span class="node-logo amber-logo">HQ</span><span class="node-main"><strong>HashQuark</strong><small>hashquark · 香港</small><span><b>99.98% 在线</b><em>分享 50%</em></span></span><span class="node-votes"><strong class="din">1.18M</strong><small>差 32.4K</small><svg><use href="#i-chevron"/></svg></span></button>
+            <button class="node-card" type="button" data-status="standby" data-name="fullnode full seoul"><span class="rank din">05</span><span class="node-logo red-logo">FN</span><span class="node-main"><strong>FullNode</strong><small>fullnode · 首尔</small><span><b>99.89% 在线</b><em>分享 30%</em></span></span><span class="node-votes"><strong class="din">982K</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></span></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" data-view="vote" hidden>
+        <div class="content vote-content">
+          <div class="page-heading"><span><small>节点投票</small><h1>分配治理票权</h1></span><button class="help-button" type="button" data-action="toast" data-message="总票权在所选 BP 之间平均分配，不会复制放大"><svg><use href="#i-info"/></svg></button></div>
+          <section class="vote-balance">
+            <div><small>可分配票权</small><strong class="din">1,200.00000000 <em>GLON</em></strong></div>
+            <span>来自 1,200 FLON 投票本金</span>
+            <div class="allocation"><span><small>已选择</small><strong class="din" data-selected-count>6 / 30</strong></span><span><small>每个 BP</small><strong class="din" data-per-node>200.00000000</strong></span></div>
+          </section>
+          <div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>修改将在 Epoch 1,249 生效</strong><small>本 Epoch 奖励仍按当前 6 个节点计算</small></span></div>
+          <div class="section-title"><h2>选择 BP</h2><button type="button" data-action="clear-selection">清空</button></div>
+          <div class="select-list">
+            <label class="select-node"><input type="checkbox" checked><span class="check"><svg><use href="#i-check"/></svg></span><span class="node-logo blue-logo">FA</span><span><strong>FullOn Alpha</strong><small>#1 · Active · 在线 99.99%</small></span><em>分享 40%</em></label>
+            <label class="select-node"><input type="checkbox" checked><span class="check"><svg><use href="#i-check"/></svg></span><span class="node-logo purple-logo">DM</span><span><strong>Dragon Master</strong><small>#2 · Active · 在线 99.97%</small></span><em>分享 35%</em></label>
+            <label class="select-node"><input type="checkbox" checked><span class="check"><svg><use href="#i-check"/></svg></span><span class="node-logo green-logo">BO</span><span><strong>BP One</strong><small>#3 · Active · 在线 99.93%</small></span><em>分享 45%</em></label>
+            <label class="select-node"><input type="checkbox" checked><span class="check"><svg><use href="#i-check"/></svg></span><span class="node-logo amber-logo">HQ</span><span><strong>HashQuark</strong><small>#4 · Standby · 在线 99.98%</small></span><em>分享 50%</em></label>
+            <label class="select-node"><input type="checkbox" checked><span class="check"><svg><use href="#i-check"/></svg></span><span class="node-logo red-logo">FN</span><span><strong>FullNode</strong><small>#5 · Standby · 在线 99.89%</small></span><em>分享 30%</em></label>
+            <label class="select-node"><input type="checkbox" checked><span class="check"><svg><use href="#i-check"/></svg></span><span class="node-logo gray-logo">SN</span><span><strong>Star Node</strong><small>#8 · Standby · 在线 99.95%</small></span><em>分享 42%</em></label>
+          </div>
+          <div class="sticky-action"><button class="secondary-button" type="button" data-action="stake">调整本金</button><button class="primary-button" type="button" data-action="sign-vote">确认分配</button></div>
+        </div>
+      </section>
+
+      <section class="view" data-view="dao" hidden>
+        <div class="content">
+          <div class="page-heading"><span><small>社区决策</small><h1>DAO 治理</h1></span><button class="primary-small" type="button" data-action="create-proposal"><svg><use href="#i-edit"/></svg>发起提案</button></div>
+          <div class="governance-stats"><span><strong class="din">2</strong><small>附议中</small></span><span><strong class="din">3</strong><small>投票中</small></span><span><strong class="din">1</strong><small>待执行</small></span></div>
+          <div class="tabs dao-tabs"><button class="is-active" data-proposal-filter="all">全部</button><button data-proposal-filter="endorsement">附议中</button><button data-proposal-filter="voting">投票中</button><button data-proposal-filter="execution">待执行</button></div>
+          <div class="proposal-list">
+            <button class="proposal-item" type="button" data-status="voting" data-action="proposal-detail"><div><span class="status voting">投票中</span><span class="proposal-id">FIP-0002</span><time>剩余 18 小时</time></div><h3>将 Active BP 席位从 3 个扩展至 7 个</h3><p>参数提案 · 提案人 fullonlabs</p><div class="mini-progress"><i style="width:71%"></i></div><footer><span><b>71%</b> 赞成</span><span>Quorum <b>54%</b></span><em>你尚未投票</em></footer></button>
+            <button class="proposal-item" type="button" data-status="endorsement"><div><span class="status endorsement">附议中</span><span class="proposal-id">FIP-0003</span><time>剩余 2 天</time></div><h3>建立生态开发者季度资助计划</h3><p>资金提案 · 提案人 build.flon</p><div class="endorsement-progress"><span><i style="width:68%"></i></span><small>68 / 100 GLON 附议门槛</small></div><footer><span>已有 <b>42</b> 人附议</span><em>可附议</em></footer></button>
+            <button class="proposal-item" type="button" data-status="execution"><div><span class="status execution">Timelock</span><span class="proposal-id">FIP-0001</span><time>20 小时后可执行</time></div><h3>启用六小时奖励 Epoch 与历史票权结算</h3><p>合约参数 · 提案人 flonian</p><div class="execution-row"><svg><use href="#i-shield"/></svg><span><strong>已通过 · 安全等待期</strong><small>执行目标 flon::setparams</small></span></div><footer><span>赞成 <b>82%</b></span><em>查看执行内容</em></footer></button>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" data-view="mine" hidden>
+        <div class="content">
+          <div class="page-heading"><span><small>flonian</small><h1>我的治理</h1></span><button class="help-button" type="button" data-action="toast" data-message="治理记录来自链上数据"><svg><use href="#i-external"/></svg></button></div>
+          <section class="mine-card"><div class="mine-title"><span class="avatar">FL</span><span><strong>日常钱包</strong><small>flonian · <span data-network-name>FullOn 测试网</span></small></span></div><div class="mine-grid"><span><small>治理权</small><strong class="din">1,200 GLON</strong></span><span><small>累计奖励</small><strong class="din">284.62 FLON</strong></span></div></section>
+          <div class="action-grid"><button type="button" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><strong>领取奖励</strong><small>18.42 FLON</small></button><button type="button" data-view-target="vote"><span class="task-icon blue"><svg><use href="#i-vote"/></svg></span><strong>我的节点投票</strong><small>6 个 BP</small></button><button type="button" data-action="candidate"><span class="task-icon purple"><svg><use href="#i-node"/></svg></span><strong>竞选管理</strong><small>未注册</small></button></div>
+          <section class="section"><div class="section-title"><h2>我的治理任务</h2></div><div class="timeline"><article><i class="now"></i><span><strong>FIP-0002 等待你投票</strong><small>1,200 GLON 快照票权 · 剩余 18 小时</small></span><button data-action="proposal-detail">处理</button></article><article><i></i><span><strong>节点分配已在 Epoch 1,248 生效</strong><small>6 个 BP · 每个 200 有效票权</small></span></article><article><i></i><span><strong>投票奖励完成结算</strong><small>Epoch 1,246–1,247 · 18.42 FLON</small></span></article></div></section>
+          <section class="section"><div class="section-title"><h2>治理记录</h2><button type="button" data-action="toast" data-message="打开完整链上治理记录">全部</button></div><div class="record-list"><article><span class="record-icon success"><svg><use href="#i-check"/></svg></span><span><strong>附议 FIP-0003</strong><small>交易不可逆 · 区块 #21,722,804</small></span><time>10:42</time></article><article><span class="record-icon"><svg><use href="#i-vote"/></svg></span><span><strong>调整 BP 投票分配</strong><small>Epoch 1,248 已生效</small></span><time>昨天</time></article></div></section>
+        </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav canvas-fixed" aria-label="治理中心导航">
+      <button class="is-active" data-view-target="overview"><svg><use href="#i-home"/></svg><span>概览</span></button>
+      <button data-view-target="nodes"><svg><use href="#i-node"/></svg><span>BP</span></button>
+      <button data-view-target="vote"><svg><use href="#i-vote"/></svg><span>投票</span></button>
+      <button data-view-target="dao"><svg><use href="#i-dao"/></svg><span>治理</span><i class="nav-dot"></i></button>
+      <button data-view-target="mine"><svg><use href="#i-user"/></svg><span>我的</span></button>
+    </nav>
+
+    <div class="toast canvas-fixed" role="status" aria-live="polite" hidden></div>
+    <div class="overlay canvas-fixed" data-overlay hidden></div>
+    <section class="sheet canvas-fixed" data-sheet hidden aria-modal="true" role="dialog" aria-labelledby="sheet-title">
+      <div class="sheet-handle"></div>
+      <button class="sheet-close" type="button" data-action="close-sheet" aria-label="关闭"><svg><use href="#i-close"/></svg></button>
+      <div data-sheet-content></div>
+    </section>
+  </div>
+  <script type="module" src="/src/app.js"></script>
+</body>
+</html>
