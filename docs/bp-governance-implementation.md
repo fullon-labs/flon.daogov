@@ -1,4 +1,4 @@
-# FLON 超级节点投票、奖励、惩罚与 DAO 治理实施方案
+# FLON Block Producer（BP）投票、奖励、惩罚与 DAO 治理实施方案
 
 ## 1. 结论与目标架构
 
