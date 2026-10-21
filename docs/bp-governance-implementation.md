@@ -135,49 +135,47 @@ ranking_score = ranking_bp_weight × performance_factor
 
 现有 `update_elected_producers` 已每分钟尝试更新一次排班并取前 21 名，可以扩展过滤条件和备用状态，无需修改底层共识的排班接口。
 
-## 4. 新币产生与奖励分配
+## 4. GAS 收入与 FLON 奖励分配
 
-### 4.1 增发上限
+### 4.1 奖励上限
 
-保留现有“每区块初始奖励、每 5 年减半”的代码框架，但不要在每个区块直接做复杂分账。`onblock` 只累计 epoch 理论预算，epoch 结算动作一次性更新奖励指数。
+节点 GAS 奖励不生成 ELON，也不建立 ELON 兑付负债。`onblock` 读取累计 GAS 费用对应的 FLON 价值，只记录相邻区块差额；完成 Epoch 后再分批结算。
 
 ```text
-epoch_mint_cap = rewards_per_block × epoch_produced_blocks
-actual_mint = min(epoch_mint_cap, annual_inflation_cap_remaining)
+epoch_gas_flon = cumulative_gas_value_flon(end) - cumulative_gas_value_flon(start)
+epoch_reward_cap = floor(epoch_gas_flon × 10%)
 ```
 
-建议增加年度通胀硬上限，并由 DAO 只能在预设安全区间内调整。例如首期上限 2%，参数调整需 14 天 timelock，且单次变动不超过 20%。
+默认最多释放当期 GAS 对应 FLON 的 10%，其余 90% 留在 `flon.gas`。DAO 只能对未来 Epoch 在预设安全范围内调整比例，不能追溯修改已结算奖励。
 
 ### 4.2 分配比例
 
 建议初始分配：
 
-| 接收方 | 比例 | 计算基础 |
-| --- | ---: | --- |
-| BP 基础服务奖 | 20% | 达到最低出勤的活跃 BP 等额分配 |
-| BP 出块绩效奖 | 30% | 按实际出块和最终性贡献分配 |
-| 投票人奖励池 | 40% | 按委托权重及所投 BP 表现分配 |
-| DAO 国库 | 10% | 自动进入 timelock 国库 |
+| 接收方 | 占 10% 奖励池 | 占当期 GAS 对应 FLON | 计算基础 |
+| --- | ---: | ---: | --- |
+| Active BP | 80% | 上限 8% | 按 21 个目标席位归一化；内部 40% 等额基础服务、60% 按出块绩效 |
+| Standby BP | 20% | 上限 2% | 按 30 个目标席位归一化；满足在线证明门限者等额分配 |
+| 留在 `flon.gas` | — | 90% 加未释放额度 | 默认锁定，等待 DAO 决定合规用途 |
 
-BP 对投票人奖励收取其注册的佣金：
+早期只有少量 Active BP 时不能瓜分完整 8%。结算上限为：
 
 ```text
-delegator_gross = voter_pool × voter_weight_for_bp / total_eligible_weight
-bp_commission = delegator_gross × commission_rate
-delegator_net = delegator_gross - bp_commission
+active_cap  = reward_cap × 80% × eligible_active_count / 21
+standby_cap = reward_cap × 20% × eligible_standby_count / 30
 ```
 
-BP 当期在线率低于最低门限时，该 BP 及其投票人的当期奖励均为零；未发部分不补发给其他 BP，直接进入 DAO 安全储备或销毁。这样投票人会主动关注节点质量。
+未释放额度和整数舍入余额继续留在 `flon.gas`，不能补发给其他 BP 或成为后续意外收益。3 个合格 Active BP 加 30 个合格 Standby BP 时，最多释放当期 GAS 对应 FLON 的 `8% × 3/21 + 2% = 3.142857%`。
 
-### 4.3 发币闭环
+### 4.3 FLON 结算闭环
 
-当前 `onblock` 只把奖励记入 `producer_info.unclaimed_rewards`；`voter.reward` 负责接收 BP 转入的投票人共享奖励，并用累计奖励指数分给投票人。实施时应改成：
+GAS 节点奖励和投票人分享奖励是两条独立账路：
 
-1. `flon.system` 在 epoch 结算时调用受控的 `flon.token::issue`，或从预先拨入的奖励金库划拨。
-2. BP 净奖励进入 BP 可领取余额。
-3. 投票人池一次性转入 `voter.reward`，按 BP 和投票人奖励指数记账。
-4. DAO 份额转入 `flon.treasury`。
-5. `claimbp`、`claimvote` 分开，采用 pull 模式，避免结算时遍历所有投票人。
+1. `flon.system` 从 `flon.gas` 只转出归一化后实际释放的 FLON到 `gas.reward`。
+2. `gas.reward` 记录各 BP 的累计已分配、已领取和待领取余额。
+3. Active 和 Standby BP 调用 `gas.reward::claimgas` 领取，错过 Epoch 不会丢失。
+4. 原有生产者奖励可按 BP 注册的分享比例进入 `voter.reward`；GAS 节点奖励默认不自动产生投票人权益。
+5. 如果未来要把 GAS 奖励分享给投票人，必须另行定义不可变的 Epoch 历史票权快照。
 
 ## 5. 出勤与作弊惩罚
 
@@ -196,9 +194,9 @@ availability = produced_blocks / expected_blocks
 | `>= 99%` | 100% 绩效奖励 |
 | `95%–99%` | 绩效奖按线性系数折减 |
 | `90%–95%` | BP 与投票人当期奖励为零，记 1 次警告 |
-| `< 90%` | 零奖励、停权 1 个 epoch、备用递补 |
-| 30 天内 3 次 `< 90%` | 停权 7 天、最低自质押提高 25% 后方可恢复 |
-| 连续漏块达到紧急阈值 | 本 epoch 临时停权，下一备用 BP 递补 |
+| `< 90%` | 零奖励、停权、备用递补，冷却期后必须主动申请恢复 |
+| 重复停权 | 冷却期依次为 1、2、4、8 个 epoch，最高 48 小时 |
+| 试运行连续漏掉 12 个应出 slot | 立即再次停权，下一备用 BP 递补 |
 
 网络整体故障时必须有“系统异常保护”：若同一 epoch 超过三分之一的活跃 BP 同时低于门限，不执行个体惩罚，只记录数据并交 DAO 复核，避免网络分区造成大面积误罚。
 
@@ -263,14 +261,20 @@ else if failed_bp_count * 3 > active_bp_count:
     status = NETWORK_INCIDENT          // 全网异常保护，只记录不处罚
 else if availability < 90%:
     status = SUSPENDED
-    suspended_until = next_epoch_end
+    suspension_count += 1
+    cooldown_epochs = min(2 ** (suspension_count - 1), 8)
+    suspended_until = epoch_id + cooldown_epochs + 1
 else:
     status = QUALIFIED
 ```
 
-`update_elected_producers` 构造下一排班时，只选择 `status == QUALIFIED`、自质押达标且资料有效的候选人。被标记为 `SUSPENDED` 的 BP 即使票数第一也不会进入 `top_producers`，备用节点因排名过滤自然递补。停权至少持续一个完整 epoch；期满后先作为备用节点完成一个观察 epoch，达到 99% 才恢复竞选资格。
+`update_elected_producers` 构造下一排班时排除 `SUSPENDED` 节点。即使其票数第一，也由下一名合格 Standby BP 递补。冷却期到期不会自动恢复资格；BP 必须使用自身权限调用 `resumeprod(producer)`，合约验证冷却期和注册状态后将其置为 `PROBATION`。若排名未变，它可在下一次确定性 schedule 更新后进入试运行，但不会因提交恢复交易而立即出块。
 
-紧急连续漏块不建议在首版自动改排班。Antelope 新排班需要提议、确认和激活，并非设置后立即生效；频繁变更反而可能造成共识风险。首版按 6 小时 epoch 结算和递补。后续若实测需要更快响应，可增加“连续漏掉完整生产轮次”的紧急停权，但仍必须经过同一确定性 intrinsic 和排班激活流程。
+启动期 Active BP 目标数量由 `flon::setbpquorum(active_bp_quorum)` 配置，参数必须处于 3–21。停权过滤后的合格集合允许缩小 schedule，不能因为新集合小于旧集合而保留已停权 BP。若相邻区块间隔超过单次链上统计安全上限，合约跳过该异常大区间并将受影响 epoch 视为不完整样本，避免 `onblock` 因无界补算耗尽 CPU；不完整样本不得触发个体处罚。
+
+试运行使用链上出块结果证明真实可用性，而不是网站、API 探测或操作者声明。`PROBATION` 节点连续漏掉 12 个确定性分配的 slot（一个完整生产轮次）时，`onblock` 通过同一 intrinsic 立即将其再次标记为 `SUSPENDED`；连续值保存在 `bpstatus.probation_missed_streak`，跨 epoch 不会重置。正常 schedule 更新最多约一分钟检查一次资格并提出替补排班。重复违规的冷却期为 1、2、4、8 个 epoch（6、12、24、48 小时），上限为 8 个 epoch。若在 epoch `N` 首次违规，最早在 `N+2` 调用恢复；后续对应最早为 `N+3`、`N+5`、`N+9`。
+
+epoch 级网络异常保护仍先于个体批量处罚执行。快速熔断只针对已经主动申请恢复的试运行节点，因此不会把普通候选人或未被排班的 Standby 误判为漏块。排班变更仍通过标准生产者 schedule 提议、确认和激活流程完成。
 
 #### 不修改链核心的保守版本
 
@@ -361,7 +365,7 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 - `setbpmeta` / `confirmmeta`。
 - `voteproducer`：改为平均分票并记录 epoch 快照。
 - `closeepoch`：结算出勤、排名、奖励和惩罚。
-- `suspendbp` / `resumebp`：仅允许确定性规则或 timelock 权限调用。
+- `resumeprod(producer)`：BP 冷却期结束后以自身权限申请恢复，进入链上试运行；停权由确定性统计自动执行。
 - `submitevid` / `challenge` / `execslash`。
 - `update_elected_producers`：过滤不合格候选人并记录 active/standby 状态。
 

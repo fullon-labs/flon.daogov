@@ -120,6 +120,12 @@
 
 普通下线采用奖励扣减、失去资格、冷却期和 Standby 自动递补；双签或冲突状态等可验证作恶才进入更严厉的 slash 流程。
 
+暂停恢复不是自动发生。冷却期到期后，BP 必须连接钱包并调用 `flon.system::resumeprod(producer)`，页面将状态从“已暂停”显示为“试运行”。若票数仍在 Active BP 范围内，节点在下一次 schedule 生效后开始试运行；成功出块并完成正常绩效结算后恢复普通状态。试运行期间连续漏掉 12 个应出 slot 会被立即再次暂停。重复暂停的冷却期依次为 6、12、24、48 小时。
+
+启动期 Active BP 目标值通过 `flon.system::setbpquorum(active_bp_quorum)` 在 3–21 范围内配置。治理中心从 `electconfig` 读取目标值，不得写死 21；试运行连续漏块数优先读取 `bpstatus.probation_missed_streak`，该数值跨 epoch 延续。
+
+节点详情页必须展示 `suspension_count`、`suspended_until_epoch`、预计可申请恢复时间、`probation_started_epoch` 和当前连续漏块数。冷却期未结束时禁用“申请恢复”；交易成功只表示进入试运行，不能显示为“已恢复出块”。
+
 ## 5. 节点投票
 
 ### 5.1 投票模型
@@ -166,6 +172,7 @@
 奖励页分开显示：
 
 - **BP 奖励**：仅 BP 调用 `flon.system::claimrewards` 提取已结算的生产者奖励。
+- **GAS 节点奖励**：默认取当期 GAS 对应 FLON 的 10%；Active/Standby 分别占奖励池 80%/20%，再按 21/30 目标席位归一化，由 BP 调用 `gas.reward::claimgas` 领取。
 - **投票人奖励**：由 BP 奖励分享在 epoch 结算后进入 `voter.reward`，用户调用 `voter.reward::claimrewards` 领取。
 - **待结算奖励**：只能作为估算，并标注尚未成为可领取余额。
 
