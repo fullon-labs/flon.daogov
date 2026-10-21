@@ -172,7 +172,7 @@
 奖励页分开显示：
 
 - **BP 奖励**：仅 BP 调用 `flon.system::claimrewards` 提取已结算的生产者奖励。
-- **GAS 节点奖励**：默认取当期 GAS 对应 FLON 的 10%；Active/Standby 分别占奖励池 80%/20%，再按 21/30 目标席位归一化，由 BP 调用 `gas.reward::claimgas` 领取。
+- **GAS 节点奖励**：默认取当期 GAS 对应 FLON 的 10%；Active/Standby 分别占奖励池 80%/20%，再按 21/30 目标席位归一化，由 BP 调用 `gas.reward::claimrewards` 领取。
 - **投票人奖励**：由 BP 奖励分享在 epoch 结算后进入 `voter.reward`，用户调用 `voter.reward::claimrewards` 领取。
 - **待结算奖励**：只能作为估算，并标注尚未成为可领取余额。
 
