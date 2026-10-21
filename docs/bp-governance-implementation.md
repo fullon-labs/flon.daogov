@@ -14,7 +14,7 @@ FLON 不需要重做一套独立的 PoS 共识。最稳妥的路径是在现有 
 - 普通离线不立即罚本金，先扣发奖励、停权、冷却；可验证的双签或签署冲突状态才罚没本金。
 - 节点竞选和 DAO 治理共用质押与快照基础设施，但使用不同投票动作、阈值和执行器。
 
-现有代码已经具备 BP 注册、锁仓投票、按票排名选出 21 个生产者、三天退出等待和投票人奖励账本的基础。主要缺口是候选人自质押、完整注册资料、备用池状态、可验证的出勤统计、惩罚状态机、奖励铸造/拨款闭环和 DAO 延时执行。
+现有代码已经具备 BP 注册、自质押门限与 21 天退出队列、锁仓投票、按票排名、Active/Standby 资格过滤、确定性出勤统计、恢复状态机和投票人奖励账本。仍需补齐完整注册资料、证据型罚没、DAO 白名单执行器与强制 timelock。
 
 ## 2. 公链机制借鉴
 
@@ -63,7 +63,7 @@ FLON 应借鉴：候选人最低自质押、委托容量与自质押挂钩、佣
 | --- | ---: |
 | 活跃 BP 数 | 21 |
 | 备用 BP 数 | 30 |
-| BP 最低自质押 | 流通量的 0.02%，另设绝对下限 |
+| BP 最低自质押 | 首期 `500,000 FLON`，由 `setbpstake` 治理调整 |
 | 用户最短投票锁定 | 7 天 |
 | BP 退出等待 | 21 天 |
 | 单账户最多投票 BP | 30 |
@@ -75,7 +75,7 @@ FLON 应借鉴：候选人最低自质押、委托容量与自质押挂钩、佣
 | 席位组成 | 15 个稳定 + 4 个竞争 + 2 个新秀 |
 | 新秀毕业期 | 180 天 |
 
-不要把候选门限写死为某个 FLON 数量；使用“绝对下限与流通量比例取大值”，否则币价和流通量变化会使门限失效。
+首期使用链上参数 `min_self_stake = 500,000 FLON`，不是编译期常量。DAO 应结合币价、流通量和候选数量定期评估；后续版本可升级为“绝对下限与流通量比例取大值”。
 
 ### 3.2 投票权重
 
@@ -359,10 +359,17 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 
 ### 8.1 `flon.system`
 
-新增或扩展：
+已实现：
 
-- `regproducer2`：加入自质押检查、佣金和 metadata 哈希。
-- `stakebp` / `unstakebp` / `claimbprefund`。
+- `regproducer` / `regproducer2` 共用内部 `check_min_bp_self_stake` 门限检查。
+- `setbpstake(enforce_schedule, min_self_stake, unstake_delay_sec)`：治理配置；默认建议 `500,000 FLON`、21 天。
+- `stakebp` / `unstakebp` / `claimbpstake`：自质押、延迟退出和到期主动申领。
+- `bpstakecfg` / `bpstakes` / `bpstkrefund`：配置、本金和待退款链上状态表。
+- `update_elected_producers` 与 Standby 快照在 `enforce_schedule=true` 时共同排除自质押不足者。
+
+仍需新增或扩展：
+
+- `regproducer2`：补充佣金和 metadata 哈希。
 - `setbpmeta` / `confirmmeta`。
 - `voteproducer`：改为平均分票并记录 epoch 快照。
 - `closeepoch`：结算出勤、排名、奖励和惩罚。
@@ -370,7 +377,9 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 - `submitevid` / `challenge` / `execslash`。
 - `update_elected_producers`：过滤不合格候选人并记录 active/standby 状态。
 
-表结构新增：`bpstakes`、`bpmetadata`、`bpstats`、`epochs`、`penalties`、`evidence`、`votesnaps`。
+待新增表：`bpmetadata`、`penalties`、`evidence`；绩效、Epoch、奖励快照及自质押表已由当前系统合约维护。
+
+部署时采用两阶段迁移：先执行 `setbpstake(false, "500000.0000 FLON", 1814400)`，立即约束新注册或重新注册的候选人，同时允许现有排班成员补足自质押；宽限期结束后再由治理执行 `setbpstake(true, ...)`，从下一次排班与 Standby 快照开始过滤不足者，避免一次升级导致活跃集合骤减。
 
 ### 8.2 `voter.reward`
 
