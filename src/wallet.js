@@ -97,15 +97,30 @@ export async function loadBPAccount(account){
   const supported=actions.some(item=>item.name==='regproducer')&&tables.some(item=>item.name==='producers');
   if(!supported)return {account:accountInfo.account_name,producer:null,supported:false};
   const recoverySupported=actions.some(item=>item.name==='resumeprod')&&tables.some(item=>item.name==='bpstatus');
+  const selfStakeSupported=actions.some(item=>item.name==='stakebp')&&
+    tables.some(item=>item.name==='bpstakecfg')&&tables.some(item=>item.name==='bpstakes');
   const requests=[
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'producers',lower_bound:account,upper_bound:account,limit:1}),
   ];
+  if(selfStakeSupported){
+    requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakecfg',limit:1}));
+    requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakes',lower_bound:account,upper_bound:account,limit:1}));
+  }
   if(recoverySupported){
     requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstatus',lower_bound:account,upper_bound:account,limit:1}));
     requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}));
     requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}));
   }
-  const [producerRows,statusRows,epochRows,globalRows]=await Promise.all(requests);
+  const results=await Promise.all(requests);
+  const producerRows=results[0];
+  let cursor=1,selfStakeConfig=null,selfStake=null;
+  if(selfStakeSupported){
+    selfStakeConfig=results[cursor++]?.rows?.[0]||null;
+    selfStake=results[cursor++]?.rows?.find(row=>row.owner===account)||null;
+  }
+  const statusRows=recoverySupported?results[cursor++]:null;
+  const epochRows=recoverySupported?results[cursor++]:null;
+  const globalRows=recoverySupported?results[cursor++]:null;
   const producer=producerRows.rows?.find(row=>row.owner===account)||null;
   const performance=statusRows?.rows?.find(row=>row.producer===account)||null;
   const fallbackEpoch=Number(epochRows?.rows?.[0]?.next_epoch_to_close||0);
@@ -119,7 +134,7 @@ export async function loadBPAccount(account){
     const statsRows=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:String(calculatedEpoch),table:'bpstats',lower_bound:account,upper_bound:account,limit:1});
     currentStats=statsRows.rows?.find(row=>row.producer===account)||null;
   }
-  return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,supported:true};
+  return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,selfStakeSupported,selfStakeConfig,selfStake,supported:true};
 }
 export async function loadVotingAccount(account){
   const [balances,voterRows,pendingRows,rewardRows,epochRows]=await Promise.all([
