@@ -175,6 +175,7 @@ GAS 节点奖励和投票人分享奖励是两条独立账路：
 2. `gas.reward` 记录各 BP 的累计已分配、已领取和待领取余额。
 3. Active 和 Standby BP 调用 `gas.reward::claimgas` 领取，错过 Epoch 不会丢失。
 4. 原有生产者奖励可按 BP 注册的分享比例进入 `voter.reward`；GAS 节点奖励默认不自动产生投票人权益。
+5. 所有面向最终受益人的 FLON 奖励统一采用主动领取：Epoch 结算只入账，不向 BP、Standby BP 或投票人自动空投。`gas.reward::claimgas`、`flon.system::claimrewards` 和 `voter.reward::claimrewards` 均须由对应受益账户授权；不支持第三方代领，未领取余额持续累计且不因跨 Epoch 失效。
 5. 如果未来要把 GAS 奖励分享给投票人，必须另行定义不可变的 Epoch 历史票权快照。
 
 ## 5. 出勤与作弊惩罚
@@ -379,7 +380,7 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 - BP 佣金结算。
 - 不合格 BP 的奖励屏蔽。
 - 精度、乘法溢出、舍入余数和零票场景测试。
-- `claimvote` 与第三方代领的权限/接收地址约束。
+- `claimrewards` 仅允许受益投票人本人授权；旧 `claimfor` 接口必须限制为 `claimer == voter`，不得用于第三方代领。
 
 ### 8.3 链核心与历史索引
 

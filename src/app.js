@@ -202,7 +202,7 @@ async function submitVote(target){
 async function confirmClaimRewards(){
   if(!walletSession){openWalletSheet();return}
   try{await refreshVotingAccount()}catch(error){showToast(`读取奖励失败：${String(error?.message||error)}`);return}
-  openSheet(`<h2 id="sheet-title">领取投票奖励</h2><p class="sheet-subtitle">未领取奖励会持续累积，不会因错过 Epoch 丢失</p><div class="sign-summary"><div><span>链上已结算</span><strong>${escapeHtml(votingState?.unclaimedRewards||'0.00000000 FLON')}</strong></div><div><span>合约</span><strong>voter.reward</strong></div><div><span>Action</span><strong>claimrewards</strong></div><div><span>领取账户</span><strong>${escapeHtml(walletSession.account)}</strong></div></div><p class="sign-warning">最终到账金额以交易执行时合约结算结果为准。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">稍后</button><button class="primary-button" data-action="claim-sign">确认签名</button></div>`);
+  openSheet(`<h2 id="sheet-title">领取投票奖励</h2><p class="sheet-subtitle">奖励不会自动空投；未领取余额持续累积，不会因错过 Epoch 丢失</p><div class="sign-summary"><div><span>链上已结算</span><strong>${escapeHtml(votingState?.unclaimedRewards||'0.00000000 FLON')}</strong></div><div><span>合约</span><strong>voter.reward</strong></div><div><span>Action</span><strong>claimrewards</strong></div><div><span>领取账户</span><strong>${escapeHtml(walletSession.account)}</strong></div></div><p class="sign-warning">领取必须由当前受益账户本人签名，第三方不能代领。最终到账金额以交易执行结果为准。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">稍后</button><button class="primary-button" data-action="claim-sign">确认签名</button></div>`);
 }
 async function submitClaimRewards(target){
   if(!walletSession)return;target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
