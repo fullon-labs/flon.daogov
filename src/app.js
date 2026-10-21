@@ -33,7 +33,7 @@ const translations=new Map([
   ['正式投票','Formal vote'],['剩余','Remaining'],['小时','hours'],['你有','You have'],['票权','voting power'],['去投票','Vote now'],['投票奖励已结算','Voter rewards settled'],['领取','Claim'],['个所投节点进入','voted node entered'],['建议检查节点状态与待生效排名','Review node status and pending ranking'],['查看','View'],
   ['网络概况','Network overview'],['节点排名','Node ranking'],['目标','Target'],['网络出块率','Block production'],['近 24 小时','Last 24 hours'],['总投票本金','Total voting stake'],['活跃投票人','Active voters'],['近 7 天','Last 7 days'],
   ['社区治理','Community governance'],['查看全部','View all'],['投票中','Voting'],['将 Active BP 席位从 3 个扩展至 7 个','Expand Active BP seats from 3 to 7'],['根据候选节点稳定性和网络负载，分阶段扩大出块节点集合。','Expand the producer set in phases based on node stability and network load.'],['赞成','For'],
-  ['网络节点','Network nodes'],['BP 竞选','BP Election'],['申请竞选','Apply'],['候选节点','Candidates'],['全部候选','All candidates'],['搜索账户、名称或地区','Search account, name, or region'],['新加坡','Singapore'],['东京','Tokyo'],['法兰克福','Frankfurt'],['香港','Hong Kong'],['首尔','Seoul'],['在线','uptime'],['分享','share'],['有效票权','effective votes'],['差','gap'],
+  ['网络节点','Network nodes'],['BP 与投票','BPs & Voting'],['BP 排名','BP Rankings'],['BP 竞选','BP Election'],['申请竞选','Apply'],['候选节点','Candidates'],['全部候选','All candidates'],['搜索账户、名称或地区','Search account, name, or region'],['新加坡','Singapore'],['东京','Tokyo'],['法兰克福','Frankfurt'],['香港','Hong Kong'],['首尔','Seoul'],['在线','uptime'],['分享','share'],['有效票权','effective votes'],['差','gap'],
   ['节点投票','Node voting'],['分配治理票权','Allocate governance power'],['总票权在所选 BP 之间平均分配，不会复制放大','Total voting power is divided equally across selected BPs and is never duplicated'],['可分配票权','Allocatable power'],['来自','Backed by'],['投票本金','voting stake'],['已选择','Selected'],['每个 BP','Per BP'],['修改将在','Changes take effect in'],['生效',''],['本 Epoch 奖励仍按当前 6 个节点计算','This epoch reward still uses the current 6-node allocation'],['选择 BP','Select BPs'],['清空','Clear'],['调整本金','Adjust stake'],['确认分配','Confirm allocation'],
   ['社区决策','Community decisions'],['DAO 治理','DAO Governance'],['发起提案','Create proposal'],['附议中','Endorsement'],['待执行','Ready to execute'],['建立生态开发者季度资助计划','Create a quarterly ecosystem developer grants program'],['资金提案','Treasury proposal'],['提案人','Proposer'],['人附议','endorsers'],['可附议','Endorse'],['后可执行','until executable'],['启用六小时奖励 Epoch 与历史票权结算','Enable six-hour reward epochs and historical voting-power settlement'],['合约参数','Contract parameters'],['已通过 · 安全等待期','Passed · security delay'],['执行目标','Execution target'],['查看执行内容','View execution'],
   ['我的治理','My Governance'],['累计奖励','Lifetime rewards'],['领取奖励','Claim rewards'],['我的节点投票','My BP votes'],['竞选管理','Election management'],['未注册','Not registered'],['我的治理任务','My governance tasks'],['等待你投票','awaits your vote'],['快照票权','snapshot power'],['处理','Act'],['节点分配已在','Node allocation became effective in'],['投票奖励完成结算','Voter rewards settled'],['治理记录','Governance history'],['打开完整链上治理记录','Open full on-chain governance history'],['附议','Endorsed'],['交易不可逆','Transaction is irreversible'],['调整 BP 投票分配','Updated BP vote allocation'],['昨天','Yesterday'],
@@ -77,6 +77,10 @@ function showView(name){
   nav.forEach(button=>button.classList.toggle('is-active',button.dataset.viewTarget===name));
   window.scrollTo({top:0,behavior:'smooth'});
   if(name==='mine')refreshBPRecovery();
+}
+function setNodeMode(mode='directory'){
+  document.querySelectorAll('[data-node-mode]').forEach(button=>button.classList.toggle('is-active',button.dataset.nodeMode===mode));
+  document.querySelectorAll('[data-node-mode-panel]').forEach(panel=>panel.hidden=panel.dataset.nodeModePanel!==mode);
 }
 function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
 function openSheet(html){sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden'}
@@ -219,7 +223,8 @@ async function submitClaimRewards(target){
 
 document.addEventListener('click',async event=>{
   const target=event.target.closest('button,[data-action]');if(!target)return;
-  if(target.dataset.viewTarget)showView(target.dataset.viewTarget);
+  if(target.dataset.viewTarget){showView(target.dataset.viewTarget);if(target.dataset.viewTarget==='nodes')setNodeMode(target.dataset.nodeModeTarget||'directory')}
+  if(target.dataset.nodeMode)setNodeMode(target.dataset.nodeMode);
   const action=target.dataset.action;
   if(action==='toast')showToast(target.dataset.message||'操作已完成');
   if(action==='close-sheet')closeSheet();

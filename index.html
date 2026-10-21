@@ -88,26 +88,26 @@
 
       <section class="view" data-view="nodes" hidden>
         <div class="content">
-          <div class="page-heading"><span><small>网络节点</small><h1>BP 竞选</h1></span><button class="outline-button" type="button" data-action="candidate">申请竞选</button></div>
-          <div class="rank-summary"><div><small>当前席位</small><strong class="din">— / —</strong></div><div><small>Standby</small><strong class="din" data-rank-standby>—</strong></div><div><small>候选节点</small><strong class="din" data-rank-candidates>—</strong></div></div>
-          <div class="tabs" role="tablist"><button class="is-active" data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-filter="all">全部候选</button></div>
-          <label class="search"><svg><use href="#i-search"/></svg><input type="search" placeholder="搜索账户、名称或地区" data-node-search></label>
-          <div class="node-list"><div class="loading-state"><i></i><span>正在读取链上 BP 排名…</span></div></div>
-        </div>
-      </section>
-
-      <section class="view" data-view="vote" hidden>
-        <div class="content vote-content">
-          <div class="page-heading"><span><small>节点投票</small><h1>分配治理票权</h1></span><button class="help-button" type="button" data-action="toast" data-message="总票权在所选 BP 之间平均分配，不会复制放大"><svg><use href="#i-info"/></svg></button></div>
-          <section class="vote-balance">
-            <div><small>可分配票权</small><strong class="din" data-vote-glon>— <em>GLON</em></strong></div>
-            <span data-vote-source>连接钱包后读取链上 GLON</span>
-            <div class="allocation"><span><small>已选择</small><strong class="din" data-selected-count>0 / 30</strong></span><span><small>每个 BP</small><strong class="din" data-per-node>0.00000000</strong></span></div>
-          </section>
-          <div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>投票分配在下一 Epoch 生效</strong><small>待生效状态以 flon::pendingvote 链上记录为准</small></span></div>
-          <div class="section-title"><h2>选择 BP</h2><button type="button" data-action="clear-selection">清空</button></div>
-          <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
-          <div class="sticky-action"><button class="secondary-button" type="button" data-action="stake">调整本金</button><button class="primary-button" type="button" data-action="sign-vote">确认分配</button></div>
+          <div class="page-heading"><span><small>网络节点</small><h1>BP 与投票</h1></span><button class="outline-button" type="button" data-action="candidate">申请竞选</button></div>
+          <div class="node-mode-tabs" role="tablist" aria-label="BP 与投票"><button class="is-active" type="button" data-node-mode="directory">BP 排名</button><button type="button" data-node-mode="vote">节点投票</button></div>
+          <div data-node-mode-panel="directory">
+            <div class="rank-summary"><div><small>当前席位</small><strong class="din">— / —</strong></div><div><small>Standby</small><strong class="din" data-rank-standby>—</strong></div><div><small>候选节点</small><strong class="din" data-rank-candidates>—</strong></div></div>
+            <div class="tabs" role="tablist"><button class="is-active" data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-filter="all">全部候选</button></div>
+            <label class="search"><svg><use href="#i-search"/></svg><input type="search" placeholder="搜索账户、名称或地区" data-node-search></label>
+            <div class="node-list"><div class="loading-state"><i></i><span>正在读取链上 BP 排名…</span></div></div>
+          </div>
+          <div class="vote-content" data-node-mode-panel="vote" hidden>
+            <div class="vote-section-heading"><span><small>节点投票</small><h2>分配治理票权</h2></span><button class="help-button" type="button" data-action="toast" data-message="总票权在所选 BP 之间平均分配，不会复制放大"><svg><use href="#i-info"/></svg></button></div>
+            <section class="vote-balance">
+              <div><small>可分配票权</small><strong class="din" data-vote-glon>— <em>GLON</em></strong></div>
+              <span data-vote-source>连接钱包后读取链上 GLON</span>
+              <div class="allocation"><span><small>已选择</small><strong class="din" data-selected-count>0 / 30</strong></span><span><small>每个 BP</small><strong class="din" data-per-node>0.00000000</strong></span></div>
+            </section>
+            <div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>投票分配在下一 Epoch 生效</strong><small>待生效状态以 flon::pendingvote 链上记录为准</small></span></div>
+            <div class="section-title"><h2>选择 BP</h2><button type="button" data-action="clear-selection">清空</button></div>
+            <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
+            <div class="sticky-action"><button class="secondary-button" type="button" data-action="stake">调整本金</button><button class="primary-button" type="button" data-action="sign-vote">确认分配</button></div>
+          </div>
         </div>
       </section>
 
@@ -127,15 +127,14 @@
           <section class="section bp-recovery-card" data-bp-recovery>
             <div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>连接 BP 账户钱包后读取链上状态</small></div>
           </section>
-          <div class="action-grid"><button type="button" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><strong>领取奖励</strong><small data-profile-claimable>连接钱包后读取</small></button><button type="button" data-view-target="vote"><span class="task-icon blue"><svg><use href="#i-vote"/></svg></span><strong>我的节点投票</strong><small data-profile-votes>— 个 BP</small></button><button type="button" data-action="candidate"><span class="task-icon purple"><svg><use href="#i-node"/></svg></span><strong>竞选管理</strong><small>读取链上状态</small></button></div>
+          <div class="action-grid"><button type="button" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><strong>领取奖励</strong><small data-profile-claimable>连接钱包后读取</small></button><button type="button" data-view-target="nodes" data-node-mode-target="vote"><span class="task-icon blue"><svg><use href="#i-vote"/></svg></span><strong>我的节点投票</strong><small data-profile-votes>— 个 BP</small></button><button type="button" data-action="candidate"><span class="task-icon purple"><svg><use href="#i-node"/></svg></span><strong>竞选管理</strong><small>读取链上状态</small></button></div>
         </div>
       </section>
     </main>
 
     <nav class="bottom-nav canvas-fixed" aria-label="治理中心导航">
       <button class="is-active" data-view-target="overview"><svg><use href="#i-home"/></svg><span>概览</span></button>
-      <button data-view-target="nodes"><svg><use href="#i-node"/></svg><span>BP</span></button>
-      <button data-view-target="vote"><svg><use href="#i-vote"/></svg><span>投票</span></button>
+      <button data-view-target="nodes"><svg><use href="#i-node"/></svg><span>BP 与投票</span></button>
       <button data-view-target="dao"><svg><use href="#i-dao"/></svg><span>治理</span><i class="nav-dot"></i></button>
       <button data-view-target="mine"><svg><use href="#i-user"/></svg><span>我的</span></button>
     </nav>
