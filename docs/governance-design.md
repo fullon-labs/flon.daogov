@@ -171,8 +171,8 @@
 
 奖励页分开显示：
 
-- **BP 奖励**：每个 BP 按 Epoch 独立结算。BP 调用 `flon.system::claimrewards(producer, max_epochs)` 时可先结算自身有界数量的未结算 Epoch，再提取累计生产者奖励；任意账户也可调用 `settleprod` 帮助记账，但不能代领。
-- **GAS 节点奖励**：默认取当期 GAS 对应 FLON 的 10%；Active/Standby 分别占奖励池 80%/20%，再按 21/30 目标席位归一化。Epoch 边界只封账，不做全局 batch；BP 调用 `gas.reward::claimrewards` 独立结算并领取。
+- **基础出块奖励**：仅 quorum Active BP（最终最多 21 个，启动期为当前 quorum）调用 `flon.system::claimrewards(producer, max_epochs)`；Standby BP 不出块，不能领取这类奖励。
+- **GAS 节点奖励**：默认取当期 GAS 对应 FLON 的 10%；Active/Standby 分别占奖励池 80%/20%。完整 Active 池由全部 quorum Active BP 按实际出块数占比分配，不按 21 席缩减；Standby 池仍按 30 个目标席位归一化。quorum Active BP 与合格 Standby BP 都通过 `gas.reward::claimrewards` 领取，最多覆盖 21+30 个节点。
 - **投票人奖励**：某 BP 独立结算时，其生产者奖励分享份额进入 `voter.reward`，用户再调用 `voter.reward::claimrewards` 领取。BP 不主动领取时，任何人仍可通过 `settleprod` 解锁该 BP 投票人的记账流程。
 - **待结算奖励**：只能作为估算，并标注尚未成为可领取余额。
 
