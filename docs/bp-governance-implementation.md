@@ -154,18 +154,21 @@ epoch_reward_cap = floor(epoch_gas_flon × 10%)
 
 | 接收方 | 占 10% 奖励池 | 占当期 GAS 对应 FLON | 计算基础 |
 | --- | ---: | ---: | --- |
-| Active BP | 80% | 上限 8% | 按 21 个目标席位归一化；内部 40% 等额基础服务、60% 按出块绩效 |
+| Active BP | 80% | 8% | 全部 quorum Active BP 分享完整 Active 池；池内 100% 按实际出块数占比分配 |
 | Standby BP | 20% | 上限 2% | 按 30 个目标席位归一化；满足在线证明门限者等额分配 |
 | 留在 `flon.gas` | — | 90% 加未释放额度 | 默认锁定，等待 DAO 决定合规用途 |
 
-早期只有少量 Active BP 时不能瓜分完整 8%。结算上限为：
+Active 池不按最终 21 席缩减；即使启动期 quorum 只有 3 个，只要本期存在实际出块，完整 8% Active 池仍由这 3 个排班 BP 按实际出块比例分享。Standby 池继续按 30 个目标席位归一化：
 
 ```text
-active_cap  = reward_cap × 80% × eligible_active_count / 21
+active_cap  = reward_cap × 80%
 standby_cap = reward_cap × 20% × eligible_standby_count / 30
+
+active_reward_i
+  = active_cap × produced_blocks_i / total_active_produced_blocks
 ```
 
-未释放额度和整数舍入余额继续留在 `flon.gas`，不能补发给其他 BP 或成为后续意外收益。3 个合格 Active BP 加 30 个合格 Standby BP 时，最多释放当期 GAS 对应 FLON 的 `8% × 3/21 + 2% = 3.142857%`。
+如果所有 Active BP 的 `produced_blocks` 总和为零，Active 池不释放并继续留在 `flon.gas`。Standby 空缺形成的未释放额度也继续留在 `flon.gas`。整数余数由确定性顺序中的最后一个正权重 Active BP 吸收。3 个 quorum Active BP 加 30 个合格 Standby BP 时，正常情况下释放完整的 GAS 价值 10%，其中 8% 由 3 个 Active BP 按实际出块比例分享，2% 由 Standby BP 分享。
 
 ### 4.3 FLON 结算闭环
 
@@ -173,7 +176,7 @@ GAS 节点奖励和投票人分享奖励是两条独立账路：
 
 1. `flon.system` 在 Epoch 边界冻结 GAS 收入、节点集合、资格统计、奖励参数和计算分母；`onblock` 不遍历节点、不执行用户转账。
 2. 每个 Active/Standby BP 按 `(epoch_id, producer)` 独立结算。`settleprod` 为 permissionless，任何人都可替指定 BP 完成记账，但不能领取该 BP 的资金。
-3. `gas.reward` 记录各 BP 的累计已分配、已领取和待领取余额。Active 和 Standby BP 调用 `gas.reward::claimrewards(owner, max_epochs)` 时，可先用同一内部逻辑结算自身有界数量的未结算 Epoch，再一次性领取；错过 Epoch 不会丢失。
+3. `gas.reward` 记录各节点的累计已分配、已领取和待领取余额。quorum Active BP 与合格 Standby BP 分别调用 `gas.reward::claimrewards(owner)` 领取自己的 GAS 节点奖励；错过 Epoch 不会丢失。基础出块奖励则仅由 Active BP 调用 `flon.system::claimrewards` 领取。
 4. 原有生产者奖励可按 BP 注册的分享比例进入 `voter.reward`；GAS 节点奖励默认不自动产生投票人权益。
 5. 所有面向最终受益人的 FLON 奖励统一采用主动领取：独立结算只入账，不向 BP、Standby BP 或投票人自动空投。`gas.reward::claimrewards`、`flon.system::claimrewards` 和 `voter.reward::claimrewards` 均须由对应受益账户授权；第三方只能调用 `settleprod` 帮助记账，不能代领，未领取余额持续累计且不因跨 Epoch 失效。
 6. 不再设置全局 `settlenext` cursor，也不要求 `finalizeepoch` 完成后其他 BP 才能领取。某个 BP 不操作，不会阻塞其他 BP 或下一 Epoch；全部 BP 都已结算时可自动记录 `FULLY_SETTLED` 审计状态，但它不是业务闸门。
@@ -184,22 +187,24 @@ GAS 节点奖励和投票人分享奖励是两条独立账路：
 ```mermaid
 flowchart TD
     blockReward["基础出块奖励 / 挖矿奖励"] --> producerReward["flon.system 生产者奖励账本"]
-    producerReward -->|"BP 自留比例"| bpClaim["BP claimrewards"]
+    producerReward -->|"BP 自留比例"| bpClaim["仅 Active BP: flon.system::claimrewards"]
     producerReward -->|"reward_shared_ratio"| voterPool["voter.reward 投票人分享池"]
     voterPool -->|"历史 Epoch 票权"| voterClaim["投票人 claimrewards"]
 
     gasValue["Epoch 实际 GAS 消耗对应的 FLON"] --> gasVault["flon.gas"]
     gasVault -->|"默认 90% 加未释放额度"| lockedGas["协议锁定 FLON"]
     gasVault -->|"上限 10%"| gasNodePool["GAS 节点奖励池"]
-    gasNodePool -->|"80%，并按 21 席归一化"| activeGas["Active BP 奖励"]
+    gasNodePool -->|"80%，全部 quorum BP 按出块比例"| activeGas["Active BP 奖励"]
     gasNodePool -->|"20%，并按 30 席归一化"| standbyGas["Standby BP 奖励"]
-    activeGas -->|"40% 基础服务"| gasLedger["gas.reward 待领取账本"]
-    activeGas -->|"60% 出块绩效"| gasLedger
+    activeGas -->|"池内 100% 按出块绩效"| gasLedger["gas.reward 待领取账本"]
     standbyGas -->|"合格节点等额"| gasLedger
-    gasLedger -->|"BP 本人 claimrewards"| bpGasClaim["BP 获得 FLON"]
+    gasLedger -->|"Active BP: gas.reward::claimrewards"| activeGasClaim["Active BP 获得 GAS 奖励 FLON"]
+    gasLedger -->|"合格 Standby BP: gas.reward::claimrewards"| standbyGasClaim["Standby BP 获得 GAS 奖励 FLON"]
 ```
 
-图中的两类奖励互相独立：基础出块奖励可以按 BP 公布的分享比例进入 `voter.reward`；GAS 节点奖励默认全部归对应 Active/Standby BP，不自动产生投票人权益。所有池只生成待领取账目，不主动空投。
+图中的两类奖励互相独立：基础出块奖励只属于 quorum Active BP，并可按其公布的分享比例进入 `voter.reward`；Standby BP 不能调用 `flon.system::claimrewards`。GAS 节点奖励则覆盖 quorum Active BP 与合格 Standby BP，二者分别调用 `gas.reward::claimrewards`。所有池只生成待领取账目，不主动空投。
+
+`setgasrwcfg(enabled, epoch_slots, active_min_bp, standby_min_proofs, pool_bp, active_share_bp)` 不再提供 `active_base_bp`。治理可以调整总体 GAS 奖励上限和 Active/Standby 比例，但不能把 Active 池切回等额基础服务分配；Active 池固定 100% 按出块绩效计算。
 
 ## 5. 出勤与作弊惩罚
 
@@ -217,8 +222,8 @@ availability = produced_blocks / expected_blocks
 | --- | --- |
 | `>= 99%` | 100% 绩效奖励 |
 | `95%–99%` | 绩效奖按线性系数折减 |
-| `90%–95%` | BP 与投票人当期奖励为零，记 1 次警告 |
-| `< 90%` | 零奖励、停权、备用递补，冷却期后必须主动申请恢复 |
+| `90%–95%` | 基础出块奖励及投票人分享为零，记 1 次警告；GAS Active 奖励仍只按实际出块数占比计算 |
+| `< 90%` | 基础出块奖励及投票人分享为零、停权、备用递补，冷却期后必须主动申请恢复；已完成区块对应的 GAS Active 占比不追溯取消 |
 | 重复停权 | 冷却期依次为 1、2、4、8 个 epoch，最高 48 小时 |
 | 试运行连续漏掉 12 个应出 slot | 立即再次停权，下一备用 BP 递补 |
 
@@ -430,7 +435,8 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 - `voteproducer`：改为平均分票并记录 epoch 快照。
 - `sealepoch`：常数时间封存出勤、排名、奖励参数和惩罚判定输入。
 - `settleprod(producer, max_epochs)`：任何人可按顺序为指定 BP 推进有界数量的历史 Epoch 独立结算，但不能代领。
-- `claimrewards(producer, max_epochs)`：BP 本人授权，结算有界数量的自身历史 Epoch 并领取累计奖励。
+- `flon.system::claimrewards(producer, max_epochs)`：仅 quorum Active BP 本人授权，结算并领取基础出块奖励；Standby BP 无权调用。
+- `gas.reward::claimrewards(owner)`：quorum Active BP 与合格 Standby BP 分别领取自己的 GAS 节点奖励。
 - `resumeprod(producer)`：BP 冷却期结束后以自身权限申请恢复，进入链上试运行；停权由确定性统计自动执行。
 - `submitevid` / `challenge` / `execslash`。
 - `update_elected_producers`：过滤不合格候选人并记录 active/standby 状态。
