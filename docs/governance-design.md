@@ -171,12 +171,12 @@
 
 奖励页分开显示：
 
-- **BP 奖励**：仅 BP 调用 `flon.system::claimrewards` 提取已结算的生产者奖励。
-- **GAS 节点奖励**：默认取当期 GAS 对应 FLON 的 10%；Active/Standby 分别占奖励池 80%/20%，再按 21/30 目标席位归一化，由 BP 调用 `gas.reward::claimrewards` 领取。
-- **投票人奖励**：由 BP 奖励分享在 epoch 结算后进入 `voter.reward`，用户调用 `voter.reward::claimrewards` 领取。
+- **BP 奖励**：每个 BP 按 Epoch 独立结算。BP 调用 `flon.system::claimrewards(producer, max_epochs)` 时可先结算自身有界数量的未结算 Epoch，再提取累计生产者奖励；任意账户也可调用 `settleprod` 帮助记账，但不能代领。
+- **GAS 节点奖励**：默认取当期 GAS 对应 FLON 的 10%；Active/Standby 分别占奖励池 80%/20%，再按 21/30 目标席位归一化。Epoch 边界只封账，不做全局 batch；BP 调用 `gas.reward::claimrewards` 独立结算并领取。
+- **投票人奖励**：某 BP 独立结算时，其生产者奖励分享份额进入 `voter.reward`，用户再调用 `voter.reward::claimrewards` 领取。BP 不主动领取时，任何人仍可通过 `settleprod` 解锁该 BP 投票人的记账流程。
 - **待结算奖励**：只能作为估算，并标注尚未成为可领取余额。
 
-所有 FLON 奖励都采用 Pull Claim。Epoch 结算只能把金额记入相应合约的待领取账本，不得直接向用户或 BP 空投。领取交易必须由受益账户本人通过钱包授权；第三方不能代领或代为触发转账。错过 Epoch 不会丢失奖励，未领取余额继续累计。
+所有 FLON 奖励都采用 Pull Claim。Epoch 到期只执行 `O(1)` 封账，各 BP 随后独立结算；不需要全局 `settlenext`，也不以 `finalizeepoch` 作为领取或下一个 Epoch 的前置条件。独立结算只能把金额记入相应合约的待领取账本，不得直接向用户或 BP 空投。领取交易必须由受益账户本人通过钱包授权；第三方不能代领或代为触发转账。错过 Epoch 不会丢失奖励，未领取余额继续累计。
 
 每条明细包含 epoch、历史有效票权、所选 BP、各 BP 分享金额、总额、结算交易和领取交易。不能用当前票权倒推历史奖励。
 

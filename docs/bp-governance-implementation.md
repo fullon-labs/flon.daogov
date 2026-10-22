@@ -139,7 +139,7 @@ ranking_score = ranking_bp_weight × performance_factor
 
 ### 4.1 奖励上限
 
-节点 GAS 奖励不生成 ELON，也不建立 ELON 兑付负债。`onblock` 读取累计 GAS 费用对应的 FLON 价值，只记录相邻区块差额；完成 Epoch 后再分批结算。
+节点 GAS 奖励不生成 ELON，也不建立 ELON 兑付负债。`onblock` 读取累计 GAS 费用对应的 FLON 价值，只记录相邻区块差额，并在 Epoch 边界执行常数时间封账；之后按 BP 独立惰性结算，不执行全局 batch settle。
 
 ```text
 epoch_gas_flon = cumulative_gas_value_flon(end) - cumulative_gas_value_flon(start)
@@ -171,12 +171,35 @@ standby_cap = reward_cap × 20% × eligible_standby_count / 30
 
 GAS 节点奖励和投票人分享奖励是两条独立账路：
 
-1. `flon.system` 从 `flon.gas` 只转出归一化后实际释放的 FLON到 `gas.reward`。
-2. `gas.reward` 记录各 BP 的累计已分配、已领取和待领取余额。
-3. Active 和 Standby BP 调用 `gas.reward::claimrewards` 领取，错过 Epoch 不会丢失。
+1. `flon.system` 在 Epoch 边界冻结 GAS 收入、节点集合、资格统计、奖励参数和计算分母；`onblock` 不遍历节点、不执行用户转账。
+2. 每个 Active/Standby BP 按 `(epoch_id, producer)` 独立结算。`settleprod` 为 permissionless，任何人都可替指定 BP 完成记账，但不能领取该 BP 的资金。
+3. `gas.reward` 记录各 BP 的累计已分配、已领取和待领取余额。Active 和 Standby BP 调用 `gas.reward::claimrewards(owner, max_epochs)` 时，可先用同一内部逻辑结算自身有界数量的未结算 Epoch，再一次性领取；错过 Epoch 不会丢失。
 4. 原有生产者奖励可按 BP 注册的分享比例进入 `voter.reward`；GAS 节点奖励默认不自动产生投票人权益。
-5. 所有面向最终受益人的 FLON 奖励统一采用主动领取：Epoch 结算只入账，不向 BP、Standby BP 或投票人自动空投。`gas.reward::claimrewards`、`flon.system::claimrewards` 和 `voter.reward::claimrewards` 均须由对应受益账户授权；不支持第三方代领，未领取余额持续累计且不因跨 Epoch 失效。
-5. 如果未来要把 GAS 奖励分享给投票人，必须另行定义不可变的 Epoch 历史票权快照。
+5. 所有面向最终受益人的 FLON 奖励统一采用主动领取：独立结算只入账，不向 BP、Standby BP 或投票人自动空投。`gas.reward::claimrewards`、`flon.system::claimrewards` 和 `voter.reward::claimrewards` 均须由对应受益账户授权；第三方只能调用 `settleprod` 帮助记账，不能代领，未领取余额持续累计且不因跨 Epoch 失效。
+6. 不再设置全局 `settlenext` cursor，也不要求 `finalizeepoch` 完成后其他 BP 才能领取。某个 BP 不操作，不会阻塞其他 BP 或下一 Epoch；全部 BP 都已结算时可自动记录 `FULLY_SETTLED` 审计状态，但它不是业务闸门。
+7. 如果未来要把 GAS 奖励分享给投票人，必须另行定义不可变的 Epoch 历史票权快照。
+
+### 4.4 总体奖励结构图
+
+```mermaid
+flowchart TD
+    blockReward["基础出块奖励 / 挖矿奖励"] --> producerReward["flon.system 生产者奖励账本"]
+    producerReward -->|"BP 自留比例"| bpClaim["BP claimrewards"]
+    producerReward -->|"reward_shared_ratio"| voterPool["voter.reward 投票人分享池"]
+    voterPool -->|"历史 Epoch 票权"| voterClaim["投票人 claimrewards"]
+
+    gasValue["Epoch 实际 GAS 消耗对应的 FLON"] --> gasVault["flon.gas"]
+    gasVault -->|"默认 90% 加未释放额度"| lockedGas["协议锁定 FLON"]
+    gasVault -->|"上限 10%"| gasNodePool["GAS 节点奖励池"]
+    gasNodePool -->|"80%，并按 21 席归一化"| activeGas["Active BP 奖励"]
+    gasNodePool -->|"20%，并按 30 席归一化"| standbyGas["Standby BP 奖励"]
+    activeGas -->|"40% 基础服务"| gasLedger["gas.reward 待领取账本"]
+    activeGas -->|"60% 出块绩效"| gasLedger
+    standbyGas -->|"合格节点等额"| gasLedger
+    gasLedger -->|"BP 本人 claimrewards"| bpGasClaim["BP 获得 FLON"]
+```
+
+图中的两类奖励互相独立：基础出块奖励可以按 BP 公布的分享比例进入 `voter.reward`；GAS 节点奖励默认全部归对应 Active/Standby BP，不自动产生投票人权益。所有池只生成待领取账目，不主动空投。
 
 ## 5. 出勤与作弊惩罚
 
@@ -237,7 +260,7 @@ get_producer_slot_stats(from_slot, to_slot)
 2. 对上一个已处理 slot 到当前 slot 的区间调用统计 intrinsic；中间没有区块的 slot 计为对应计划 BP 的 missed。
 3. 更新 `bpstats`：`expected_blocks`、`produced_blocks`、`missed_blocks`、`consecutive_missed`。
 4. 只累计数据，不在每个区块里遍历全部 BP 或立即罚没。
-5. 到 epoch 边界由系统内联动作 `closeepoch(epoch_id)` 结算，写入不可变的 `epochstats`。
+5. 到 epoch 边界由系统内联动作 `sealepoch(epoch_id)` 以 `O(1)` 冻结不可变的 `epochstats`、奖励参数和计算分母，不遍历 BP 或转账；随后按 BP 独立结算。
 
 建议表结构：
 
@@ -276,6 +299,39 @@ else:
 试运行使用链上出块结果证明真实可用性，而不是网站、API 探测或操作者声明。`PROBATION` 节点连续漏掉 12 个确定性分配的 slot（一个完整生产轮次）时，`onblock` 通过同一 intrinsic 立即将其再次标记为 `SUSPENDED`；连续值保存在 `bpstatus.probation_missed_streak`，跨 epoch 不会重置。正常 schedule 更新最多约一分钟检查一次资格并提出替补排班。重复违规的冷却期为 1、2、4、8 个 epoch（6、12、24、48 小时），上限为 8 个 epoch。若在 epoch `N` 首次违规，最早在 `N+2` 调用恢复；后续对应最早为 `N+3`、`N+5`、`N+9`。
 
 epoch 级网络异常保护仍先于个体批量处罚执行。快速熔断只针对已经主动申请恢复的试运行节点，因此不会把普通候选人或未被排班的 Standby 误判为漏块。排班变更仍通过标准生产者 schedule 提议、确认和激活流程完成。
+
+### 5.3 惩罚与恢复状态图
+
+```mermaid
+flowchart TD
+    sealed["Epoch 已封账"] --> incidentCheck{"超过三分之一 Active BP 不达标?"}
+    incidentCheck -->|"是"| networkIncident["NETWORK_INCIDENT"]
+    networkIncident --> daoReview["保留统计并由 DAO 复核"]
+    daoReview --> noAutoSlash["不自动停权或罚没本金"]
+
+    incidentCheck -->|"否"| sampleCheck{"样本达到最低门限?"}
+    sampleCheck -->|"否"| insufficient["INSUFFICIENT_SAMPLE"]
+    sampleCheck -->|"是"| availability{"Epoch 出勤率"}
+    availability -->|">= 99%"| qualified["QUALIFIED / 全额绩效奖励"]
+    availability -->|"95% 至 99%"| reduced["QUALIFIED / 线性折减"]
+    availability -->|"90% 至 95%"| warning["零奖励并记录警告"]
+    availability -->|"< 90%"| suspended["SUSPENDED / 零奖励 / Standby 递补"]
+
+    suspended --> cooldown["冷却 1、2、4、8 个 Epoch"]
+    cooldown --> resume["BP 本人调用 resumeprod"]
+    resume --> probation["PROBATION / 下一次排班进入试运行"]
+    probation --> probationCheck{"是否连续漏掉 12 个应出 slot?"}
+    probationCheck -->|"是"| suspended
+    probationCheck -->|"否，完成合格 Epoch"| qualified
+
+    evidence["双签或冲突确定性证据"] --> freeze["冻结并进入挑战期"]
+    freeze --> evidenceCheck{"证据最终成立?"}
+    evidenceCheck -->|"否"| release["解除冻结"]
+    evidenceCheck -->|"是"| slash["按治理规则罚没自质押"]
+    slash --> disposition["销毁 / 安全储备 / 举报奖励"]
+```
+
+普通漏块只影响当期奖励与 BP 资格，不直接扣除自质押本金。本金罚没仅适用于链上可验证的双签、冲突最终性等严重作弊证据，并必须经过冻结、挑战和确定性执行流程；DAO 可以设定参数与处理证据争议，但不能用主观投票替代密码学证据。
 
 #### 不修改链核心的保守版本
 
@@ -372,7 +428,9 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 - `regproducer2`：补充佣金和 metadata 哈希。
 - `setbpmeta` / `confirmmeta`。
 - `voteproducer`：改为平均分票并记录 epoch 快照。
-- `closeepoch`：结算出勤、排名、奖励和惩罚。
+- `sealepoch`：常数时间封存出勤、排名、奖励参数和惩罚判定输入。
+- `settleprod(producer, max_epochs)`：任何人可按顺序为指定 BP 推进有界数量的历史 Epoch 独立结算，但不能代领。
+- `claimrewards(producer, max_epochs)`：BP 本人授权，结算有界数量的自身历史 Epoch 并领取累计奖励。
 - `resumeprod(producer)`：BP 冷却期结束后以自身权限申请恢复，进入链上试运行；停权由确定性统计自动执行。
 - `submitevid` / `challenge` / `execslash`。
 - `update_elected_producers`：过滤不合格候选人并记录 active/standby 状态。
