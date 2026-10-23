@@ -50,7 +50,11 @@ function assertFreshChainTime(info,now=Date.now()){
   if(!Number.isFinite(chainTime)||now-chainTime>90000||chainTime-now>30000)throw new Error('CHAIN_TIME_STALE');
 }
 function assertChain(chainId){if(chainId&&String(chainId)!==config().chainId)throw new Error('WALLET_CHAIN_ID_MISMATCH')}
-export function isHuFuApp(){return navigator.userAgent.toLowerCase().includes('hufu')||Boolean(window.HuFuJSProvider)}
+export function isHuFuApp(){
+  return navigator.userAgent.toLowerCase().includes('hufu')||
+    Boolean(window.HuFu||window.HuFuJSProvider)||
+    window.self!==window.top;
+}
 async function prepareHuFu(){
   if(window.HuFu?.requestAccountsHuFu)return window.HuFu;
   if(!isHuFuApp())return window.HuFu||null;
