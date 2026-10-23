@@ -19,6 +19,7 @@ let bpRecoveryState=null;
 let bpRecoveryRequest=0;
 let votingState=null;
 let electionState=null;
+let pendingVoteProducers=null;
 let candidateStep=1;
 let candidateChainState={loading:false,registered:false,producer:null,error:''};
 const candidateDraft={
@@ -84,7 +85,7 @@ function setNodeMode(mode='directory'){
 }
 function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
 function openSheet(html){sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
+function closeSheet(){pendingVoteProducers=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
 function walletProviderName(provider){return provider==='iframe'?'HuFu App':provider==='hufu'?'HuFu Wallet':'Anchor Wallet'}
 function renderWallet(){const account=walletSession?.account||'未连接',label=walletSession?walletProviderName(walletSession.provider):'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
 const bpStatusMeta={0:['未评估',''],1:['合格','qualified'],2:['降级',''],3:['警告',''],4:['暂停','suspended'],5:['样本不足',''],6:['网络事件',''],7:['试运行','probation']};
@@ -199,17 +200,26 @@ function openCandidateWizard(step=1){
 }
 
 function selectedProducers(){return [...document.querySelectorAll('.select-node input:checked')].map(input=>input.closest('.select-node')?.dataset.producer).filter(Boolean).sort()}
+function restoreSelectedProducers(producers){
+  const selected=new Set(producers);
+  document.querySelectorAll('.select-node').forEach(label=>{const input=label.querySelector('input');if(input)input.checked=selected.has(label.dataset.producer)});
+  updateAllocation();
+}
 async function confirmVote(){
   if(!walletSession){openWalletSheet();return}
   if(!electionState){showToast('链上 BP 数据尚未就绪');return}
-  try{await refreshVotingAccount()}catch(error){showToast(`读取链上票权失败：${String(error?.message||error)}`);return}
   const producers=selectedProducers();if(producers.length>30){showToast('最多选择 30 个 BP');return}
+  try{await refreshVotingAccount()}catch(error){showToast(`读取链上票权失败：${String(error?.message||error)}`);return}
+  // refreshVotingAccount synchronizes the checkboxes with the current on-chain
+  // allocation. Restore the user's draft before rendering and signing it.
+  restoreSelectedProducers(producers);pendingVoteProducers=producers;
   const glon=votingState?.glon||'0.00000000 GLON';
-  openSheet(`<h2 id="sheet-title">确认节点投票</h2><p class="sheet-subtitle">请核对交易内容，签名后将在下一 Epoch 生效</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>flon::voteproducer</strong></div><div><span>选择 BP</span><strong>${producers.length} 个</strong></div><div><span>总票权</span><strong>${escapeHtml(glon)}</strong></div><div><span>每节点票权</span><strong>${escapeHtml(perNode())} GLON</strong></div></div><p class="sign-warning">目标列表将按账户名排序提交。交易入块后，新的分配在下一 Epoch 边界生效。</p><div class="profile-review"><small>${escapeHtml(producers.join(' · ')||'清空全部 BP 投票')}</small></div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="vote-sign">在 HuFu 中签名</button></div>`);
+  const powerPerNode=producers.length?(assetAmount(glon)/producers.length).toFixed(8):'0.00000000';
+  openSheet(`<h2 id="sheet-title">确认节点投票</h2><p class="sheet-subtitle">请核对交易内容，签名后将在下一 Epoch 生效</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>flon::voteproducer</strong></div><div><span>选择 BP</span><strong>${producers.length} 个</strong></div><div><span>总票权</span><strong>${escapeHtml(glon)}</strong></div><div><span>每节点票权</span><strong>${escapeHtml(powerPerNode)} GLON</strong></div></div><p class="sign-warning">目标列表将按账户名排序提交。交易入块后，新的分配在下一 Epoch 边界生效。</p><div class="profile-review"><small>${escapeHtml(producers.join(' · ')||'清空全部 BP 投票')}</small></div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="vote-sign">在 HuFu 中签名</button></div>`);
 }
 async function submitVote(target){
-  if(!walletSession)return;const producers=selectedProducers();target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
-  try{const result=await transact(walletSession,[{account:'flon',name:'voteproducer',data:{voter:walletSession.account,producers}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">节点投票已广播</h2><p>${escapeHtml(producers.length)} 个 BP · 下一 Epoch 生效</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中签名':'Sign in HuFu';showToast(String(error?.message||error))}
+  if(!walletSession)return;const producers=pendingVoteProducers?[...pendingVoteProducers]:selectedProducers();target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
+  try{const result=await transact(walletSession,[{account:'flon',name:'voteproducer',data:{voter:walletSession.account,producers}}]),id=transactionId(result);pendingVoteProducers=null;openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">节点投票已广播</h2><p>${escapeHtml(producers.length)} 个 BP · 下一 Epoch 生效</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中签名':'Sign in HuFu';showToast(String(error?.message||error))}
 }
 async function confirmClaimRewards(){
   if(!walletSession){openWalletSheet();return}
