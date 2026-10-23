@@ -6,6 +6,7 @@ const config=()=>({anchorService:'https://fwd.hufu.io',...(window.__DAO_GOV_CONF
 const appId=()=>`flon-daogov-${config().network||'mainnet'}`;
 const storageKey=()=>`flon.daogov.wallet.${config().network||'mainnet'}`;
 let anchorLink;
+let walletRpc=null;
 
 function normalizeAccount(value){
   if(!value||typeof value!=='object')return null;
@@ -16,7 +17,18 @@ function normalizeAccount(value){
 function save(session){localStorage.setItem(storageKey(),JSON.stringify(session));return session}
 function forget(){localStorage.removeItem(storageKey())}
 function load(){try{return JSON.parse(localStorage.getItem(storageKey())||'null')}catch{return null}}
+function rpcRequest(path,body={}){
+  const method=path.split('/').filter(Boolean).pop();
+  if(method==='get_info'||method==='get_producer_schedule')return {method,params:[]};
+  if(method==='get_account'||method==='get_abi')return {method,params:[body.account_name]};
+  if(method==='get_currency_balance')return {method,params:[body.code,body.account,body.symbol]};
+  return {method,params:[body]};
+}
 async function rpcPost(path,body){
+  if(walletRpc){
+    const {method,params}=rpcRequest(path,body);
+    return timeout(walletRpc(method,params),12000,'WALLET_RPC_TIMEOUT');
+  }
   const response=await timeout(fetch(`${config().rpcUrl.replace(/\/$/,'')}${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),12000,'RPC_TIMEOUT');
   if(!response.ok)throw new Error(`RPC_HTTP_${response.status}`);
   return response.json();
@@ -50,8 +62,9 @@ async function getAnchorLink(){
 export async function restoreWallet(){
   const stored=load();if(!stored)return null;
   try{
-    assertChain(stored.chainId);await rpcInfo();
+    assertChain(stored.chainId);
     if(stored.provider==='anchor'){
+      await rpcInfo();
       const session=await (await getAnchorLink()).restoreSession(appId());
       if(!session||session.auth.actor.toString()!==stored.account)throw new Error('SESSION_EXPIRED');
       assertChain(String(session.chainId));
@@ -59,30 +72,44 @@ export async function restoreWallet(){
     if(stored.provider==='iframe'){
       const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
       if(!client.isInIframe())throw new Error('IFRAME_SESSION_EXPIRED');
+      const info=await timeout(client.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
       const account=normalizeAccount(await timeout(client.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
       if(!account||account.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
+      walletRpc=(method,params)=>client.rpc[method](...params);
+    }
+    if(stored.provider==='hufu'){
+      const provider=window.HuFu||(await prepareHuFu());
+      if(!provider?.request)throw new Error('HUFU_RPC_UNAVAILABLE');
+      const request=(method,params)=>Promise.resolve(provider.request({method:'rpc',params:{request:{method,params}}}));
+      const info=await timeout(request('get_info',[]),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id||info?.chainId);
+      walletRpc=request;
     }
     return stored;
-  }catch{forget();return null}
+  }catch{walletRpc=null;forget();return null}
 }
 export async function connectWallet(){
   const restored=await restoreWallet();if(restored)return restored;
-  await rpcInfo();
   const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
   if(client.isInIframe()){
     const info=await timeout(client.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
     const account=normalizeAccount(await timeout(client.getAccount(),30000,'HUFU_ACCOUNT_TIMEOUT'));
     if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
+    walletRpc=(method,params)=>client.rpc[method](...params);
     return save({...account,chainId:config().chainId,provider:'iframe'});
   }
   const provider=window.HuFu||(isHuFuApp()?await prepareHuFu():null);
   if(provider?.requestAccountsHuFu){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
     const account=normalizeAccount(Array.isArray(response)?response[0]:response);
-    if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');assertChain(account.chainId);
+    if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
+    if(!provider.request)throw new Error('HUFU_RPC_UNAVAILABLE');
+    const request=(method,params)=>Promise.resolve(provider.request({method:'rpc',params:{request:{method,params}}}));
+    const info=await timeout(request('get_info',[]),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id||info?.chainId);
+    walletRpc=request;
     return save({...account,chainId:config().chainId,provider:'hufu'});
   }
   if(isHuFuApp())throw new Error('HUFU_PROVIDER_UNAVAILABLE');
+  await rpcInfo();
   const link=await getAnchorLink(),identity=await link.login(appId()),session=identity.session;
   assertChain(String(session.chainId));
   return save({account:session.auth.actor.toString(),permission:session.auth.permission.toString(),chainId:config().chainId,provider:'anchor'});
@@ -90,7 +117,7 @@ export async function connectWallet(){
 export async function disconnectWallet(){
   const stored=load();
   if(stored?.provider==='anchor'){try{(await getAnchorLink()).clearSessions(appId())}catch{}}
-  forget();
+  walletRpc=null;forget();
 }
 export async function loadBPAccount(account){
   const [accountInfo,abi,chainInfo]=await Promise.all([
