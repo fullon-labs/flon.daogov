@@ -286,4 +286,15 @@ document.querySelectorAll('[data-proposal-filter]').forEach(button=>button.addEv
 applyTranslations();
 renderVotingAccount();
 refreshElection();
-restoreWallet().then(async session=>{walletSession=session;renderWallet();await refreshVotingAccount()}).catch(()=>renderWallet());
+async function initializeWallet(){
+  let session=await restoreWallet();
+  if(!session&&isHuFuApp())session=await connectWallet();
+  walletSession=session;
+  renderWallet();
+  await refreshVotingAccount();
+}
+initializeWallet().catch(error=>{
+  walletSession=null;
+  renderWallet();
+  if(isHuFuApp())showToast(walletErrorMessage(error));
+});
