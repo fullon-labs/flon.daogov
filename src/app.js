@@ -29,7 +29,7 @@ const candidateDraft={
 
 const translations=new Map([
   ['跳到主要内容','Skip to main content'],['返回 HuFu','Back to HuFu'],['治理中心','DAO Governance'],['治理通知','Governance notifications'],['语言','Language'],['未连接','Not connected'],['连接钱包','Connect wallet'],['断开连接','Disconnect'],['钱包连接','Wallet connection'],['使用 HuFu 钱包连接','Connect with HuFu Wallet'],['使用 HuFu 或 Anchor 钱包连接','Connect with HuFu or Anchor Wallet'],['普通浏览器将显示 Anchor 二维码；HuFu 内会直接请求当前账户。','A standard browser displays an Anchor QR code; HuFu requests the current account directly.'],['钱包只负责账户授权与交易签名，DApp 不接触私钥。','The wallet only authorizes the account and signs transactions. The DApp never accesses private keys.'],['连接中…','Connecting…'],['钱包已连接','Wallet connected'],['钱包已断开','Wallet disconnected'],
-  ['概览','Overview'],['投票','Vote'],['治理','Governance'],['我的','Profile'],['当前治理账户','Governance account'],['日常钱包','Daily wallet'],['我的治理权','My governance power'],['全部已生效','All effective'],
+  ['概览','Overview'],['投票','Vote'],['治理','Governance'],['我的','Profile'],['当前治理账户','Governance account'],['日常钱包','Daily wallet'],['我的治理权','My governance power'],
   ['已投 FLON','Staked FLON'],['已选 BP','Selected BPs'],['待领取','Claimable'],['进行中','in progress'],['当前席位','Active seats'],['区块','Block'],['需要你处理','Action required'],['全部','All'],
   ['正式投票','Formal vote'],['剩余','Remaining'],['小时','hours'],['你有','You have'],['票权','voting power'],['去投票','Vote now'],['投票奖励已结算','Voter rewards settled'],['领取','Claim'],['个所投节点进入','voted node entered'],['建议检查节点状态与待生效排名','Review node status and pending ranking'],['查看','View'],
   ['网络概况','Network overview'],['节点排名','Node ranking'],['目标','Target'],['网络出块率','Block production'],['近 24 小时','Last 24 hours'],['总投票本金','Total voting stake'],['活跃投票人','Active voters'],['近 7 天','Last 7 days'],
@@ -170,7 +170,6 @@ function renderVotingAccount(){
   setText('[data-voting-stake]',connected?nodeVoteAmount:'—');setText('[data-voted-bps]',connected?`${producers.length} / 30`:'— / 30');setText('[data-profile-votes]',connected?`${producers.length} 个 BP`:'— 个 BP');
   setText('[data-unclaimed-rewards]',rewards);setText('[data-profile-rewards]',rewards);setText('[data-profile-claimable]',connected?rewards:'连接钱包后读取');
   setText('[data-claimable-summary]',connected?`链上已结算 ${rewards}`:'连接钱包后读取链上已结算余额');
-  setText('[data-voting-status]',connected?(votingState.pendingProducers?'存在下一 Epoch 待生效修改':'全部已生效'):'连接钱包后读取');
   setText('[data-vote-source]',connected?'投票后生成等额不可转让 GLON，用于 DAO 治理':'连接钱包后读取链上 FLON 投票本金');
   applyTranslations();
 }
