@@ -17,3 +17,27 @@ services:
     volumes:
       - ./config.testnet.js:/usr/share/nginx/html/config.js:ro
       - ./api.testnet.conf:/etc/nginx/daogov/api.conf:ro
+
+  daogov-keeper-mainnet:
+    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.0}
+    container_name: flon-daogov-keeper-mainnet
+    restart: unless-stopped
+    environment:
+      KEEPER_RPC_URL: https://m.flonscan.io
+      KEEPER_CHAIN_ID: d4019d7d8633a337973408c6c00e5c4888933ad1b6ce10edddea8145317d8d12
+      KEEPER_BROADCAST: "false"
+      KEEPER_HEALTH_PORT: "8788"
+    ports:
+      - "127.0.0.1:20111:8788"
+
+  daogov-keeper-testnet:
+    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.0}
+    container_name: flon-daogov-keeper-testnet
+    restart: unless-stopped
+    environment:
+      KEEPER_RPC_URL: http://47.237.17.245:19889
+      KEEPER_CHAIN_ID: 18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f
+      KEEPER_BROADCAST: "false"
+      KEEPER_HEALTH_PORT: "8788"
+    ports:
+      - "127.0.0.1:20112:8788"
