@@ -3,17 +3,22 @@ import { Client } from '@fullon/flonjs';
 const wait=milliseconds=>new Promise(resolve=>window.setTimeout(resolve,milliseconds));
 const timeout=(promise,milliseconds,message)=>Promise.race([promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(message)),milliseconds))]);
 const config=()=>({anchorService:'https://fwd.hufu.io',...(window.__DAO_GOV_CONFIG__||{})});
+const rpcUrl=()=>new URL(config().rpcUrl,window.location.origin).href.replace(/\/$/,'');
 const appId=()=>`flon-daogov-${config().network||'mainnet'}`;
 const storageKey=()=>`flon.daogov.wallet.${config().network||'mainnet'}`;
 let anchorLink;
-let walletRpc=null;
 let hufuChainInfo=null;
+let automaticConnection=null;
+let accountPromptReadyAt=0;
 
 function normalizeAccount(value){
+  if(typeof value==='string'){try{return normalizeAccount(JSON.parse(value))}catch{return /^[a-z1-5.]{1,12}$/.test(value)?{account:value,permission:'active',chainId:''}:null}}
+  if(Array.isArray(value)){for(const item of value){const found=normalizeAccount(item);if(found)return found}return null}
   if(!value||typeof value!=='object')return null;
-  const account=value.account||value.name||value.actor;
-  if(!account)return null;
-  return {account:String(account),permission:String(value.permission||'active'),chainId:String(value.chainId||value.chain_id||'')};
+  const account=value.account||value.accountName||value.name||value.actor;
+  if(account)return {account:String(account),permission:String(value.permission||'active'),chainId:String(value.chainId||value.chain_id||'')};
+  for(const key of ['selectedAccount','currentAccount','accounts','data','result']){const found=normalizeAccount(value[key]);if(found)return found}
+  return null;
 }
 function save(session){localStorage.setItem(storageKey(),JSON.stringify(session));return session}
 function forget(){localStorage.removeItem(storageKey())}
@@ -24,25 +29,8 @@ function formatAssetUnits(value,symbol,precision=8){
   const padded=digits.padStart(precision+1,'0');
   return `${negative?'-':''}${padded.slice(0,-precision)}.${padded.slice(-precision)} ${symbol}`;
 }
-function rpcRequest(path,body={}){
-  const method=path.split('/').filter(Boolean).pop();
-  if(method==='get_info'||method==='get_producer_schedule')return {method,params:[]};
-  if(method==='get_account'||method==='get_abi')return {method,params:[body.account_name]};
-  if(method==='get_currency_balance')return {method,params:[body.code,body.account,body.symbol]};
-  return {method,params:[body]};
-}
-function rpcBody(method,params=[]){
-  if(method==='get_info'||method==='get_producer_schedule')return {};
-  if(method==='get_account'||method==='get_abi')return {account_name:params[0]};
-  if(method==='get_currency_balance')return {code:params[0],account:params[1],symbol:params[2]};
-  return params[0]||{};
-}
 async function rpcPost(path,body){
-  if(walletRpc){
-    const {method,params}=rpcRequest(path,body);
-    return timeout(walletRpc(method,params),12000,'WALLET_RPC_TIMEOUT');
-  }
-  const response=await timeout(fetch(`${config().rpcUrl.replace(/\/$/,'')}${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),12000,'RPC_TIMEOUT');
+  const response=await timeout(fetch(`${rpcUrl()}${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),12000,'RPC_TIMEOUT');
   if(!response.ok)throw new Error(`RPC_HTTP_${response.status}`);
   return response.json();
 }
@@ -63,91 +51,67 @@ export function isHuFuApp(){
     window.self!==window.top;
 }
 async function captureHuFuChainInfo(bridge){
-  if(!bridge?.HuFuGetChain)return;
-  const previous=window.onChainInfo;
-  window.onChainInfo=value=>{hufuChainInfo=value;previous?.(value)};
-  try{const value=await timeout(Promise.resolve(bridge.HuFuGetChain()),2000,'HUFU_CHAIN_TIMEOUT');if(value!==undefined)hufuChainInfo=value;else await wait(300)}catch{}
+  if(!bridge)return;
+  const previousReady=window.onChainReady,previousInfo=window.onChainInfo;
+  let resolveReady;const ready=new Promise(resolve=>resolveReady=resolve);let settled=false;
+  const finish=value=>{if(value!==undefined)hufuChainInfo=value;if(!settled){settled=true;resolveReady()}};
+  window.onChainReady=value=>{previousReady?.(value);if(value&&bridge.HuFuGetChain)Promise.resolve(bridge.HuFuGetChain()).then(finish).catch(()=>finish())};
+  window.onChainInfo=value=>{previousInfo?.(value);finish(value)};
+  const timer=window.setTimeout(()=>finish(),5000);
+  try{
+    if(bridge.HuFuSwitchChain)Promise.resolve(bridge.HuFuSwitchChain('FLON')).then(value=>{if(value!==undefined)hufuChainInfo=value}).catch(()=>{});
+    if(bridge.HuFuGetChain)Promise.resolve(bridge.HuFuGetChain()).then(finish).catch(()=>finish());
+    await ready;
+  }finally{window.clearTimeout(timer);window.onChainReady=previousReady;window.onChainInfo=previousInfo}
 }
 async function prepareHuFu(){
-  if(window.HuFu?.requestAccountsHuFu){await captureHuFuChainInfo(window.HuFuJSProvider);return window.HuFu}
   if(!isHuFuApp())return window.HuFu||null;
   for(let count=0;count<30&&!window.HuFuJSProvider;count++)await wait(100);
   const bridge=window.HuFuJSProvider;
-  if(bridge?.HuFuSwitchChain){try{await timeout(Promise.resolve(bridge.HuFuSwitchChain('FLON')),5000,'HUFU_CHAIN_TIMEOUT')}catch{}}
   await captureHuFuChainInfo(bridge);
   for(let count=0;count<50&&!window.HuFu;count++)await wait(100);
   return window.HuFu||null;
 }
-function walletRpcUrl(value,depth=0){
-  if(!value||depth>5)return '';
+function chainIdFrom(value,depth=0){
+  if(!value||depth>4)return '';
   if(typeof value==='string'){
-    try{return walletRpcUrl(JSON.parse(value),depth+1)}catch{}
-    try{const url=new URL(value);return /^https?:$/.test(url.protocol)?url.href.replace(/\/$/,''):''}catch{return ''}
+    const normalized=value.trim().toLowerCase().replace(/^0x/,'');if(/^[0-9a-f]{64}$/.test(normalized))return normalized;
+    try{return chainIdFrom(JSON.parse(value),depth+1)}catch{return ''}
   }
   if(typeof value!=='object')return '';
-  for(const key of ['rpcUrl','rpcURL','rpc_url','nodeUrl','nodeURL','endpoint']){
-    const found=walletRpcUrl(value[key],depth+1);if(found)return found;
-  }
-  for(const key of ['network','chain','data','result','payload','info']){
-    const found=walletRpcUrl(value[key],depth+1);if(found)return found;
-  }
+  for(const key of ['chainId','chain_id','id']){const found=chainIdFrom(value[key],depth+1);if(found)return found}
+  for(const key of ['network','chain','info','data','result','payload']){const found=chainIdFrom(value[key],depth+1);if(found)return found}
   return '';
 }
-function endpointRpc(endpoint){
-  return async(method,params=[])=>{
-    const response=await timeout(fetch(`${endpoint}/v1/chain/${method}`,{
-      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(rpcBody(method,params)),
-    }),12000,'HUFU_NETWORK_TIMEOUT');
-    if(!response.ok)throw new Error(`RPC_HTTP_${response.status}`);
-    return response.json();
-  };
-}
-function unwrapRpc(value){
-  let current=value;
-  if(typeof current==='string'){try{current=JSON.parse(current)}catch{return current}}
-  for(let depth=0;depth<4&&current&&typeof current==='object';depth++){
-    if(current.chain_id||current.rows||Array.isArray(current))return current;
-    if(current.result!==undefined){current=current.result;continue}
-    if(current.payload!==undefined){current=current.payload;continue}
-    if(current.data!==undefined){current=current.data;continue}
-    break;
-  }
-  return current;
-}
-async function prepareInjectedRpc(provider,accountResponse=null){
-  await captureHuFuChainInfo(window.HuFuJSProvider);
-  const candidates=[];
-  const endpoint=walletRpcUrl(accountResponse)||walletRpcUrl(provider)||walletRpcUrl(hufuChainInfo);
-  if(endpoint)candidates.push(endpointRpc(endpoint));
-  if(provider?.rpc?.get_info)candidates.push((method,params)=>provider.rpc[method](...params));
-  if(provider?.request){
-    candidates.push((method,params)=>Promise.resolve(provider.request({method:'rpc',params:{request:{method,params}}})).then(unwrapRpc));
-    candidates.push((method,params)=>Promise.resolve(provider.request({method,params})).then(unwrapRpc));
-  }
-  if(!candidates.length)throw new Error('HUFU_RPC_UNAVAILABLE');
-  for(const call of candidates){
-    try{
-      const info=unwrapRpc(await timeout(call('get_info',[]),endpoint?5000:2500,'HUFU_NETWORK_TIMEOUT'));
-      const chainId=info?.chain_id||info?.chainId;
-      if(!chainId)throw new Error('HUFU_RPC_INVALID_RESPONSE');
-      assertChain(chainId);
-      return {call,info};
-    }catch(error){
-      if(String(error?.message||error)==='WALLET_CHAIN_ID_MISMATCH')throw error;
-    }
-  }
-  throw new Error('HUFU_NETWORK_TIMEOUT');
+function isFullOnChain(value){const record=value&&typeof value==='object'?value:null;return ['FLON','FULLON'].includes(String(record?.name||record?.chain||value||'').toUpperCase())}
+function accountSnapshot(provider){for(const value of [provider?.selectedAccount,provider?.currentAccount,provider?.account,provider?.accounts]){const found=normalizeAccount(value);if(found)return found}return null}
+async function confirmInjectedChain(provider,account=null,restoredChainId=''){
+  const embedded=chainIdFrom(account)||chainIdFrom(provider);if(embedded){assertChain(embedded);return embedded}
+  const reads=[];
+  for(const getter of [provider?.getChainId,provider?.getChainID,provider?.getInfo])if(typeof getter==='function')reads.push(timeout(Promise.resolve().then(()=>getter.call(provider)),1500,'HUFU_NETWORK_TIMEOUT'));
+  if(typeof provider?.request==='function')for(const request of [{method:'get_info'},{method:'rpc',params:{request:{method:'get_info',params:[]}}}])reads.push(timeout(Promise.resolve().then(()=>provider.request(request)),1500,'HUFU_NETWORK_TIMEOUT'));
+  for(const result of await Promise.allSettled(reads)){if(result.status==='fulfilled'){const found=chainIdFrom(result.value);if(found){assertChain(found);return found}}}
+  const refreshed=await prepareHuFu();const refreshedId=chainIdFrom(account)||chainIdFrom(refreshed)||chainIdFrom(hufuChainInfo);
+  if(refreshedId){assertChain(refreshedId);return refreshedId}
+  if(isFullOnChain(hufuChainInfo)){assertChain(restoredChainId||config().chainId);return restoredChainId||config().chainId}
+  throw new Error('WALLET_CHAIN_UNCONFIRMED');
 }
 async function getAnchorLink(){
   if(anchorLink)return anchorLink;
   const [{default:AnchorLink},{default:AnchorLinkBrowserTransport}]=await Promise.all([import('@fullon/anchor-link'),import('@fullon/anchor-link-browser-transport')]);
-  anchorLink=new AnchorLink({transport:new AnchorLinkBrowserTransport(),service:config().anchorService,chains:[{chainId:config().chainId,nodeUrl:config().rpcUrl}]});
+  anchorLink=new AnchorLink({transport:new AnchorLinkBrowserTransport(),service:config().anchorService,chains:[{chainId:config().chainId,nodeUrl:rpcUrl()}]});
   return anchorLink;
 }
 export async function restoreWallet(){
   const stored=load();if(!stored)return null;
   try{
     assertChain(stored.chainId);
+    if(stored.provider==='hufu'&&isHuFuApp()){
+      const current=accountSnapshot(window.HuFu);
+      if(current&&current.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
+      const chainId=chainIdFrom(current)||chainIdFrom(window.HuFu)||chainIdFrom(hufuChainInfo);if(chainId)assertChain(chainId);
+      return stored;
+    }
     if(stored.provider==='anchor'){
       await rpcInfo();
       const session=await (await getAnchorLink()).restoreSession(appId());
@@ -160,35 +124,28 @@ export async function restoreWallet(){
       const info=await timeout(client.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
       const account=normalizeAccount(await timeout(client.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
       if(!account||account.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
-      walletRpc=(method,params)=>client.rpc[method](...params);
-    }
-    if(stored.provider==='hufu'){
-      const provider=window.HuFu||(await prepareHuFu());
-      const prepared=await prepareInjectedRpc(provider);
-      walletRpc=prepared.call;
     }
     return stored;
-  }catch{walletRpc=null;forget();return null}
+  }catch{forget();return null}
 }
 export async function connectWallet(){
   const restored=await restoreWallet();if(restored)return restored;
   const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
-  const provider=window.HuFu||(isHuFuApp()?await prepareHuFu():null);
+  if(client.isInIframe()){
+    const info=await timeout(client.rpc.get_info(),10000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
+    const account=normalizeAccount(await timeout(client.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
+    if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
+    return save({...account,chainId:config().chainId,provider:'iframe'});
+  }
+  const provider=isHuFuApp()?await prepareHuFu():window.HuFu;
   if(provider?.requestAccountsHuFu){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
-    const account=normalizeAccount(Array.isArray(response)?response[0]:response);
+    accountPromptReadyAt=Date.now()+650;
+    const account=normalizeAccount(response);
     if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
-    await wait(700);
-    const prepared=await prepareInjectedRpc(provider,response);
-    walletRpc=prepared.call;
-    return save({...account,chainId:config().chainId,provider:'hufu'});
-  }
-  if(client.isInIframe()){
-    const info=await timeout(client.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
-    const account=normalizeAccount(await timeout(client.getAccount(),30000,'HUFU_ACCOUNT_TIMEOUT'));
-    if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
-    walletRpc=(method,params)=>client.rpc[method](...params);
-    return save({...account,chainId:config().chainId,provider:'iframe'});
+    await wait(650);
+    const chainId=await confirmInjectedChain(provider,account);
+    return save({...account,chainId,provider:'hufu'});
   }
   if(isHuFuApp())throw new Error('HUFU_PROVIDER_UNAVAILABLE');
   await rpcInfo();
@@ -196,10 +153,27 @@ export async function connectWallet(){
   assertChain(String(session.chainId));
   return save({account:session.auth.actor.toString(),permission:session.auth.permission.toString(),chainId:config().chainId,provider:'anchor'});
 }
+export function autoConnectHuFuWallet(){
+  if(!isHuFuApp())return Promise.resolve(null);
+  if(!automaticConnection)automaticConnection=(async()=>{
+    const restored=await restoreWallet();if(restored)return restored;
+    const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
+    if(client.isInIframe()){
+      const info=await timeout(client.rpc.get_info(),10000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
+      const account=normalizeAccount(await timeout(client.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
+      return account?save({...account,chainId:config().chainId,provider:'iframe'}):null;
+    }
+    const provider=await prepareHuFu();if(!provider)return null;
+    const account=accountSnapshot(provider);if(!account)return null;
+    const chainId=await confirmInjectedChain(provider,account);
+    return save({...account,chainId,provider:'hufu'});
+  })();
+  return automaticConnection;
+}
 export async function disconnectWallet(){
   const stored=load();
   if(stored?.provider==='anchor'){try{(await getAnchorLink()).clearSessions(appId())}catch{}}
-  walletRpc=null;forget();
+  automaticConnection=null;forget();
 }
 export async function loadBPAccount(account){
   const [accountInfo,abi,chainInfo]=await Promise.all([
@@ -300,6 +274,9 @@ export async function transact(session,actions){
   if(session.provider==='iframe')return window.__DAO_HUFU_CLIENT__.transact(authorized);
   if(session.provider==='hufu'){
     const provider=window.HuFu||(await prepareHuFu());if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
+    const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
+    await confirmInjectedChain(provider,current,session.chainId);
+    const remaining=accountPromptReadyAt-Date.now();if(remaining>0)await wait(remaining);
     return provider.transact({transaction:{actions:authorized}});
   }
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
