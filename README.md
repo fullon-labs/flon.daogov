@@ -76,3 +76,5 @@ flon.daogov/
 ## 文档
 
 [治理中心产品与实施设计](./docs/governance-design.md)
+
+[链上日常维护操作指南：closeepoch 与 standbyproof](./docs/operations-guide.md)
