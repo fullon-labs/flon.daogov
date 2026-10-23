@@ -225,20 +225,27 @@ export async function loadBPAccount(account){
   return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,selfStakeSupported,selfStakeConfig,selfStake,supported:true};
 }
 export async function loadVotingAccount(account){
-  const [balances,voterRows,pendingRows,rewardRows,epochRows]=await Promise.all([
+  const [balances,flonBalances,voterRows,pendingRows,rewardRows,epochRows,refundRows,abi]=await Promise.all([
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'GLON'}).catch(()=>[]),
+    rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'FLON'}).catch(()=>[]),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendingvote',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'voter.reward',scope:'voter.reward',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:account,table:'voterefund',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>({abi:{actions:[]}})),
   ]);
   const voter=voterRows.rows?.find(row=>row.owner===account)||null;
   const pending=pendingRows.rows?.find(row=>row.voter===account)||null;
   const rewards=rewardRows.rows?.find(row=>row.owner===account)||null;
+  const refund=refundRows.rows?.find(row=>row.owner===account)||null;
   const glon=Array.isArray(balances)&&balances.length?balances[0]:'0.00000000 GLON';
+  const flon=Array.isArray(flonBalances)&&flonBalances.length?flonBalances[0]:'0.00000000 FLON';
+  const actions=new Set((abi.abi?.actions||[]).map(item=>item.name));
   const nodeVoteUnits=pending?.votes??voter?.votes??0;
   return {
-    account,glon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,rewards,
+    account,glon,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,rewards,refund,
+    stakeSupported:actions.has('addvote')&&actions.has('subvote')&&actions.has('voterefund'),
     nextEpoch:Number(epochRows.rows?.[0]?.next_epoch_to_close||0),
     effectiveVotes:Number(voter?.votes||0),
     effectiveProducers:Array.isArray(voter?.producers)?voter.producers:[],
