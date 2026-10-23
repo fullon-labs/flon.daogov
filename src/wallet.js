@@ -52,12 +52,56 @@ function assertFreshChainTime(info,now=Date.now()){
 function assertChain(chainId){if(chainId&&String(chainId)!==config().chainId)throw new Error('WALLET_CHAIN_ID_MISMATCH')}
 export function isHuFuApp(){return navigator.userAgent.toLowerCase().includes('hufu')||Boolean(window.HuFuJSProvider)}
 async function prepareHuFu(){
+  if(window.HuFu?.requestAccountsHuFu)return window.HuFu;
   if(!isHuFuApp())return window.HuFu||null;
   for(let count=0;count<30&&!window.HuFuJSProvider;count++)await wait(100);
   const bridge=window.HuFuJSProvider;
   if(bridge?.HuFuSwitchChain){try{await timeout(Promise.resolve(bridge.HuFuSwitchChain('FLON')),5000,'HUFU_CHAIN_TIMEOUT')}catch{}}
   for(let count=0;count<50&&!window.HuFu;count++)await wait(100);
   return window.HuFu||null;
+}
+function unwrapRpc(value){
+  let current=value;
+  for(let depth=0;depth<4&&current&&typeof current==='object';depth++){
+    if(current.chain_id||current.rows||Array.isArray(current))return current;
+    if(current.result!==undefined){current=current.result;continue}
+    if(current.payload!==undefined){current=current.payload;continue}
+    break;
+  }
+  return current;
+}
+function firstSuccessful(promises){
+  return new Promise((resolve,reject)=>{
+    const errors=[];
+    let pending=promises.length;
+    for(const promise of promises){
+      Promise.resolve(promise).then(resolve,error=>{
+        errors.push(error);
+        if(--pending===0)reject(errors);
+      });
+    }
+  });
+}
+async function prepareInjectedRpc(provider){
+  const candidates=[];
+  if(provider?.rpc?.get_info)candidates.push((method,params)=>provider.rpc[method](...params));
+  if(provider?.request){
+    candidates.push((method,params)=>Promise.resolve(provider.request({method:'rpc',params:{request:{method,params}}})).then(unwrapRpc));
+    candidates.push((method,params)=>Promise.resolve(provider.request({method,params})).then(unwrapRpc));
+  }
+  if(!candidates.length)throw new Error('HUFU_RPC_UNAVAILABLE');
+  try{
+    return await firstSuccessful(candidates.map(async call=>{
+      const info=unwrapRpc(await timeout(call('get_info',[]),8000,'HUFU_NETWORK_TIMEOUT'));
+      const chainId=info?.chain_id||info?.chainId;
+      if(!chainId)throw new Error('HUFU_RPC_INVALID_RESPONSE');
+      assertChain(chainId);
+      return {call,info};
+    }));
+  }catch(errors){
+    if(errors?.some(item=>String(item?.message||item)==='WALLET_CHAIN_ID_MISMATCH'))throw new Error('WALLET_CHAIN_ID_MISMATCH');
+    throw new Error('HUFU_NETWORK_TIMEOUT');
+  }
 }
 async function getAnchorLink(){
   if(anchorLink)return anchorLink;
@@ -85,10 +129,8 @@ export async function restoreWallet(){
     }
     if(stored.provider==='hufu'){
       const provider=window.HuFu||(await prepareHuFu());
-      if(!provider?.request)throw new Error('HUFU_RPC_UNAVAILABLE');
-      const request=(method,params)=>Promise.resolve(provider.request({method:'rpc',params:{request:{method,params}}}));
-      const info=await timeout(request('get_info',[]),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id||info?.chainId);
-      walletRpc=request;
+      const prepared=await prepareInjectedRpc(provider);
+      walletRpc=prepared.call;
     }
     return stored;
   }catch{walletRpc=null;forget();return null}
@@ -96,23 +138,21 @@ export async function restoreWallet(){
 export async function connectWallet(){
   const restored=await restoreWallet();if(restored)return restored;
   const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
+  const provider=window.HuFu||(isHuFuApp()?await prepareHuFu():null);
+  if(provider?.requestAccountsHuFu){
+    const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
+    const account=normalizeAccount(Array.isArray(response)?response[0]:response);
+    if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
+    const prepared=await prepareInjectedRpc(provider);
+    walletRpc=prepared.call;
+    return save({...account,chainId:config().chainId,provider:'hufu'});
+  }
   if(client.isInIframe()){
     const info=await timeout(client.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
     const account=normalizeAccount(await timeout(client.getAccount(),30000,'HUFU_ACCOUNT_TIMEOUT'));
     if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
     walletRpc=(method,params)=>client.rpc[method](...params);
     return save({...account,chainId:config().chainId,provider:'iframe'});
-  }
-  const provider=window.HuFu||(isHuFuApp()?await prepareHuFu():null);
-  if(provider?.requestAccountsHuFu){
-    const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
-    const account=normalizeAccount(Array.isArray(response)?response[0]:response);
-    if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
-    if(!provider.request)throw new Error('HUFU_RPC_UNAVAILABLE');
-    const request=(method,params)=>Promise.resolve(provider.request({method:'rpc',params:{request:{method,params}}}));
-    const info=await timeout(request('get_info',[]),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id||info?.chainId);
-    walletRpc=request;
-    return save({...account,chainId:config().chainId,provider:'hufu'});
   }
   if(isHuFuApp())throw new Error('HUFU_PROVIDER_UNAVAILABLE');
   await rpcInfo();
