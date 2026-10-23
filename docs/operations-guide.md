@@ -105,6 +105,11 @@ fucli -u "$RPC_URL" push action flon closeepoch \
 
 自动化必须使用“读链后决定”，不能简单设置成每 6 小时无条件广播一笔交易。
 
+本项目已提供独立的 TypeScript 实现：[`keeper/`](../keeper/README.md)。它默认运行在
+dry-run 模式，要求显式配置目标 chain ID，采用 15/5/1 分钟自适应检查，并在每次
+提交后等待 LIB、验证 `next_epoch_to_close` 恰好增加 1，再继续追赶下一个 epoch。
+该程序不加载钱包或私钥，也不提交需要 BP 授权的 `standbyproof`。
+
 ## 3. Standby 在线证明：`standbyproof`
 
 ### 3.1 谁负责提交
