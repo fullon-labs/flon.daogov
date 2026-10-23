@@ -97,16 +97,17 @@
             <div class="node-list"><div class="loading-state"><i></i><span>正在读取链上 BP 排名…</span></div></div>
           </div>
           <div class="vote-content" data-node-mode-panel="vote" hidden>
-            <div class="vote-section-heading"><span><small>节点投票</small><h2>分配 FLON 节点票权</h2></span><button class="help-button" type="button" data-action="toast" data-message="锁定的 FLON 在所选 BP 之间平均分配，不会复制放大"><svg><use href="#i-info"/></svg></button></div>
+            <div class="vote-section-heading"><span><small>节点投票</small><h2>分配 FLON 节点票权</h2></span><button class="help-button" type="button" data-action="toast" data-message="为每个 BP 独立填写 FLON 票数；分配合计不能超过账户拥有的 FLON"><svg><use href="#i-info"/></svg></button></div>
             <section class="vote-balance">
-              <div><small>节点投票本金</small><strong class="din" data-vote-stake>— FLON</strong></div>
+              <div class="vote-total"><small>本次分配合计</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></div>
+              <div class="vote-funds"><span>链上已投 <strong class="din" data-vote-stake>— FLON</strong></span><span>可用余额 <strong class="din" data-vote-liquid>— FLON</strong></span><span>账户总可投 <strong class="din" data-vote-owned>— FLON</strong></span></div>
               <span data-vote-source>连接钱包后读取链上 FLON 投票本金</span>
-              <div class="allocation"><span><small>已选择</small><strong class="din" data-selected-count>0 / 30</strong></span><span><small>每个 BP</small><strong class="din" data-per-node>0.00000000</strong></span></div>
+              <div class="allocation"><span><small>已选择</small><strong class="din" data-selected-count>0 / 30</strong></span><span><small>分配方式</small><strong class="din" data-per-node>自定义</strong></span></div>
             </section>
             <div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>投票分配在下一 Epoch 生效</strong><small>待生效状态以 flon::pendingvote 链上记录为准</small></span></div>
             <div class="section-title"><h2>选择 BP</h2><button type="button" data-action="clear-selection">清空</button></div>
             <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
-            <div class="sticky-action"><button class="secondary-button" type="button" data-action="stake">调整本金</button><button class="primary-button" type="button" data-action="sign-vote">确认分配</button></div>
+            <div class="sticky-action"><button class="secondary-button" type="button" data-action="clear-selection">清空选择</button><button class="primary-button" type="button" data-action="sign-vote">确认投票</button></div>
           </div>
         </div>
       </section>

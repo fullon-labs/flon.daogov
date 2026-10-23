@@ -19,7 +19,7 @@ let bpRecoveryState=null;
 let bpRecoveryRequest=0;
 let votingState=null;
 let electionState=null;
-let pendingVoteProducers=null;
+let pendingVoteAllocations=null;
 let candidateStep=1;
 let candidateChainState={loading:false,registered:false,producer:null,error:''};
 const candidateDraft={
@@ -35,7 +35,7 @@ const translations=new Map([
   ['网络概况','Network overview'],['节点排名','Node ranking'],['目标','Target'],['网络出块率','Block production'],['近 24 小时','Last 24 hours'],['总投票本金','Total voting stake'],['活跃投票人','Active voters'],['近 7 天','Last 7 days'],
   ['DAO治理','DAO Governance'],['查看全部','View all'],['投票中','Voting'],['将 Active BP 席位从 3 个扩展至 7 个','Expand Active BP seats from 3 to 7'],['根据候选节点稳定性和网络负载，分阶段扩大出块节点集合。','Expand the producer set in phases based on node stability and network load.'],['赞成','For'],
   ['网络节点','Network nodes'],['BP 与投票','BPs & Voting'],['BP 排名','BP Rankings'],['BP 竞选','BP Election'],['BP 详情','BP details'],['申请竞选','Apply'],['候选节点','Candidates'],['全部候选','All candidates'],['搜索账户、名称或地区','Search account, name, or region'],['新加坡','Singapore'],['东京','Tokyo'],['法兰克福','Frankfurt'],['香港','Hong Kong'],['首尔','Seoul'],['在线','uptime'],['分享','share'],['有效票权','effective votes'],['精确节点票权','Exact node voting power'],['节点状态','Node status'],['排名','Rank'],['奖励分享比例','Reward sharing ratio'],['未领取出块奖励','Unclaimed block rewards'],['最后领取时间','Last reward claim'],['注册地址','Registered URL'],['地区代码','Location code'],['出块公钥','Block signing key'],['链上数据源','On-chain source'],['差','gap'],
-  ['节点投票','Node voting'],['分配 FLON 节点票权','Allocate FLON node voting power'],['锁定的 FLON 在所选 BP 之间平均分配，不会复制放大','Locked FLON is divided equally across selected BPs and is never duplicated'],['节点投票本金','Node voting stake'],['投票后生成等额不可转让 GLON，用于 DAO 治理','Voting mints an equal amount of non-transferable GLON for DAO governance'],['来自','Backed by'],['投票本金','voting stake'],['已选择','Selected'],['每个 BP','Per BP'],['修改将在','Changes take effect in'],['生效',''],['本 Epoch 奖励仍按当前 6 个节点计算','This epoch reward still uses the current 6-node allocation'],['选择 BP','Select BPs'],['清空','Clear'],['调整本金','Adjust stake'],['确认分配','Confirm allocation'],
+  ['节点投票','Node voting'],['分配 FLON 节点票权','Allocate FLON node voting power'],['为每个 BP 独立填写 FLON 票数；分配合计不能超过账户拥有的 FLON','Enter FLON votes for each BP; the total cannot exceed the FLON owned by the account'],['本次分配合计','Allocation total'],['总投票本金（FLON）','Total voting stake (FLON)'],['节点投票本金','Node voting stake'],['链上已投','Staked on-chain'],['可用余额','Available balance'],['账户总可投','Total voting capacity'],['投票后生成等额不可转让 GLON，用于 DAO 治理','Voting mints an equal amount of non-transferable GLON for DAO governance'],['来自','Backed by'],['投票本金','voting stake'],['已选择','Selected'],['分配方式','Allocation mode'],['自定义','Custom'],['每个 BP','Per BP'],['修改将在','Changes take effect in'],['生效',''],['本 Epoch 奖励仍按当前 6 个节点计算','This epoch reward still uses the current 6-node allocation'],['选择 BP','Select BPs'],['清空','Clear'],['清空选择','Clear selection'],['调整本金','Adjust stake'],['确认投票','Confirm vote'],['确认分配','Confirm allocation'],
   ['社区决策','Community decisions'],['DAO 治理','DAO Governance'],['发起提案','Create proposal'],['附议中','Endorsement'],['待执行','Ready to execute'],['建立生态开发者季度资助计划','Create a quarterly ecosystem developer grants program'],['资金提案','Treasury proposal'],['提案人','Proposer'],['人附议','endorsers'],['可附议','Endorse'],['后可执行','until executable'],['启用六小时奖励 Epoch 与历史票权结算','Enable six-hour reward epochs and historical voting-power settlement'],['合约参数','Contract parameters'],['已通过 · 安全等待期','Passed · security delay'],['执行目标','Execution target'],['查看执行内容','View execution'],
   ['我的治理','My Governance'],['累计奖励','Lifetime rewards'],['领取奖励','Claim rewards'],['我的节点投票','My BP votes'],['竞选管理','Election management'],['未注册','Not registered'],['我的治理任务','My governance tasks'],['等待你投票','awaits your vote'],['快照票权','snapshot power'],['处理','Act'],['节点分配已在','Node allocation became effective in'],['投票奖励完成结算','Voter rewards settled'],['治理记录','Governance history'],['打开完整链上治理记录','Open full on-chain governance history'],['附议','Endorsed'],['交易不可逆','Transaction is irreversible'],['调整 BP 投票分配','Updated BP vote allocation'],['昨天','Yesterday'],
   ['当前为','Current network:'],['当前账户','Current account'],['操作已完成','Done'],['确认节点投票','Confirm node vote'],['请核对交易内容，签名后将在下一 Epoch 生效','Review the transaction. It takes effect in the next epoch after signing.'],['网络','Network'],['账户','Account'],['选择 BP','Selected BPs'],['FLON 投票本金','FLON voting stake'],['每节点票权','Power per node'],['DAO 治理凭证','DAO governance receipt'],['GLON 仅用于 DAO 治理，不参与 BP 排名计算。','GLON is used only for DAO governance and does not count toward BP ranking.'],['总票权','Total power'],['生效 Epoch','Effective epoch'],['已入块不等于立即计入排名。新的节点分配将在 Epoch 1,249 边界生效。','Inclusion in a block does not immediately affect ranking. The new allocation takes effect at the Epoch 1,249 boundary.'],['取消','Cancel'],['在 HuFu 中签名','Sign in HuFu'],['签名请求已发送至 HuFu 钱包','Signature request sent to HuFu'],
@@ -85,7 +85,7 @@ function setNodeMode(mode='directory'){
 }
 function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
 function openSheet(html){sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){pendingVoteProducers=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
+function closeSheet(){pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
 function walletProviderName(provider){return provider==='iframe'?'HuFu App':provider==='hufu'?'HuFu Wallet':'Anchor Wallet'}
 function renderWallet(){const account=walletSession?.account||'未连接',label=walletSession?walletProviderName(walletSession.provider):'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
 const bpStatusMeta={0:['未评估',''],1:['合格','qualified'],2:['降级',''],3:['警告',''],4:['暂停','suspended'],5:['样本不足',''],6:['网络事件',''],7:['试运行','probation']};
@@ -121,6 +121,9 @@ function openWalletSheet(){if(!walletSession){openSheet(`<h2 id="sheet-title">�
 function walletErrorMessage(error){const code=String(error?.message||error);const zh={WALLET_CHAIN_ID_MISMATCH:'钱包网络与当前站点不一致，请在 HuFu 中切换到对应网络',WALLET_CHAIN_UNCONFIRMED:'无法确认 HuFu 当前网络，请切换到对应 FullOn 网络后重试',RPC_CHAIN_ID_MISMATCH:'RPC Chain ID 配置错误',RPC_TIMEOUT:'链上 RPC 连接超时',HUFU_NETWORK_TIMEOUT:'HuFu 网络查询超时',CHAIN_TIME_STALE:'节点区块时间异常或同步已停滞，请等待网络恢复后重试',HUFU_ACCOUNT_TIMEOUT:'HuFu 账户选择超时',HUFU_ACCOUNT_UNAVAILABLE:'未获取到 HuFu 账户',HUFU_PROVIDER_UNAVAILABLE:'未检测到 HuFu 钱包',ACCOUNT_CHANGED:'HuFu 当前账户已变化，请重新连接'};const en={WALLET_CHAIN_ID_MISMATCH:'The wallet network does not match this site. Switch to the corresponding network in HuFu.',WALLET_CHAIN_UNCONFIRMED:'Unable to confirm the HuFu network. Switch to the matching FullOn network and retry.',RPC_TIMEOUT:'The chain RPC timed out.',HUFU_NETWORK_TIMEOUT:'The HuFu network query timed out.',CHAIN_TIME_STALE:'RPC block time is stale or incorrect. Retry after the network recovers.',ACCOUNT_CHANGED:'The active HuFu account changed. Reconnect the wallet.'};return currentLanguage==='zh-CN'?(zh[code]||`钱包连接失败：${code}`):(en[code]||`Wallet connection failed: ${code}`)}
 function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
 function assetAmount(value){const amount=Number.parseFloat(String(value||'0'));return Number.isFinite(amount)?amount:0}
+function decimalUnits(value){const text=String(value??'').trim();if(!/^\d+(?:\.\d{0,8})?$/.test(text))throw new Error('INVALID_FLON_AMOUNT');const [whole,fraction='']=text.split('.');return BigInt(whole)*100000000n+BigInt((fraction+'00000000').slice(0,8))}
+function assetUnits(value){const match=String(value||'0').trim().match(/^(\d+(?:\.\d{0,8})?)/);return match?decimalUnits(match[1]):0n}
+function formatUnits(units){const value=BigInt(units),whole=value/100000000n,fraction=(value%100000000n).toString().padStart(8,'0');return `${whole}.${fraction}`}
 function formatVotes(value){const amount=Number(value||0)/100000000;if(amount>=1000000)return`${(amount/1000000).toFixed(2)}M`;if(amount>=1000)return`${(amount/1000).toFixed(1)}K`;return amount.toFixed(2)}
 function formatVoteAsset(value){const digits=String(value||0).replace(/^0+(?=\d)/,'')||'0',padded=digits.padStart(9,'0');return`${padded.slice(0,-8)}.${padded.slice(-8)} FLON`}
 function producerInitials(account){return String(account).split('.').map(part=>part[0]||'').join('').slice(0,2).toUpperCase()||'BP'}
@@ -136,7 +139,7 @@ async function refreshElection(){
     electionState=await loadElection();
     const nodeList=document.querySelector('.node-list'),selectList=document.querySelector('.select-list');
     if(nodeList)nodeList.innerHTML=electionState.producers.map((producer,index)=>`<button class="node-card" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}" data-status="${escapeHtml(producer.status)}" data-name="${escapeHtml(`${producer.owner} ${producer.url||''}`.toLowerCase())}"><span class="rank din">${String(index+1).padStart(2,'0')}</span><span class="node-logo blue-logo">${escapeHtml(producerInitials(producer.owner))}</span><span class="node-main"><strong>${escapeHtml(producer.owner)}</strong><small>${escapeHtml(producer.url||'No public URL')}</small><span><b>${escapeHtml(producer.status)}</b><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></span></span><span class="node-votes"><strong class="din">${escapeHtml(formatVotes(producer.total_votes))}</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></span></button>`).join('');
-    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').slice(0,51).map((producer,index)=>`<label class="select-node" data-producer="${escapeHtml(producer.owner)}"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span><span class="node-logo blue-logo">${escapeHtml(producerInitials(producer.owner))}</span><span><strong>${escapeHtml(producer.owner)}</strong><small>#${index+1} · ${escapeHtml(producer.status)}</small></span><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></label>`).join('');
+    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').slice(0,51).map((producer,index)=>`<div class="select-node" data-producer="${escapeHtml(producer.owner)}"><label class="check-control"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span></label><span class="node-logo blue-logo">${escapeHtml(producerInitials(producer.owner))}</span><span><strong>${escapeHtml(producer.owner)}</strong><small>#${index+1} · 分享 ${Number(producer.reward_shared_ratio||0)/100}%</small></span><input class="node-vote-input din" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" data-node-votes disabled aria-label="${escapeHtml(producer.owner)} FLON votes"></div>`).join('');
     const standbyCount=electionState.producers.filter(producer=>producer.status==='standby').length;
     const summary=document.querySelector('.rank-summary');if(summary)summary.querySelector('strong').textContent=`${electionState.activeCount} / ${electionState.activeTarget}`;
     document.querySelectorAll('[data-active-count]').forEach(node=>node.textContent=String(electionState.activeCount));
@@ -166,7 +169,8 @@ function renderVotingAccount(){
   const nodeVoteAmount=connected?assetAmount(nodeVoteStake).toFixed(8):'—';
   const producers=connected?(votingState.pendingProducers||votingState.effectiveProducers||[]):[];
   const rewards=connected?votingState.unclaimedRewards:'— FLON';
-  setText('[data-glon-balance]',`${glonAmount} GLON`);setText('[data-profile-glon]',`${glonAmount} GLON`);setText('[data-vote-stake]',connected?nodeVoteStake:'— FLON');
+  const owned=connected?assetUnits(nodeVoteStake)+assetUnits(votingState.flon):0n;
+  setText('[data-glon-balance]',`${glonAmount} GLON`);setText('[data-profile-glon]',`${glonAmount} GLON`);setText('[data-vote-stake]',connected?nodeVoteStake:'— FLON');setText('[data-vote-liquid]',connected?votingState.flon:'— FLON');setText('[data-vote-owned]',connected?`${formatUnits(owned)} FLON`:'— FLON');
   setText('[data-voting-stake]',connected?nodeVoteAmount:'—');setText('[data-voted-bps]',connected?`${producers.length} / 30`:'— / 30');setText('[data-profile-votes]',connected?`${producers.length} 个 BP`:'— 个 BP');
   setText('[data-unclaimed-rewards]',rewards);setText('[data-profile-rewards]',rewards);setText('[data-profile-claimable]',connected?rewards:'连接钱包后读取');
   setText('[data-claimable-summary]',connected?`链上已结算 ${rewards}`:'连接钱包后读取链上已结算余额');
@@ -175,8 +179,12 @@ function renderVotingAccount(){
 }
 function syncVotingSelection(){
   if(!votingState)return;
-  const selected=new Set(votingState.pendingProducers||votingState.effectiveProducers||[]);
-  document.querySelectorAll('.select-node').forEach(label=>{const input=label.querySelector('input');if(input)input.checked=selected.has(label.dataset.producer)});
+  const source=votingState.pendingAllocations||votingState.effectiveAllocations;
+  const producers=votingState.pendingProducers||votingState.effectiveProducers||[];
+  const totalUnits=BigInt(votingState.pending?.votes??votingState.voter?.votes??0);
+  const fallback=producers.length?totalUnits/BigInt(producers.length):0n;
+  const allocations=new Map((source||producers.map(producer=>({producer,votes:fallback.toString()}))).map(item=>[item.producer,BigInt(item.votes||0)]));
+  document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),amount=label.querySelector('[data-node-votes]'),units=allocations.get(label.dataset.producer)||0n;if(checkbox)checkbox.checked=units>0n;if(amount){amount.disabled=units<=0n;amount.value=units>0n?formatUnits(units):''}});
 }
 function candidateSteps(){return `<div class="wizard-steps" aria-label="注册进度">${['资格检查','公开资料','节点配置','确认注册'].map((label,index)=>`<span class="${candidateStep===index+1?'is-active':''} ${candidateStep>index+1?'is-done':''}"><i>${candidateStep>index+1?'✓':index+1}</i><small>${label}</small></span>`).join('')}</div>`}
 function saveCandidateStep(){const form=sheetContent.querySelector('[data-candidate-form]');if(!form)return true;const keyField=form.elements.producerKey;if(keyField){const validKey=/^(FU|EOS)[1-9A-HJ-NP-Za-km-z]{50,}$/.test(keyField.value.trim());keyField.setCustomValidity(validKey?'':'请输入有效的 FU 或 EOS Base58 出块公钥')}if(!form.reportValidity())return false;new FormData(form).forEach((value,key)=>candidateDraft[key]=String(value).trim());return true}
@@ -230,27 +238,30 @@ function openCandidateWizard(step=1){
   openSheet(`<h2 id="sheet-title">申请 BP 竞选</h2><p class="sheet-subtitle">${candidateStep}/4 · ${['资格检查','公开资料','节点配置','确认注册'][candidateStep-1]}</p>${candidateSteps()}${body}`);
 }
 
-function selectedProducers(){return [...document.querySelectorAll('.select-node input:checked')].map(input=>input.closest('.select-node')?.dataset.producer).filter(Boolean).sort()}
-function restoreSelectedProducers(producers){
-  const selected=new Set(producers);
-  document.querySelectorAll('.select-node').forEach(label=>{const input=label.querySelector('input');if(input)input.checked=selected.has(label.dataset.producer)});
-  updateAllocation();
-}
+function draftVoteAllocations(){return [...document.querySelectorAll('.select-node')].filter(label=>label.querySelector('input[type="checkbox"]')?.checked).map(label=>{const input=label.querySelector('[data-node-votes]');return{producer:label.dataset.producer,votes:decimalUnits(input?.value||'0')}}).sort((a,b)=>a.producer.localeCompare(b.producer))}
+function restoreVoteAllocations(allocations){const values=new Map(allocations.map(item=>[item.producer,BigInt(item.votes)]));document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),input=label.querySelector('[data-node-votes]'),units=values.get(label.dataset.producer)||0n;if(checkbox)checkbox.checked=units>0n;if(input){input.disabled=units<=0n;input.value=units>0n?formatUnits(units):''}});updateAllocation()}
 async function confirmVote(){
   if(!walletSession){openWalletSheet();return}
   if(!electionState){showToast('链上 BP 数据尚未就绪');return}
-  const producers=selectedProducers();if(producers.length>30){showToast('最多选择 30 个 BP');return}
+  let allocations;try{allocations=draftVoteAllocations()}catch{showToast('请输入最多 8 位小数的有效 FLON 票数');return}
+  if(allocations.length>30){showToast('最多投票给 30 个 BP');return}
+  if(allocations.some(item=>item.votes<=0n)){showToast('每个已选 BP 的票数必须大于 0');return}
+  const draft=[...allocations];
   try{await refreshVotingAccount()}catch(error){showToast(`读取链上票权失败：${String(error?.message||error)}`);return}
-  // refreshVotingAccount synchronizes the checkboxes with the current on-chain
-  // allocation. Restore the user's draft before rendering and signing it.
-  restoreSelectedProducers(producers);pendingVoteProducers=producers;
-  const nodeVoteStake=votingState?.nodeVoteStake||'0.00000000 FLON';
-  const powerPerNode=producers.length?(assetAmount(nodeVoteStake)/producers.length).toFixed(8):'0.00000000';
-  openSheet(`<h2 id="sheet-title">确认节点投票</h2><p class="sheet-subtitle">请核对交易内容，签名后将在下一 Epoch 生效</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>flon::voteproducer</strong></div><div><span>选择 BP</span><strong>${producers.length} 个</strong></div><div><span>FLON 投票本金</span><strong>${escapeHtml(nodeVoteStake)}</strong></div><div><span>每节点票权</span><strong>${escapeHtml(powerPerNode)} FLON</strong></div><div><span>DAO治理凭证</span><strong>${escapeHtml(votingState?.glon||'0.00000000 GLON')}</strong></div></div><p class="sign-warning">目标列表将按账户名排序提交。交易入块后，新的分配在下一 Epoch 边界生效。GLON 仅用于DAO治理，不参与 BP 排名计算。</p><div class="profile-review"><small>${escapeHtml(producers.join(' · ')||'清空全部 BP 投票')}</small></div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="vote-sign">在 HuFu 中签名</button></div>`);
+  restoreVoteAllocations(draft);pendingVoteAllocations=draft;
+  const total=draft.reduce((sum,item)=>sum+item.votes,0n),current=assetUnits(votingState?.nodeVoteStake),available=assetUnits(votingState?.flon),owned=current+available,delta=total-current;
+  if(total>owned){showToast(`分配合计不能超过账户拥有的 ${formatUnits(owned)} FLON`);return}
+  if(delta<0n&&votingState?.refund){showToast('已有一笔撤票退款待领取，暂时不能减少投票总额');return}
+  if(!votingState?.voteAllocationSupported){showToast('当前链上合约尚未启用逐 BP 票数分配');return}
+  const actionNames=[delta>0n?'flon::addvote':delta<0n?'flon::subvote':null,'flon::votealloc'].filter(Boolean).join(' + ');
+  openSheet(`<h2 id="sheet-title">确认节点投票</h2><p class="sheet-subtitle">请核对每个 BP 的票数，一次签名后将在下一 Epoch 生效</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>${escapeHtml(actionNames)}</strong></div><div><span>选择 BP</span><strong>${draft.length} 个</strong></div><div><span>分配合计</span><strong>${formatUnits(total)} FLON</strong></div><div><span>账户拥有</span><strong>${formatUnits(owned)} FLON</strong></div></div><div class="profile-review">${draft.map(item=>`<small>${escapeHtml(item.producer)}：${formatUnits(item.votes)} FLON</small>`).join('')||'<small>清空全部 BP 投票</small>'}</div><p class="sign-warning">所有 BP 分配之和必须等于锁定投票本金，且不能超过账户拥有的 FLON。每 1 FLON 最多产生 1 票，不会复制放大。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="vote-sign">在 HuFu 中签名</button></div>`);
 }
 async function submitVote(target){
-  if(!walletSession)return;const producers=pendingVoteProducers?[...pendingVoteProducers]:selectedProducers();target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
-  try{const result=await transact(walletSession,[{account:'flon',name:'voteproducer',data:{voter:walletSession.account,producers}}]),id=transactionId(result);pendingVoteProducers=null;openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">节点投票已广播</h2><p>${escapeHtml(producers.length)} 个 BP · 下一 Epoch 生效</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中签名':'Sign in HuFu';showToast(String(error?.message||error))}
+  if(!walletSession||!pendingVoteAllocations)return;const allocations=pendingVoteAllocations.map(item=>({...item})),total=allocations.reduce((sum,item)=>sum+item.votes,0n),current=assetUnits(votingState?.nodeVoteStake),delta=total-current,actions=[];
+  if(delta>0n)actions.push({account:'flon',name:'addvote',data:{voter:walletSession.account,vote_staked:`${formatUnits(delta)} FLON`}});else if(delta<0n)actions.push({account:'flon',name:'subvote',data:{voter:walletSession.account,vote_staked:`${formatUnits(-delta)} FLON`}});
+  actions.push({account:'flon',name:'votealloc',data:{voter:walletSession.account,allocations:allocations.map(item=>({producer:item.producer,votes:item.votes.toString()}))}});
+  target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
+  try{const result=await transact(walletSession,actions),id=transactionId(result);const count=allocations.length;pendingVoteAllocations=null;openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">节点投票已广播</h2><p>${formatUnits(total)} FLON · ${count} 个 BP · 下一 Epoch 生效</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中签名':'Sign in HuFu';showToast(walletErrorMessage(error))}
 }
 function formatFlon(value){return `${Number(value).toFixed(8)} FLON`}
 function refundReadyAt(refund){
@@ -306,7 +317,7 @@ document.addEventListener('click',async event=>{
     try{walletSession=await connectWallet();renderWallet();await refreshVotingAccount();closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已连接':'Wallet connected')}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'连接钱包':'Connect wallet';showToast(walletErrorMessage(error))}
   }
   if(action==='disconnect-wallet'){await disconnectWallet();walletSession=null;votingState=null;renderWallet();renderVotingAccount();syncVotingSelection();updateAllocation();closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已断开':'Wallet disconnected')}
-  if(action==='clear-selection'){document.querySelectorAll('.select-node input').forEach(input=>input.checked=false);updateAllocation()}
+  if(action==='clear-selection'){document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),amount=label.querySelector('[data-node-votes]');if(checkbox)checkbox.checked=false;if(amount){amount.value='';amount.disabled=true}});updateAllocation()}
   if(action==='producer-details')openProducerDetails(target.dataset.producer);
   if(action==='sign-vote')await confirmVote();
   if(action==='vote-sign')await submitVote(target);
@@ -328,13 +339,13 @@ document.addEventListener('click',async event=>{
   if(action==='claim-vote-refund')await claimVoteRefund(target);
 });
 overlay.addEventListener('click',closeSheet);
-document.addEventListener('change',event=>{if(event.target.matches('.select-node input'))updateAllocation();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
-document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}});
+document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation()}if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
+document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]'))updateAllocation()});
 document.querySelector('[data-language]').addEventListener('change',event=>{currentLanguage=event.target.value;localStorage.setItem('flon-daogov-language',currentLanguage);applyTranslations();showToast(currentLanguage==='zh-CN'?'语言已切换为中文':'Language changed to English')});
 
-function selectedCount(){return [...document.querySelectorAll('.select-node input:checked')].length}
-function perNode(){const count=selectedCount(),total=assetAmount(votingState?.nodeVoteStake);return count?(total/count).toFixed(8):'0.00000000'}
-function updateAllocation(){document.querySelector('[data-selected-count]').textContent=`${selectedCount()} / 30`;document.querySelector('[data-per-node]').textContent=perNode()}
+function selectedCount(){return [...document.querySelectorAll('.select-node input[type="checkbox"]:checked')].length}
+function allocationTotal(){try{return draftVoteAllocations().reduce((sum,item)=>sum+item.votes,0n)}catch{return 0n}}
+function updateAllocation(){const total=allocationTotal(),count=selectedCount(),owned=assetUnits(votingState?.nodeVoteStake)+assetUnits(votingState?.flon);document.querySelector('[data-selected-count]').textContent=`${count} / 30`;document.querySelector('[data-per-node]').textContent=count?'自定义':'—';document.querySelector('[data-allocation-total]').textContent=`${formatUnits(total)} FLON`;const confirm=document.querySelector('[data-action="sign-vote"]');if(confirm)confirm.disabled=!walletSession||count>30||total>owned}
 document.querySelectorAll('[data-node-filter]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-node-filter]').forEach(b=>b.classList.toggle('is-active',b===button));document.querySelectorAll('.node-card').forEach(card=>card.hidden=button.dataset.nodeFilter!=='all'&&card.dataset.status!==button.dataset.nodeFilter)}));
 document.querySelector('[data-node-search]').addEventListener('input',event=>{const query=event.target.value.trim().toLowerCase();document.querySelectorAll('.node-card').forEach(card=>card.hidden=query&&!card.dataset.name.includes(query))});
 document.querySelectorAll('[data-proposal-filter]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-proposal-filter]').forEach(b=>b.classList.toggle('is-active',b===button));document.querySelectorAll('.proposal-item').forEach(card=>card.hidden=button.dataset.proposalFilter!=='all'&&card.dataset.status!==button.dataset.proposalFilter)}));
