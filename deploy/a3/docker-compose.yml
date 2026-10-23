@@ -16,3 +16,4 @@ services:
       - "127.0.0.1:20102:80"
     volumes:
       - ./config.testnet.js:/usr/share/nginx/html/config.js:ro
+      - ./api.testnet.conf:/etc/nginx/daogov/api.conf:ro

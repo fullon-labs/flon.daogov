@@ -26,6 +26,11 @@ async function rpcInfo(){
   if(String(info.chain_id)!==config().chainId)throw new Error('RPC_CHAIN_ID_MISMATCH');
   return info;
 }
+function assertFreshChainTime(info,now=Date.now()){
+  const value=String(info?.head_block_time||'');
+  const chainTime=Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(value)?value:`${value}Z`);
+  if(!Number.isFinite(chainTime)||now-chainTime>90000||chainTime-now>30000)throw new Error('CHAIN_TIME_STALE');
+}
 function assertChain(chainId){if(chainId&&String(chainId)!==config().chainId)throw new Error('WALLET_CHAIN_ID_MISMATCH')}
 export function isHuFuApp(){return navigator.userAgent.toLowerCase().includes('hufu')||Boolean(window.HuFuJSProvider)}
 async function prepareHuFu(){
@@ -180,7 +185,7 @@ export async function loadElection(){
   return {producers,activeTarget,activeCount:active.size};
 }
 export async function transact(session,actions){
-  assertChain(session.chainId);await rpcInfo();
+  assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
   if(session.provider==='iframe')return window.__DAO_HUFU_CLIENT__.transact(authorized);
   if(session.provider==='hufu'){
@@ -188,5 +193,5 @@ export async function transact(session,actions){
     return provider.transact({transaction:{actions:authorized}});
   }
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
-  return anchorSession.transact({actions:authorized},{broadcast:true});
+  return anchorSession.transact({actions:authorized},{broadcast:true,blocksBehind:3,expireSeconds:120});
 }
