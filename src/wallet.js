@@ -17,6 +17,12 @@ function normalizeAccount(value){
 function save(session){localStorage.setItem(storageKey(),JSON.stringify(session));return session}
 function forget(){localStorage.removeItem(storageKey())}
 function load(){try{return JSON.parse(localStorage.getItem(storageKey())||'null')}catch{return null}}
+function formatAssetUnits(value,symbol,precision=8){
+  const negative=String(value||0).startsWith('-');
+  const digits=String(value||0).replace(/^-/, '').replace(/^0+(?=\d)/,'')||'0';
+  const padded=digits.padStart(precision+1,'0');
+  return `${negative?'-':''}${padded.slice(0,-precision)}.${padded.slice(-precision)} ${symbol}`;
+}
 function rpcRequest(path,body={}){
   const method=path.split('/').filter(Boolean).pop();
   if(method==='get_info'||method==='get_producer_schedule')return {method,params:[]};
@@ -180,8 +186,9 @@ export async function loadVotingAccount(account){
   const pending=pendingRows.rows?.find(row=>row.voter===account)||null;
   const rewards=rewardRows.rows?.find(row=>row.owner===account)||null;
   const glon=Array.isArray(balances)&&balances.length?balances[0]:'0.00000000 GLON';
+  const nodeVoteUnits=pending?.votes??voter?.votes??0;
   return {
-    account,glon,voter,pending,rewards,
+    account,glon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,rewards,
     nextEpoch:Number(epochRows.rows?.[0]?.next_epoch_to_close||0),
     effectiveVotes:Number(voter?.votes||0),
     effectiveProducers:Array.isArray(voter?.producers)?voter.producers:[],
