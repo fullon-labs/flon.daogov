@@ -66,25 +66,15 @@ async function prepareHuFu(){
 }
 function unwrapRpc(value){
   let current=value;
+  if(typeof current==='string'){try{current=JSON.parse(current)}catch{return current}}
   for(let depth=0;depth<4&&current&&typeof current==='object';depth++){
     if(current.chain_id||current.rows||Array.isArray(current))return current;
     if(current.result!==undefined){current=current.result;continue}
     if(current.payload!==undefined){current=current.payload;continue}
+    if(current.data!==undefined){current=current.data;continue}
     break;
   }
   return current;
-}
-function firstSuccessful(promises){
-  return new Promise((resolve,reject)=>{
-    const errors=[];
-    let pending=promises.length;
-    for(const promise of promises){
-      Promise.resolve(promise).then(resolve,error=>{
-        errors.push(error);
-        if(--pending===0)reject(errors);
-      });
-    }
-  });
 }
 async function prepareInjectedRpc(provider){
   const candidates=[];
@@ -94,18 +84,18 @@ async function prepareInjectedRpc(provider){
     candidates.push((method,params)=>Promise.resolve(provider.request({method,params})).then(unwrapRpc));
   }
   if(!candidates.length)throw new Error('HUFU_RPC_UNAVAILABLE');
-  try{
-    return await firstSuccessful(candidates.map(async call=>{
-      const info=unwrapRpc(await timeout(call('get_info',[]),8000,'HUFU_NETWORK_TIMEOUT'));
+  for(const call of candidates){
+    try{
+      const info=unwrapRpc(await timeout(call('get_info',[]),5000,'HUFU_NETWORK_TIMEOUT'));
       const chainId=info?.chain_id||info?.chainId;
       if(!chainId)throw new Error('HUFU_RPC_INVALID_RESPONSE');
       assertChain(chainId);
       return {call,info};
-    }));
-  }catch(errors){
-    if(errors?.some(item=>String(item?.message||item)==='WALLET_CHAIN_ID_MISMATCH'))throw new Error('WALLET_CHAIN_ID_MISMATCH');
-    throw new Error('HUFU_NETWORK_TIMEOUT');
+    }catch(error){
+      if(String(error?.message||error)==='WALLET_CHAIN_ID_MISMATCH')throw error;
+    }
   }
+  throw new Error('HUFU_NETWORK_TIMEOUT');
 }
 async function getAnchorLink(){
   if(anchorLink)return anchorLink;
@@ -147,6 +137,7 @@ export async function connectWallet(){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
     const account=normalizeAccount(Array.isArray(response)?response[0]:response);
     if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
+    await wait(700);
     const prepared=await prepareInjectedRpc(provider);
     walletRpc=prepared.call;
     return save({...account,chainId:config().chainId,provider:'hufu'});
