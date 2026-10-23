@@ -230,6 +230,36 @@ async function submitVote(target){
   if(!walletSession)return;const producers=pendingVoteProducers?[...pendingVoteProducers]:selectedProducers();target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
   try{const result=await transact(walletSession,[{account:'flon',name:'voteproducer',data:{voter:walletSession.account,producers}}]),id=transactionId(result);pendingVoteProducers=null;openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">节点投票已广播</h2><p>${escapeHtml(producers.length)} 个 BP · 下一 Epoch 生效</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中签名':'Sign in HuFu';showToast(String(error?.message||error))}
 }
+function formatFlon(value){return `${Number(value).toFixed(8)} FLON`}
+function refundReadyAt(refund){
+  if(!refund?.request_time)return 0;
+  const value=String(refund.request_time);
+  const timestamp=Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(value)?value:`${value}Z`);
+  return Number.isFinite(timestamp)?timestamp+180000:0;
+}
+async function openStakeSheet(){
+  if(!walletSession){openWalletSheet();return}
+  try{await refreshVotingAccount()}catch(error){showToast(`读取投票本金失败：${String(error?.message||error)}`);return}
+  if(!votingState?.stakeSupported){showToast('当前链上合约不支持调整投票本金');return}
+  const liquid=votingState.flon||'0.00000000 FLON',staked=votingState.nodeVoteStake||'0.00000000 FLON';
+  const refund=votingState.refund,readyAt=refundReadyAt(refund),ready=refund&&Date.now()>=readyAt;
+  openSheet(`<h2 id="sheet-title">调整投票本金</h2><p class="sheet-subtitle">质押 FLON 生成等额不可转让 GLON</p><div class="sign-summary"><div><span>可用 FLON</span><strong>${escapeHtml(liquid)}</strong></div><div><span>已投本金</span><strong>${escapeHtml(staked)}</strong></div><div><span>治理凭证</span><strong>${escapeHtml(votingState.glon)}</strong></div></div>${refund?`<div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>撤票退款 ${escapeHtml(refund.vote_staked)}</strong><small>${ready?'退款已成熟，可以领取':`可领取时间 ${escapeHtml(new Date(readyAt).toLocaleString())}`}</small></span></div>`:''}<form class="wizard-form" data-stake-form><label><span>操作</span><select name="operation"><option value="add">增加投票本金</option><option value="sub" ${refund?'disabled':''}>撤回投票本金</option></select></label><label><span>金额</span><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" required placeholder="0.00000000"></label><p class="field-note">增加本金在下一 Epoch 计入节点票权；撤票会立即销毁等额 GLON，FLON 在 3 分钟冷却期后领取。每个账户同一时间只能有一笔待领取退款。</p></form><div class="sheet-actions">${refund?`<button class="secondary-button" data-action="claim-vote-refund" ${ready?'':'disabled'}>领取退款</button>`:`<button class="secondary-button" data-action="close-sheet">取消</button>`}<button class="primary-button" data-action="stake-sign">检查并签名</button></div>`);
+}
+async function submitStake(target){
+  if(!walletSession||!votingState)return;
+  const form=sheetContent.querySelector('[data-stake-form]');if(!form||!form.reportValidity())return;
+  const operation=form.elements.operation.value,amount=Number(form.elements.amount.value);
+  const maximum=operation==='add'?assetAmount(votingState.flon):assetAmount(votingState.nodeVoteStake);
+  if(!Number.isFinite(amount)||amount<=0||amount>maximum){showToast(operation==='add'?'可用 FLON 余额不足':'投票本金不足');return}
+  const actionName=operation==='add'?'addvote':'subvote',quantity=formatFlon(amount);
+  target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
+  try{const result=await transact(walletSession,[{account:'flon',name:actionName,data:{voter:walletSession.account,vote_staked:quantity}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">投票本金交易已广播</h2><p>${escapeHtml(actionName)} · ${escapeHtml(quantity)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><p class="sign-warning">新的节点排名票权将在下一 Epoch 生效。</p><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'检查并签名':'Review and sign';showToast(walletErrorMessage(error))}
+}
+async function claimVoteRefund(target){
+  if(!walletSession||!votingState?.refund)return;
+  target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
+  try{const result=await transact(walletSession,[{account:'flon',name:'voterefund',data:{owner:walletSession.account}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">撤票退款已领取</h2><p>${escapeHtml(votingState.refund.vote_staked)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'领取退款':'Claim refund';showToast(walletErrorMessage(error))}
+}
 async function confirmClaimRewards(){
   if(!walletSession){openWalletSheet();return}
   try{await refreshVotingAccount()}catch(error){showToast(`读取奖励失败：${String(error?.message||error)}`);return}
@@ -268,7 +298,9 @@ document.addEventListener('click',async event=>{
   if(action==='refresh-bp-status')await refreshBPRecovery();
   if(action==='resume-producer')confirmResumeProducer();
   if(action==='resume-producer-sign')await submitResumeProducer(target);
-  if(action==='stake')openSheet(`<h2 id="sheet-title">调整投票本金尚未启用</h2><p class="sheet-subtitle">需要先确认 addvote / subvote 的主网 ABI 与资产精度</p><p class="sign-warning">当前版本不会根据示例余额构造质押或撤票交易。节点选择与投票奖励领取已使用真实链上状态。</p><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`)
+  if(action==='stake')await openStakeSheet();
+  if(action==='stake-sign')await submitStake(target);
+  if(action==='claim-vote-refund')await claimVoteRefund(target);
 });
 overlay.addEventListener('click',closeSheet);
 document.addEventListener('change',event=>{if(event.target.matches('.select-node input'))updateAllocation();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
