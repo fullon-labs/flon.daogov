@@ -35,7 +35,7 @@
   <div id="app-frame">
     <header class="topbar">
       <button class="icon-button" type="button" aria-label="返回 HuFu"><svg><use href="#i-back"/></svg></button>
-      <div class="top-title"><strong>治理中心</strong><button class="network" type="button" data-action="network"><i></i><span data-network-name>FullOn 测试网</span></button></div>
+      <div class="top-title"><strong>社区治理</strong><button class="network" type="button" data-action="network"><i></i><span data-network-name>FullOn 测试网</span></button></div>
       <div class="top-actions">
         <label class="language-picker" aria-label="语言"><span>文</span><select data-language><option value="zh-CN">中文</option><option value="en">EN</option></select></label>
         <button class="icon-button notify" type="button" aria-label="治理通知" data-action="toast" data-message="你有 3 项治理任务"><svg><use href="#i-bell"/></svg><span>3</span></button>
@@ -78,7 +78,7 @@
           <section class="section proposal-preview">
             <div class="section-title"><h2>社区治理</h2><button type="button" data-view-target="dao">查看全部</button></div>
             <button class="proposal-card" type="button" data-action="governance-unavailable">
-              <div><span class="status endorsement">待接入</span><span class="proposal-id">DAO Governance</span></div>
+              <div><span class="status endorsement">待接入</span><span class="proposal-id">社区治理</span></div>
               <h3>提案、附议、投票与 Timelock</h3>
               <p>当前尚未配置可验证的治理合约数据源；本页不会构造或广播模拟治理交易。</p>
             </button>
@@ -113,10 +113,10 @@
 
       <section class="view" data-view="dao" hidden>
         <div class="content">
-          <div class="page-heading"><span><small>社区决策</small><h1>DAO 治理</h1></span><button class="primary-small" type="button" data-action="governance-unavailable"><svg><use href="#i-edit"/></svg>发起提案</button></div>
+          <div class="page-heading"><span><small>社区决策</small><h1>社区治理</h1></span><button class="primary-small" type="button" data-action="governance-unavailable"><svg><use href="#i-edit"/></svg>发起提案</button></div>
           <div class="governance-stats"><span><strong class="din">—</strong><small>附议中</small></span><span><strong class="din">—</strong><small>投票中</small></span><span><strong class="din">—</strong><small>待执行</small></span></div>
           <div class="tabs dao-tabs"><button class="is-active" data-proposal-filter="all">全部</button><button data-proposal-filter="endorsement">附议中</button><button data-proposal-filter="voting">投票中</button><button data-proposal-filter="execution">待执行</button></div>
-          <div class="proposal-list"><div class="inline-error">DAO Governance 合约尚未配置。提案、附议、投票和执行功能当前不可用，也不会广播模拟交易。</div></div>
+          <div class="proposal-list"><div class="inline-error">社区治理合约尚未配置。提案、附议、投票和执行功能当前不可用，也不会广播模拟交易。</div></div>
         </div>
       </section>
 
@@ -135,7 +135,7 @@
     <nav class="bottom-nav canvas-fixed" aria-label="治理中心导航">
       <button class="is-active" data-view-target="overview"><svg><use href="#i-home"/></svg><span>概览</span></button>
       <button data-view-target="nodes"><svg><use href="#i-node"/></svg><span>BP 与投票</span></button>
-      <button data-view-target="dao"><svg><use href="#i-dao"/></svg><span>治理</span><i class="nav-dot"></i></button>
+      <button data-view-target="dao"><svg><use href="#i-dao"/></svg><span>社区治理</span><i class="nav-dot"></i></button>
       <button data-view-target="mine"><svg><use href="#i-user"/></svg><span>我的</span></button>
     </nav>
 
