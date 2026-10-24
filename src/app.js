@@ -208,7 +208,7 @@ function renderVotingAccount(){
   const rewards=connected?votingState.unclaimedRewards:'— FLON';
   const owned=connected?assetUnits(nodeVoteStake)+assetUnits(votingState.flon):0n;
   setText('[data-glon-balance]',`${glonAmount} GLON`);setText('[data-profile-glon]',`${glonAmount} GLON`);setText('[data-vote-stake]',connected?nodeVoteStake:'— FLON');setText('[data-vote-liquid]',connected?votingState.flon:'— FLON');setText('[data-vote-owned]',connected?`${formatUnits(owned)} FLON`:'— FLON');
-  setText('[data-voting-stake]',connected?nodeVoteAmount:'—');setText('[data-voted-bps]',connected?`${producers.length} / 30`:'— / 30');setText('[data-profile-votes]',connected?`${producers.length} 个 BP`:'— 个 BP');
+  setText('[data-voting-stake]',connected?nodeVoteAmount:'—');setText('[data-voted-bps]',connected?String(producers.length):'—');setText('[data-profile-votes]',connected?`${producers.length} 个 BP`:'— 个 BP');
   setText('[data-unclaimed-rewards]',rewards);setText('[data-profile-rewards]',rewards);setText('[data-profile-claimable]',connected?rewards:'连接钱包后读取');
   const hasClaimableRewards=connected&&assetAmount(rewards)>0;
   setText('[data-claimable-summary]',connected?(hasClaimableRewards?`链上已结算 ${rewards}`:'暂无已结算奖励可领取'):'连接钱包后读取链上已结算余额');
