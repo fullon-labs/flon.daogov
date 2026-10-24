@@ -1,12 +1,12 @@
 # DAO Governance 链上日常维护操作指南
 
-本文面向 FullOn 网络运营人员、Block Producer（BP）和自动化 Keeper，说明 DAO Governance 上线后需要持续执行的链上维护交易。
+本文面向 FullOn 网络运营人员、Block Producer（BP）和自动化 Keeper。当前协议的 Epoch 封存由 `onblock` 有界状态机自动推进，不再依赖外部 `closeepoch`。
 
 这里有两类职责不同的交易：
 
 | Action | 谁提交 | 周期 | 主要作用 |
 | --- | --- | --- | --- |
-| `flon::closeepoch` | 公共 Keeper；任何账户均可触发 | 每个基础奖励 epoch 结束后 | 结算 BP/Voter 基础奖励、绩效状态和下一 epoch 票权 |
+| `flon::claimrewards` | BP 本人或公共 Keeper 代触发 | 建议每小时检查；BP 可按天自行领取 | 同时领取该 BP 已封存的基础和 GAS 奖励 |
 | `flon::standbyproof` | 每个 Standby BP 本人或其专用授权机器人 | 当前 GAS epoch 内定期提交 | 证明该 Standby BP 持续在线并取得当期 GAS Standby 奖励资格 |
 
 两者不能互相代替。公共 Keeper 不应持有 Standby BP 的 `active` 私钥；Standby BP 也不能假设公共 Keeper 会替自己提交在线证明。
@@ -26,89 +26,26 @@
 
 主网和测试网必须使用独立配置、钱包和告警通道。自动化程序应把允许的 chain ID 写入只读配置，并在不匹配时立即停止。
 
-## 2. 基础奖励 epoch：`closeepoch`
+## 2. BP 奖励 Keeper：`claimrewards`
 
-### 2.1 为什么需要 Keeper
+### 2.1 为什么仍保留 Keeper
 
-`closeepoch` 不由 `onblock` 自动执行。`onblock` 只累计逐块奖励和确定性出块统计；完整 epoch 结算包含 BP 绩效判定、状态表扫描、Voter 分享池划拨、inline action 和下一 epoch 票权激活。如果把这些工作放入每块必经的 `onblock`，CPU 超限、转账失败或异常数据可能阻塞共识出块。
+Epoch 边界和奖励封存已经由 `onblock` 自动处理。Keeper 只帮助长期没有主动领取的 BP 发起 pull claim，不参与奖励计算，不能更改收款账户，也不持有 BP 私钥。
 
-因此，协议采用链下 Keeper 发起、链上确定性验证的 permissionless 模式。Keeper 只负责触发，不能修改结算结果。
+### 2.2 执行频率和安全边界
 
-### 2.2 执行频率
-
-基础奖励 epoch 固定为 6 小时。推荐参数：
-
-| 项目 | 推荐值 |
-| --- | --- |
-| 常态检查 | 距边界超过 30 分钟时每 15 分钟 |
-| 边界预热 | 距边界 30–10 分钟时每 5 分钟 |
-| 边界窗口 | 距边界不足 10 分钟，直到成功关闭前每 1 分钟 |
-| 正常提交 | epoch 边界后 1–5 分钟 |
-| 延迟告警 | 边界后 15 分钟仍未关闭 |
-| 严重告警 | 落后一个完整 epoch，即约 6 小时 |
-| Keeper 高可用 | 1 个主 Keeper，至少 2 个独立备用监控/补单 Keeper |
-
-查询当前待关闭 epoch：
+默认每小时扫描一次所有已注册且仍 active 的 BP。只有 `unclaimed_rewards`、`prodclaims` 或 `gasclaims` 存在可领取记录时才广播交易。每个 BP 独立调用：
 
 ```bash
-fucli -u "$RPC_URL" get info
-fucli -u "$RPC_URL" get table flon flon rewardepoch
+fucli -u "$RPC_URL" push action flon claimrewards \
+  '["<KEEPER>","<PRODUCER>",24]' -p <KEEPER>@claimer
 ```
 
-只在 `rewardepoch.next_epoch_to_close` 对应 epoch 已经结束时提交：
+`max_steps=24` 对应最多处理约一天的一小时奖励行；积压更多时会在后续周期继续领取。BP 即使按天自行领取也不会丢失奖励，不要求 Keeper 每小时必然在线。
 
-```bash
-fucli -u "$RPC_URL" push action flon closeepoch \
-  '[<NEXT_EPOCH_TO_CLOSE>]'
-```
+Keeper 的专用 permission 必须只 link 到 `flon::claimrewards`。合约固定把资金转给 `producer`，`caller` 不能重定向资产。每笔交易等待 LIB 后才处理下一 BP；chain ID 不匹配、链头过旧或签名异常时停止本轮并告警。
 
-`closeepoch` 是 permissionless action，不应要求公共 Keeper 使用系统账户权限。提交后等待不可逆，再次读取 `rewardepoch`；只有 `next_epoch_to_close` 恰好增加 1 才算成功。
-
-### 2.3 错过一次或多次
-
-错过执行不会销毁奖励。对应 epoch 的 BP 基础奖励和 Voter 分享数据仍保留，可以稍后结算。但是延迟期间：
-
-- BP 和 Voter 尚不能领取该部分奖励；
-- `pendingvote` / `votedeltas` 的下一 epoch 票权变化不能及时生效；
-- BP 绩效、停权、恢复结果以及 Active schedule 变化会延迟；
-- 未结算数据继续占用链上 RAM；
-- DApp 会持续显示“待结算”或“待生效”。
-
-如果积压多个 epoch，必须严格串行追赶：
-
-1. 读取链上的 `next_epoch_to_close`；
-2. 只提交该 epoch 的 `closeepoch`；
-3. 等待不可逆并确认链上值增加 1；
-4. 重新读取状态；
-5. 如果新的 `next_epoch_to_close` 也已结束，再处理下一笔。
-
-不能跳号、不能并发关闭多个 epoch，也不要预签一批固定 epoch ID。两名 Keeper 同时提交相同 epoch 时，后到交易通常会被 `reward epochs must be closed sequentially` 拒绝。该拒绝不会破坏状态，但会浪费资源并产生无效告警。
-
-每次 action 只结算一个 epoch；积压不会自动合并为一笔大交易。因此通常可以安全地逐个追赶，奖励不会丢失。若单个 epoch 因 BP/奖励行过多出现 CPU 或 NET 超限，应停止盲目重试，保存错误、交易 ID 和相关表状态，并评估将结算升级为有界、可续跑的状态机。
-
-### 2.4 Keeper 自动化
-
-```text
-根据链上时间计算下一边界
-  ├─ 距边界 > 30 分钟：每 15 分钟校准一次
-  ├─ 距边界 30–10 分钟：每 5 分钟检查一次
-  └─ 距边界 < 10 分钟或已有积压：每 1 分钟检查
-       ├─ chain ID 不匹配 / 链未同步：停止并告警
-       ├─ next_epoch_to_close 尚未结束：等待下一轮
-       └─ epoch 已结束：提交 closeepoch(next_epoch_to_close)
-       ├─ 等待不可逆
-       ├─ 验证 next_epoch_to_close == 原值 + 1
-       └─ 如果仍有积压，串行处理下一 epoch
-```
-
-进程启动、重启或网络恢复时应立即完成一次全量检查，再进入自适应周期。链头/LIB、节点进程和 P2P 健康监控可以独立保持较高频率，但不需要因此每分钟查询或提交 `closeepoch`。
-
-自动化必须使用“读链后决定”，不能简单设置成每 6 小时无条件广播一笔交易。
-
-本项目已提供独立的 TypeScript 实现：[`keeper/`](../keeper/README.md)。它默认运行在
-dry-run 模式，要求显式配置目标 chain ID，采用 15/5/1 分钟自适应检查，并在每次
-提交后等待 LIB、验证 `next_epoch_to_close` 恰好增加 1，再继续追赶下一个 epoch。
-该程序不加载钱包或私钥，也不提交需要 BP 授权的 `standbyproof`。
+本项目实现见 [`keeper/`](../keeper/README.md)。主网默认 dry-run；测试网可单独启用广播。
 
 ## 3. Standby 在线证明：`standbyproof`
 
@@ -207,11 +144,10 @@ DAO Governance DApp 应分别为 Keeper 和 Standby BP 展示以下信息：
 
 ### Keeper 面板
 
-- 当前基础奖励 epoch 与 `next_epoch_to_close`；
-- 最近一次成功关闭时间和交易 ID；
-- 是否存在积压及积压数量；
-- “尚未结束 / 可以关闭 / 等待不可逆 / 已积压 / 执行失败”状态；
-- 严格按顺序追赶的说明和告警。
+- 最近一次扫描时间、链头和 LIB；
+- 当前检测到的可领取 BP；
+- 最近一次代领取的 BP、交易 ID 和不可逆状态；
+- dry-run / broadcast 模式及失败告警。
 
 ### Standby BP 面板
 
@@ -225,14 +161,6 @@ DAO Governance DApp 应分别为 Keeper 和 Standby BP 展示以下信息：
 
 DApp 可以帮助构造和解释交易，但不能托管 BP 私钥，也不能在用户不知情时自动使用钱包权限签名。无人值守 proof agent 应作为 BP 自主管理的独立服务部署，并使用最小权限密钥。
 
-## 5. 基础奖励与 GAS 奖励是独立状态机
+## 5. 自动封存与主动领取
 
-基础奖励 epoch 从 `reward_epoch_start` 开始编号；GAS epoch 使用绝对 block slot 与 `epoch_slots` 计算。两套 epoch ID、表和结算流程互不等价：
-
-- `closeepoch` 处理基础挖矿奖励、Voter 分享、BP 绩效和待生效票权；
-- `standbyproof` 只记录当前 GAS epoch 的 Standby 在线证明；
-- GAS 奖励还需要独立执行 `beginsettle`、分批 `settlenext` 和 `finalizeepoch`；
-- 完成基础 `closeepoch` 不代表 GAS epoch 已结算；
-- 完成 `standbyproof` 也不代表奖励已进入 `gas.reward` 待领取账本。
-
-监控、告警和运维脚本必须把两套状态机分别实现，严禁混用 epoch ID。
+基础奖励和 GAS 奖励各自按链上配置记录，但封存与内部结算都由 `onblock` 有界推进。BP 最终通过同一个 `flon::claimrewards` 拉取两类奖励；`standbyproof` 仍只负责 Standby 在线证明。外部 Keeper 不再调用 `closeepoch`、`beginsettle`、`settlenext` 或 `finalizeepoch`。

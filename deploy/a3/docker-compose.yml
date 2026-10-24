@@ -19,7 +19,7 @@ services:
       - ./api.testnet.conf:/etc/nginx/daogov/api.conf:ro
 
   daogov-keeper-mainnet:
-    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.1}
+    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.2.0}
     container_name: flon-daogov-keeper-mainnet
     restart: unless-stopped
     environment:
@@ -31,7 +31,7 @@ services:
       - "127.0.0.1:20111:8788"
 
   daogov-keeper-testnet:
-    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.1}
+    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.2.0}
     container_name: flon-daogov-keeper-testnet
     restart: unless-stopped
     environment:
@@ -39,8 +39,10 @@ services:
       KEEPER_CHAIN_ID: 18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f
       KEEPER_BROADCAST: "true"
       KEEPER_SIGNER_ACTOR: epoch.keeper
-      KEEPER_SIGNER_PERMISSION: closer
+      KEEPER_SIGNER_PERMISSION: claimer
       KEEPER_PRIVATE_KEY_FILE: /run/secrets/testnet_keeper_key
+      KEEPER_MAX_STEPS: "24"
+      KEEPER_POLL_MS: "3600000"
       KEEPER_HEALTH_PORT: "8788"
     secrets:
       - testnet_keeper_key
