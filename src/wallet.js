@@ -244,6 +244,28 @@ export async function loadBPAccount(account){
   }
   return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,selfStakeSupported,selfStakeConfig,selfStake,supported:true};
 }
+export async function loadProducerRewards(producer){
+  if(!/^[a-z1-5.]{1,12}$/.test(String(producer||'')))throw new Error('INVALID_BP_ACCOUNT');
+  const [abi,producerRows,baseRows,gasRows]=await Promise.all([
+    rpcPost('/v1/chain/get_abi',{account_name:'flon'}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'producers',lower_bound:producer,upper_bound:producer,limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:producer,table:'prodclaims',limit:1000}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:producer,table:'gasclaims',limit:1000}).catch(()=>({rows:[]})),
+  ]);
+  const supported=(abi.abi?.actions||[]).some(item=>item.name==='claimrewards');
+  const row=producerRows.rows?.find(item=>item.owner===producer)||null;
+  if(!row)throw new Error('BP_NOT_FOUND');
+  const sum=rows=>rows.reduce((total,item)=>total+BigInt(String(item.quantity||'0').split(' ')[0].replace('.','').padEnd(9,'0').slice(0,16)||0),0n);
+  const baseClaims=baseRows.rows||[],gasClaims=gasRows.rows||[];
+  return {
+    producer,row,supported,
+    baseUnclaimed:row.unclaimed_rewards||'0.00000000 FLON',
+    baseRows:baseClaims.length,
+    gasRows:gasClaims.length,
+    gasUnclaimed:formatAssetUnits(sum(gasClaims),'FLON'),
+    hasClaimable:Number.parseFloat(row.unclaimed_rewards||'0')>0||baseClaims.length>0||gasClaims.length>0,
+  };
+}
 export async function loadVotingAccount(account){
   const [balances,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows]=await Promise.all([
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'GLON'}).catch(()=>[]),
