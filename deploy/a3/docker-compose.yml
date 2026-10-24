@@ -38,6 +38,15 @@ services:
       KEEPER_RPC_URL: http://47.237.17.245:19889
       KEEPER_CHAIN_ID: 18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f
       KEEPER_BROADCAST: "true"
+      KEEPER_SIGNER_ACTOR: epoch.keeper
+      KEEPER_SIGNER_PERMISSION: closer
+      KEEPER_PRIVATE_KEY_FILE: /run/secrets/testnet_keeper_key
       KEEPER_HEALTH_PORT: "8788"
+    secrets:
+      - testnet_keeper_key
     ports:
       - "127.0.0.1:20112:8788"
+
+secrets:
+  testnet_keeper_key:
+    file: /data/flon-daogov/secrets/testnet-epoch-keeper.key

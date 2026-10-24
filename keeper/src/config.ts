@@ -1,10 +1,14 @@
 import {DEFAULT_EPOCH_MS} from './domain.js';
+import {readFileSync} from 'node:fs';
 
 export interface KeeperConfig {
   rpcUrl: string;
   expectedChainId: string;
   contract: string;
   broadcast: boolean;
+  signerActor?: string;
+  signerPermission?: string;
+  privateKey?: string;
   epochMs: number;
   maxHeadAgeMs: number;
   maxCatchupPerCycle: number;
@@ -47,11 +51,23 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): KeeperConfig {
     throw new Error('KEEPER_CHAIN_ID must be a 64-character hexadecimal chain ID');
   }
 
+  const broadcast = boolean(env, 'KEEPER_BROADCAST', false);
+  const signerActor = env.KEEPER_SIGNER_ACTOR;
+  const signerPermission = env.KEEPER_SIGNER_PERMISSION || 'active';
+  const privateKeyFile = env.KEEPER_PRIVATE_KEY_FILE;
+  const privateKey = privateKeyFile ? readFileSync(privateKeyFile, 'utf8').trim() : undefined;
+  if (broadcast && (!signerActor || !privateKey)) {
+    throw new Error('broadcast mode requires KEEPER_SIGNER_ACTOR and KEEPER_PRIVATE_KEY_FILE');
+  }
+
   return {
     rpcUrl,
     expectedChainId,
     contract: env.KEEPER_CONTRACT || 'flon',
-    broadcast: boolean(env, 'KEEPER_BROADCAST', false),
+    broadcast,
+    signerActor,
+    signerPermission,
+    privateKey,
     epochMs: positiveInteger(env, 'KEEPER_EPOCH_MS', DEFAULT_EPOCH_MS),
     maxHeadAgeMs: positiveInteger(env, 'KEEPER_MAX_HEAD_AGE_MS', 90_000),
     maxCatchupPerCycle: positiveInteger(env, 'KEEPER_MAX_CATCHUP_PER_CYCLE', 16),
