@@ -7,6 +7,7 @@ const rpcUrl=()=>new URL(config().rpcUrl,window.location.origin).href.replace(/\
 const appId=()=>`flon-daogov-${config().network||'mainnet'}`;
 const storageKey=()=>`flon.daogov.wallet.${config().network||'mainnet'}`;
 const rewardEpochMilliseconds=21600000;
+const blockTimestampEpochMilliseconds=Date.UTC(2000,0,1);
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
@@ -44,20 +45,31 @@ function utcMilliseconds(value){
   const text=String(value||'');
   return Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(text)?text:`${text}Z`);
 }
-function epochTiming(chainInfo,globalRow,activationEpoch=null){
+function epochTiming(chainInfo,globalRow,rewardConfig=null,nextEpochToClose=null,activationEpoch=null){
   const chainHeadMs=utcMilliseconds(chainInfo?.head_block_time);
   const rewardStartMs=utcMilliseconds(globalRow?.reward_started_time);
   if(!Number.isFinite(chainHeadMs)||!Number.isFinite(rewardStartMs)||chainHeadMs<rewardStartMs)return null;
-  const currentEpoch=Math.floor((chainHeadMs-rewardStartMs)/rewardEpochMilliseconds);
-  const targetEpoch=Number.isInteger(Number(activationEpoch))?Number(activationEpoch):currentEpoch+1;
-  return {chainHeadMs,rewardStartMs,currentEpoch,targetEpoch,boundaryMs:rewardStartMs+targetEpoch*rewardEpochMilliseconds};
+  const headSlot=Math.floor((chainHeadMs-blockTimestampEpochMilliseconds)/500);
+  const firstEpoch=Number(rewardConfig?.first_epoch_id),v2StartSlot=Number(rewardConfig?.start_slot),v2EpochSlots=Number(rewardConfig?.epoch_slots);
+  const hasV2=Number.isSafeInteger(firstEpoch)&&Number.isSafeInteger(v2StartSlot)&&Number.isSafeInteger(v2EpochSlots)&&v2EpochSlots>0;
+  const currentEpoch=hasV2&&headSlot>=v2StartSlot
+    ? firstEpoch+Math.floor((headSlot-v2StartSlot)/v2EpochSlots)
+    : Math.floor((chainHeadMs-rewardStartMs)/rewardEpochMilliseconds);
+  const hasActivationEpoch=activationEpoch!==null&&activationEpoch!==undefined&&Number.isSafeInteger(Number(activationEpoch));
+  const targetEpoch=hasActivationEpoch?Number(activationEpoch):currentEpoch+1;
+  const boundaryMs=hasV2&&targetEpoch>=firstEpoch
+    ? blockTimestampEpochMilliseconds+(v2StartSlot+(targetEpoch-firstEpoch)*v2EpochSlots)*500
+    : rewardStartMs+targetEpoch*rewardEpochMilliseconds;
+  return {chainHeadMs,rewardStartMs,currentEpoch,targetEpoch,boundaryMs,nextEpochToClose:Number(nextEpochToClose)};
 }
 export async function loadEpochTiming(activationEpoch=null){
-  const [chainInfo,globalRows]=await Promise.all([
+  const [chainInfo,globalRows,configRows,epochRows]=await Promise.all([
     rpcInfo(),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardcfgv2',limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}).catch(()=>({rows:[]})),
   ]);
-  return epochTiming(chainInfo,globalRows.rows?.[0],activationEpoch);
+  return epochTiming(chainInfo,globalRows.rows?.[0],configRows.rows?.[0],epochRows.rows?.[0]?.next_epoch_to_close,activationEpoch);
 }
 function assertFreshChainTime(info,now=Date.now()){
   const value=String(info?.head_block_time||'');
@@ -267,7 +279,7 @@ export async function loadProducerRewards(producer){
   };
 }
 export async function loadVotingAccount(account){
-  const [balances,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows]=await Promise.all([
+  const [balances,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows,rewardConfigRows]=await Promise.all([
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'GLON'}).catch(()=>[]),
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'FLON'}).catch(()=>[]),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
@@ -280,6 +292,7 @@ export async function loadVotingAccount(account){
     rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>({abi:{actions:[]}})),
     rpcInfo(),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardcfgv2',limit:1}).catch(()=>({rows:[]})),
   ]);
   const voter=voterRows.rows?.find(row=>row.owner===account)||null;
   const pending=pendingRows.rows?.find(row=>row.voter===account)||null;
@@ -309,7 +322,7 @@ export async function loadVotingAccount(account){
     effectiveAllocations:Array.isArray(effectiveAllocation?.allocations)?effectiveAllocation.allocations:null,
     pendingAllocations:Array.isArray(pendingAllocation?.allocations)?pendingAllocation.allocations:null,
     unclaimedRewards:rewards?.unclaimed_rewards||'0.00000000 FLON',
-    epochTiming:epochTiming(chainInfo,globalRows.rows?.[0],hasUnsettledVote?pendingActivationEpoch:null),
+    epochTiming:epochTiming(chainInfo,globalRows.rows?.[0],rewardConfigRows.rows?.[0],nextEpoch,hasUnsettledVote?pendingActivationEpoch:null),
     hasPendingVote:hasUnsettledVote,
   };
 }
