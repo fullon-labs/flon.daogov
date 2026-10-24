@@ -107,7 +107,7 @@
             <div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>投票分配在下一 Epoch 生效</strong><small>待生效状态以 flon::pendingvote 链上记录为准</small><small class="epoch-countdown"><span data-vote-epoch-label>正在读取链上时间…</span><b class="din" data-vote-epoch-countdown>--:--:--</b></small></span></div>
             <div class="section-title"><h2>选择 BP</h2><button type="button" data-action="clear-selection">清空</button></div>
             <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
-            <div class="sticky-action"><button class="secondary-button" type="button" data-action="clear-selection">清空选择</button><button class="primary-button" type="button" data-action="sign-vote">确认投票</button></div>
+            <div class="sticky-action"><button class="secondary-button" type="button" data-action="stake">本金与退款</button><button class="primary-button" type="button" data-action="sign-vote">确认投票</button></div>
           </div>
         </div>
       </section>
@@ -128,7 +128,7 @@
           <section class="section bp-recovery-card" data-bp-recovery>
             <div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>连接 BP 账户钱包后读取链上状态</small></div>
           </section>
-          <div class="action-grid"><button type="button" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><strong>领取投票奖励</strong><small data-profile-claimable>连接钱包后读取</small></button><button type="button" data-action="bp-claim"><span class="task-icon blue"><svg><use href="#i-reward"/></svg></span><strong>领取 BP 奖励</strong><small>可为 BP 代触发</small></button><button type="button" data-view-target="nodes" data-node-mode-target="vote"><span class="task-icon blue"><svg><use href="#i-vote"/></svg></span><strong>我的节点投票</strong><small data-profile-votes>— 个 BP</small></button><button type="button" data-action="candidate"><span class="task-icon purple"><svg><use href="#i-node"/></svg></span><strong>竞选管理</strong><small>读取链上状态</small></button></div>
+          <div class="action-grid"><button type="button" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><strong>领取投票奖励</strong><small data-profile-claimable>连接钱包后读取</small></button><button type="button" data-action="stake"><span class="task-icon amber"><svg><use href="#i-clock"/></svg></span><strong>投票本金与退款</strong><small data-refund-status>增加、撤回或领取</small></button><button type="button" data-view-target="nodes" data-node-mode-target="vote"><span class="task-icon blue"><svg><use href="#i-vote"/></svg></span><strong>我的节点投票</strong><small data-profile-votes>— 个 BP</small></button><button type="button" data-action="candidate"><span class="task-icon purple"><svg><use href="#i-node"/></svg></span><strong>竞选管理</strong><small>读取链上状态</small></button></div>
         </div>
       </section>
     </main>

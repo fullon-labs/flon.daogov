@@ -11,6 +11,7 @@ const runtimeConfig=Object.freeze({
   networkName:'FullOn 测试网',
   chainId:'18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f',
   rpcUrl:'/rpc',
+  voteRefundDelaySeconds:3*24*60*60,
   ...(window.__DAO_GOV_CONFIG__||{})
 });
 let toastTimer;
@@ -18,9 +19,11 @@ let walletSession=null;
 let bpRecoveryState=null;
 let bpRecoveryRequest=0;
 let votingState=null;
+let profileBPRewards=null;
 let electionState=null;
 let pendingVoteAllocations=null;
 let epochCountdownTimer=null;
+let refundCountdownTimer=null;
 let epochCountdownAnchor=null;
 let candidateStep=1;
 let candidateChainState={loading:false,registered:false,producer:null,error:''};
@@ -53,11 +56,14 @@ const translations=new Map([
   ['领取 BP 奖励','Claim BP rewards'],['代 BP 领取','Claim for a BP'],['BP 奖励领取','BP reward claim'],['当前账户可为自己或任意 BP 触发领取','The connected account can trigger a claim for itself or any BP'],['BP 收款账户','BP recipient'],['触发账户','Caller'],['基础奖励','Base rewards'],['GAS 奖励','GAS rewards'],['待领取记录','claim rows'],['本次最多处理','Maximum rows this claim'],['奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。','Rewards are always paid directly to the BP. The caller cannot change the recipient or receive the rewards.'],['检查奖励','Check rewards'],['确认代领','Confirm claim'],['BP 奖励领取交易已广播','BP reward claim broadcast'],['请输入有效的 BP 账户名','Enter a valid BP account name'],['未找到该 BP','BP not found'],['当前合约尚未启用 BP 奖励领取','BP reward claims are not enabled by the current contract'],['处理中…','Processing…'],['可由任意钱包代为触发','Any wallet can trigger this claim'],['可为 BP 代触发','Can trigger for a BP'],['治理权','Governance power'],['暂无可领取的 BP 奖励','No BP rewards are currently claimable']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
-  ['完成','Done'],['不可领取','Not claimable'],['GAS 待领取奖励','Unclaimed GAS rewards'],['尚未积累足够的已分配出块样本','Not enough assigned production samples have accumulated yet'],['未设置','N/A'],['暂无已结算奖励可领取','No settled rewards to claim']
+  ['完成','Done'],['不可领取','Not claimable'],['GAS 待领取奖励','Unclaimed GAS rewards'],['未设置','N/A'],['暂无已结算奖励可领取','No settled rewards to claim'],['当前账户未注册为 BP','The current account is not registered as a BP'],['奖励状态不可用','Reward status unavailable'],['当前合约未启用 BP 奖励领取','BP reward claims are not enabled by the current contract']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['连接钱包后读取链上已结算余额','Connect wallet to load the settled on-chain balance'],['提案、附议、投票与 Timelock','Proposals, endorsement, voting, and Timelock'],['当前尚未配置可验证的治理合约数据源；本页不会构造或广播模拟治理交易。','No verified governance contract data source is configured. This page does not construct or broadcast simulated governance transactions.'],['待接入','Pending integration'],['候选','Candidates'],
   ['连接钱包后读取','Connect wallet to load'],['链上选举状态','On-chain election status'],['实时 RPC','Live RPC'],['链上候选排名','On-chain candidate ranking'],['历史索引服务待接入','History indexer not connected'],['正在读取链上 BP 排名…','Loading on-chain BP ranking…'],['正在读取候选 BP…','Loading candidate BPs…'],['链上 BP 数据读取失败，请稍后刷新。','Failed to load on-chain BP data. Please try again later.'],['链上 BP 数据尚未就绪','On-chain BP data is not ready yet'],['投票分配在下一 Epoch 生效','Vote allocation takes effect next epoch'],['待生效状态以 flon::pendingvote 链上记录为准','Pending state is read from flon::pendingvote'],['正在读取链上时间…','Loading chain time…'],['距离下一 Epoch','Until next epoch'],['距离 Epoch 生效','Until epoch activation'],['等待 Epoch 结算','Awaiting epoch settlement'],['Epoch 时间不可用','Epoch timing unavailable'],['DAO 提案功能待接入','DAO proposal integration pending'],['治理合约 ABI 与部署地址确认后开放','Available after the governance ABI and deployment are verified'],['说明','Details'],['读取链上状态','Load on-chain status'],['待领取奖励','Claimable rewards'],['存在下一 Epoch 待生效修改','A change is pending for the next epoch'],['链上已结算','Settled on-chain'],['DAO Governance 尚未启用','DAO Governance is not enabled'],['当前站点未配置可验证的治理合约 ABI 与部署地址','This site has no verified governance contract ABI or deployment configured'],['提案、附议、正式投票、Timelock 和执行按钮已保持只读，不会请求钱包签名，也不会广播模拟交易。','Proposal, endorsement, formal voting, Timelock, and execution remain read-only; they neither request a wallet signature nor broadcast simulated transactions.'],['调整投票本金尚未启用','Voting stake adjustment is not enabled'],['需要先确认 addvote / subvote 的主网 ABI 与资产精度','The production addvote/subvote ABI and asset precision must be verified first'],['当前版本不会根据示例余额构造质押或撤票交易。节点选择与投票奖励领取已使用真实链上状态。','This version does not construct stake or unstake transactions from sample balances. BP selection and voter reward claims use real on-chain state.']
+].forEach(([zh,en])=>translations.set(zh,en));
+[
+  ['投票本金与退款','Voting stake & refund'],['本金与退款','Stake & refund'],['增加、撤回或领取','Add, unstake, or claim'],['撤票退款处理中','Vote refund pending'],['退款已可领取','Refund ready to claim'],['全部撤票并申请退款','Unstake all and request refund'],['确认退出节点投票','Confirm exit from node voting'],['全部 BP 分配将在下一 Epoch 清零','All BP allocations will become zero in the next epoch'],['退款冷却期','Refund cooldown'],['72 小时','72 hours'],['申请退款','Request refund'],['领取解锁 FLON','Claim unlocked FLON'],['解锁倒计时','Unlock countdown'],['预计可领取时间','Estimated claim time'],['等待退款成熟','Waiting for refund maturity'],['退出交易已广播','Exit transaction broadcast'],['FLON 已进入 72 小时退款冷却期','FLON entered the 72-hour refund cooldown'],['撤回投票本金并申请退款','Unstake voting principal and request refund'],['立即销毁等量凭证','Burn the same amount of receipts immediately']
 ].forEach(([zh,en])=>translations.set(zh,en));
 const sourceText=new WeakMap();
 const sourceAttrs=new WeakMap();
@@ -93,8 +99,8 @@ function setNodeMode(mode='directory'){
   document.querySelectorAll('[data-node-mode-panel]').forEach(panel=>panel.hidden=panel.dataset.nodeModePanel!==mode);
 }
 function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
-function openSheet(html){sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
+function openSheet(html){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden'}
+function closeSheet(){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
 function walletProviderName(provider){return provider==='iframe'?'HuFu App':provider==='hufu'?'HuFu Wallet':'Anchor Wallet'}
 function renderWallet(){const account=walletSession?.account||'未连接',label=walletSession?walletProviderName(walletSession.provider):'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
 const bpStatusMeta={0:['未评估',''],1:['合格','qualified'],2:['降级',''],3:['警告',''],4:['暂停','suspended'],5:['样本不足',''],6:['网络事件',''],7:['试运行','probation']};
@@ -140,15 +146,13 @@ function producerKey(producer){if(producer.producer_key)return producer.producer
 function safePublicUrl(value){try{const url=new URL(String(value||''));return ['http:','https:'].includes(url.protocol)?url.href:''}catch{return''}}
 async function openProducerDetails(owner){
   const index=electionState?.producers.findIndex(item=>item.owner===owner)??-1,producer=index>=0?electionState.producers[index]:null;if(!producer)return;
-  const url=safePublicUrl(producer.url),performance=producer.performance||{};
+  const url=safePublicUrl(producer.url);
   let rewards=null;try{rewards=await loadProducerRewards(producer.owner)}catch(error){console.error('Failed to load BP rewards',error)}
   const baseUnclaimed=rewards?.baseUnclaimed||producer.unclaimed_rewards||'0.00000000 FLON';
   const gasUnclaimed=rewards?.gasUnclaimed||'0.00000000 FLON';
   const hasClaimable=Boolean(rewards?.hasClaimable);
   const location=Number(producer.location||0)>0?String(producer.location):'未设置';
-  const statusCode=Number(performance.status??0),statusMeta=bpStatusMeta[statusCode]||bpStatusMeta[0];
-  const performanceDetail=Object.keys(performance).length?`<strong>BP 生产状态</strong><small>${statusMeta[0]}</small>${statusCode===5?'<small>尚未积累足够的已分配出块样本</small>':''}`:'';
-  openSheet(`<h2 id="sheet-title">BP 详情</h2><p class="sheet-subtitle">${escapeHtml(producer.owner)} · #${index+1}</p><div class="sign-summary"><div><span>节点状态</span><strong>${escapeHtml(producer.status)}</strong></div><div><span>排名</span><strong>#${index+1}</strong></div><div><span>精确节点票权</span><strong>${escapeHtml(formatVoteAsset(producer.total_votes))}</strong></div><div><span>奖励分享比例</span><strong>${Number(producer.reward_shared_ratio||0)/100}%</strong></div><div><span>未领取出块奖励</span><strong>${escapeHtml(baseUnclaimed)}</strong></div><div><span>GAS 待领取奖励</span><strong>${escapeHtml(gasUnclaimed)}</strong></div><div><span>最后领取时间</span><strong>${escapeHtml(producer.last_claim_time||'—')}</strong></div><div><span>地区代码</span><strong>${escapeHtml(location)}</strong></div><div><span>链上数据源</span><strong>flon::producers</strong></div></div><div class="profile-review"><strong>注册地址</strong>${url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`:`<small>${escapeHtml(producer.url||'—')}</small>`}<strong>出块公钥</strong><small class="full-value">${escapeHtml(producerKey(producer))}</small>${performanceDetail}</div><div class="sheet-actions ${hasClaimable?'':'one'}"><button class="secondary-button" data-action="close-sheet">完成</button>${hasClaimable?`<button class="primary-button" data-action="bp-claim" data-producer="${escapeHtml(producer.owner)}">领取 BP 奖励</button>`:''}</div>`);
+  openSheet(`<h2 id="sheet-title">BP 详情</h2><p class="sheet-subtitle">${escapeHtml(producer.owner)} · #${index+1}</p><div class="sign-summary"><div><span>节点状态</span><strong>${escapeHtml(producer.status)}</strong></div><div><span>排名</span><strong>#${index+1}</strong></div><div><span>精确节点票权</span><strong>${escapeHtml(formatVoteAsset(producer.total_votes))}</strong></div><div><span>奖励分享比例</span><strong>${Number(producer.reward_shared_ratio||0)/100}%</strong></div><div><span>未领取出块奖励</span><strong>${escapeHtml(baseUnclaimed)}</strong></div><div><span>GAS 待领取奖励</span><strong>${escapeHtml(gasUnclaimed)}</strong></div><div><span>最后领取时间</span><strong>${escapeHtml(producer.last_claim_time||'—')}</strong></div><div><span>地区代码</span><strong>${escapeHtml(location)}</strong></div><div><span>链上数据源</span><strong>flon::producers</strong></div></div><div class="profile-review"><strong>注册地址</strong>${url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`:`<small>${escapeHtml(producer.url||'—')}</small>`}<strong>出块公钥</strong><small class="full-value">${escapeHtml(producerKey(producer))}</small></div><div class="sheet-actions ${hasClaimable?'':'one'}"><button class="secondary-button" data-action="close-sheet">完成</button>${hasClaimable?`<button class="primary-button" data-action="bp-claim" data-producer="${escapeHtml(producer.owner)}">领取 BP 奖励</button>`:''}</div>`);
 }
 async function refreshElection(){
   try{
@@ -173,7 +177,17 @@ async function refreshElection(){
   }
 }
 async function refreshVotingAccount(){
-  votingState=walletSession?await loadVotingAccount(walletSession.account):{epochTiming:await loadEpochTiming(),hasPendingVote:false};
+  if(walletSession){
+    const [accountState,bpRewards]=await Promise.all([
+      loadVotingAccount(walletSession.account),
+      loadProducerRewards(walletSession.account).catch(error=>({error:String(error?.message||error)}))
+    ]);
+    votingState=accountState;
+    profileBPRewards=bpRewards;
+  }else{
+    votingState={epochTiming:await loadEpochTiming(),hasPendingVote:false};
+    profileBPRewards=null;
+  }
   renderVotingAccount();syncVotingSelection();updateAllocation();
 }
 function setText(selector,value){document.querySelectorAll(selector).forEach(node=>node.textContent=value)}
@@ -215,6 +229,13 @@ function renderVotingAccount(){
   setText('[data-claimable-summary]',connected?(hasClaimableRewards?`链上已结算 ${rewards}`:'暂无已结算奖励可领取'):'连接钱包后读取链上已结算余额');
   setText('[data-claim-action-label]',connected?(hasClaimableRewards?'领取':'不可领取'):'领取');
   document.querySelectorAll('[data-action="claim"]').forEach(button=>{button.disabled=connected&&!hasClaimableRewards;button.classList.toggle('is-unavailable',connected&&!hasClaimableRewards)});
+  const voteRefund=votingState?.refund,refundReady=voteRefund&&Date.now()>=refundReadyAt(voteRefund);
+  setText('[data-refund-status]',!connected?'连接钱包后读取':voteRefund?(refundReady?'退款已可领取':'撤票退款处理中'):'增加、撤回或领取');
+  const bpClaimButton=document.querySelector('[data-profile-bp-claim]');
+  const bpClaimable=connected&&profileBPRewards?.hasClaimable===true;
+  const bpClaimStatus=!connected?'连接钱包后读取':profileBPRewards?.error?.includes('BP_NOT_FOUND')?'当前账户未注册为 BP':profileBPRewards?.error?'奖励状态不可用':!profileBPRewards?.supported?'当前合约未启用 BP 奖励领取':bpClaimable?`${profileBPRewards.baseUnclaimed} + ${profileBPRewards.gasUnclaimed}`:'暂无可领取的 BP 奖励';
+  setText('[data-profile-bp-claimable]',bpClaimStatus);
+  if(bpClaimButton){bpClaimButton.disabled=!bpClaimable;bpClaimButton.classList.toggle('is-unavailable',!bpClaimable)}
   setText('[data-vote-source]',connected?'投票后生成等额不可转让 GLON，用于DAO治理':'连接钱包后读取链上 FLON 投票本金');
   applyTranslations();
   startEpochCountdown(votingState?.epochTiming,votingState?.hasPendingVote===true);
@@ -310,7 +331,19 @@ function refundReadyAt(refund){
   if(!refund?.request_time)return 0;
   const value=String(refund.request_time);
   const timestamp=Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(value)?value:`${value}Z`);
-  return Number.isFinite(timestamp)?timestamp+180000:0;
+  return Number.isFinite(timestamp)?timestamp+Number(runtimeConfig.voteRefundDelaySeconds||259200)*1000:0;
+}
+function updateRefundCountdown(){
+  const countdown=sheetContent.querySelector('[data-refund-countdown]'),claim=sheetContent.querySelector('[data-action="claim-vote-refund"]');
+  if(!countdown||!votingState?.refund)return;
+  const remaining=refundReadyAt(votingState.refund)-Date.now(),ready=remaining<=0;
+  countdown.textContent=ready?(currentLanguage==='zh-CN'?'退款已可领取':'Refund ready to claim'):formatCountdown(remaining);
+  if(claim){claim.disabled=!ready;claim.textContent=ready?(currentLanguage==='zh-CN'?'领取解锁 FLON':'Claim unlocked FLON'):(currentLanguage==='zh-CN'?'等待退款成熟':'Waiting for refund maturity')}
+}
+function startRefundCountdown(){
+  if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);
+  updateRefundCountdown();
+  refundCountdownTimer=window.setInterval(updateRefundCountdown,1000);
 }
 async function openStakeSheet(){
   if(!walletSession){openWalletSheet();return}
@@ -318,7 +351,23 @@ async function openStakeSheet(){
   if(!votingState?.stakeSupported){showToast('当前链上合约不支持调整投票本金');return}
   const liquid=votingState.flon||'0.00000000 FLON',staked=votingState.nodeVoteStake||'0.00000000 FLON';
   const refund=votingState.refund,readyAt=refundReadyAt(refund),ready=refund&&Date.now()>=readyAt;
-  openSheet(`<h2 id="sheet-title">调整投票本金</h2><p class="sheet-subtitle">质押 FLON 生成等额不可转让 GLON</p><div class="sign-summary"><div><span>可用 FLON</span><strong>${escapeHtml(liquid)}</strong></div><div><span>已投本金</span><strong>${escapeHtml(staked)}</strong></div><div><span>治理凭证</span><strong>${escapeHtml(votingState.glon)}</strong></div></div>${refund?`<div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>撤票退款 ${escapeHtml(refund.vote_staked)}</strong><small>${ready?'退款已成熟，可以领取':`可领取时间 ${escapeHtml(new Date(readyAt).toLocaleString())}`}</small></span></div>`:''}<form class="wizard-form" data-stake-form><label><span>操作</span><select name="operation"><option value="add">增加投票本金</option><option value="sub" ${refund?'disabled':''}>撤回投票本金</option></select></label><label><span>金额</span><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" required placeholder="0.00000000"></label><p class="field-note">增加本金在下一 Epoch 计入节点票权；撤票会立即销毁等额 GLON，FLON 在 3 分钟冷却期后领取。每个账户同一时间只能有一笔待领取退款。</p></form><div class="sheet-actions">${refund?`<button class="secondary-button" data-action="claim-vote-refund" ${ready?'':'disabled'}>领取退款</button>`:`<button class="secondary-button" data-action="close-sheet">取消</button>`}<button class="primary-button" data-action="stake-sign">检查并签名</button></div>`);
+  openSheet(`<h2 id="sheet-title">投票本金与退款</h2><p class="sheet-subtitle">质押 FLON 生成等额不可转让 GLON</p><div class="sign-summary"><div><span>可用 FLON</span><strong>${escapeHtml(liquid)}</strong></div><div><span>已投本金</span><strong>${escapeHtml(staked)}</strong></div><div><span>治理凭证</span><strong>${escapeHtml(votingState.glon)}</strong></div></div>${refund?`<div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>撤票退款 ${escapeHtml(refund.vote_staked)}</strong><small>预计可领取时间 ${escapeHtml(new Date(readyAt).toLocaleString())}</small><small class="epoch-countdown"><span>解锁倒计时</span><b class="din" data-refund-countdown>${ready?'退款已可领取':formatCountdown(readyAt-Date.now())}</b></small></span></div>`:''}<form class="wizard-form" data-stake-form><label><span>操作</span><select name="operation"><option value="add">增加投票本金</option><option value="sub" ${refund?'disabled':''}>撤回投票本金并申请退款</option></select></label><label><span>金额</span><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" required placeholder="0.00000000"></label><p class="field-note">增加本金在下一 Epoch 计入节点票权；撤票会立即销毁等量 GLON，BP 票权在下一 Epoch 移除，FLON 在 72 小时冷却期后领取。每个账户同一时间只能有一笔待领取退款。</p></form><div class="sheet-actions">${refund?`<button class="secondary-button" data-action="claim-vote-refund" ${ready?'':'disabled'}>${ready?'领取解锁 FLON':'等待退款成熟'}</button>`:`<button class="secondary-button danger-button" data-action="unstake-all">全部撤票并申请退款</button>`}<button class="primary-button" data-action="stake-sign">检查并签名</button></div>`);
+  if(refund)startRefundCountdown();
+}
+function confirmUnstakeAll(){
+  if(!walletSession||!votingState)return;
+  const staked=votingState.nodeVoteStake||'0.00000000 FLON';
+  if(assetAmount(staked)<=0){showToast(currentLanguage==='zh-CN'?'当前没有可撤回的投票本金':'No voting stake is available to unstake');return}
+  if(votingState.refund){showToast(currentLanguage==='zh-CN'?'已有一笔撤票退款待处理':'A vote refund is already pending');return}
+  openSheet(`<h2 id="sheet-title">确认退出节点投票</h2><p class="sheet-subtitle">全部 BP 分配将在下一 Epoch 清零</p><div class="sign-summary"><div><span>撤回本金</span><strong>${escapeHtml(staked)}</strong></div><div><span>Action</span><strong>flon::subvote + flon::votealloc</strong></div><div><span>退款冷却期</span><strong>72 小时</strong></div><div><span>GLON</span><strong>立即销毁等量凭证</strong></div></div><p class="sign-warning">签名后会创建链上退款申请。72 小时到期后仍需调用 flon::voterefund 领取，FLON 不会自动到账。</p><div class="sheet-actions"><button class="secondary-button" data-action="stake">返回</button><button class="primary-button danger-button" data-action="unstake-all-sign">申请退款</button></div>`);
+}
+async function submitUnstakeAll(target){
+  if(!walletSession||!votingState)return;
+  const quantity=votingState.nodeVoteStake;
+  if(assetAmount(quantity)<=0||votingState.refund)return;
+  target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
+  const actions=[{account:'flon',name:'subvote',data:{voter:walletSession.account,vote_staked:quantity}},{account:'flon',name:'votealloc',data:{voter:walletSession.account,allocations:[]}}];
+  try{const result=await transact(walletSession,actions),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">退出交易已广播</h2><p>${escapeHtml(quantity)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><p class="sign-warning">FLON 已进入 72 小时退款冷却期；BP 票权将在下一 Epoch 清零。到期后请返回“投票本金与退款”领取。</p><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'申请退款':'Request refund';showToast(walletErrorMessage(error))}
 }
 async function submitStake(target){
   if(!walletSession||!votingState)return;
@@ -381,7 +430,7 @@ document.addEventListener('click',async event=>{
     target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'连接中…':'Connecting…';
     try{walletSession=await connectWallet();renderWallet();await refreshVotingAccount();closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已连接':'Wallet connected')}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'连接钱包':'Connect wallet';showToast(walletErrorMessage(error))}
   }
-  if(action==='disconnect-wallet'){await disconnectWallet();walletSession=null;votingState=null;renderWallet();renderVotingAccount();syncVotingSelection();updateAllocation();closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已断开':'Wallet disconnected')}
+  if(action==='disconnect-wallet'){await disconnectWallet();walletSession=null;votingState=null;profileBPRewards=null;renderWallet();renderVotingAccount();syncVotingSelection();updateAllocation();closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已断开':'Wallet disconnected')}
   if(action==='clear-selection'){document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),amount=label.querySelector('[data-node-votes]');if(checkbox)checkbox.checked=false;if(amount){amount.value='';amount.disabled=true}});updateAllocation()}
   if(action==='producer-details')await openProducerDetails(target.dataset.producer);
   if(action==='sign-vote')await confirmVote();
@@ -404,6 +453,8 @@ document.addEventListener('click',async event=>{
   if(action==='resume-producer-sign')await submitResumeProducer(target);
   if(action==='stake')await openStakeSheet();
   if(action==='stake-sign')await submitStake(target);
+  if(action==='unstake-all')confirmUnstakeAll();
+  if(action==='unstake-all-sign')await submitUnstakeAll(target);
   if(action==='claim-vote-refund')await claimVoteRefund(target);
 });
 overlay.addEventListener('click',closeSheet);
