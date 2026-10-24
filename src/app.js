@@ -1,4 +1,4 @@
-import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadElection,loadVotingAccount,restoreWallet,transact} from './wallet.js';
+import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadElection,loadEpochTiming,loadVotingAccount,restoreWallet,transact} from './wallet.js';
 
 const views=[...document.querySelectorAll('.view')];
 const nav=[...document.querySelectorAll('.bottom-nav [data-view-target]')];
@@ -20,6 +20,8 @@ let bpRecoveryRequest=0;
 let votingState=null;
 let electionState=null;
 let pendingVoteAllocations=null;
+let epochCountdownTimer=null;
+let epochCountdownAnchor=null;
 let candidateStep=1;
 let candidateChainState={loading:false,registered:false,producer:null,error:''};
 const candidateDraft={
@@ -48,7 +50,7 @@ const translations=new Map([
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['连接钱包后读取链上已结算余额','Connect wallet to load the settled on-chain balance'],['提案、附议、投票与 Timelock','Proposals, endorsement, voting, and Timelock'],['当前尚未配置可验证的治理合约数据源；本页不会构造或广播模拟治理交易。','No verified governance contract data source is configured. This page does not construct or broadcast simulated governance transactions.'],['待接入','Pending integration'],['候选','Candidates'],
-  ['连接钱包后读取','Connect wallet to load'],['链上选举状态','On-chain election status'],['实时 RPC','Live RPC'],['链上候选排名','On-chain candidate ranking'],['历史索引服务待接入','History indexer not connected'],['正在读取链上 BP 排名…','Loading on-chain BP ranking…'],['正在读取候选 BP…','Loading candidate BPs…'],['链上 BP 数据读取失败，请稍后刷新。','Failed to load on-chain BP data. Please try again later.'],['链上 BP 数据尚未就绪','On-chain BP data is not ready yet'],['投票分配在下一 Epoch 生效','Vote allocation takes effect next epoch'],['待生效状态以 flon::pendingvote 链上记录为准','Pending state is read from flon::pendingvote'],['DAO 提案功能待接入','DAO proposal integration pending'],['治理合约 ABI 与部署地址确认后开放','Available after the governance ABI and deployment are verified'],['说明','Details'],['读取链上状态','Load on-chain status'],['待领取奖励','Claimable rewards'],['存在下一 Epoch 待生效修改','A change is pending for the next epoch'],['链上已结算','Settled on-chain'],['DAO Governance 尚未启用','DAO Governance is not enabled'],['当前站点未配置可验证的治理合约 ABI 与部署地址','This site has no verified governance contract ABI or deployment configured'],['提案、附议、正式投票、Timelock 和执行按钮已保持只读，不会请求钱包签名，也不会广播模拟交易。','Proposal, endorsement, formal voting, Timelock, and execution remain read-only; they neither request a wallet signature nor broadcast simulated transactions.'],['调整投票本金尚未启用','Voting stake adjustment is not enabled'],['需要先确认 addvote / subvote 的主网 ABI 与资产精度','The production addvote/subvote ABI and asset precision must be verified first'],['当前版本不会根据示例余额构造质押或撤票交易。节点选择与投票奖励领取已使用真实链上状态。','This version does not construct stake or unstake transactions from sample balances. BP selection and voter reward claims use real on-chain state.']
+  ['连接钱包后读取','Connect wallet to load'],['链上选举状态','On-chain election status'],['实时 RPC','Live RPC'],['链上候选排名','On-chain candidate ranking'],['历史索引服务待接入','History indexer not connected'],['正在读取链上 BP 排名…','Loading on-chain BP ranking…'],['正在读取候选 BP…','Loading candidate BPs…'],['链上 BP 数据读取失败，请稍后刷新。','Failed to load on-chain BP data. Please try again later.'],['链上 BP 数据尚未就绪','On-chain BP data is not ready yet'],['投票分配在下一 Epoch 生效','Vote allocation takes effect next epoch'],['待生效状态以 flon::pendingvote 链上记录为准','Pending state is read from flon::pendingvote'],['正在读取链上时间…','Loading chain time…'],['距离下一 Epoch','Until next epoch'],['距离 Epoch 生效','Until epoch activation'],['等待 Epoch 结算','Awaiting epoch settlement'],['Epoch 时间不可用','Epoch timing unavailable'],['DAO 提案功能待接入','DAO proposal integration pending'],['治理合约 ABI 与部署地址确认后开放','Available after the governance ABI and deployment are verified'],['说明','Details'],['读取链上状态','Load on-chain status'],['待领取奖励','Claimable rewards'],['存在下一 Epoch 待生效修改','A change is pending for the next epoch'],['链上已结算','Settled on-chain'],['DAO Governance 尚未启用','DAO Governance is not enabled'],['当前站点未配置可验证的治理合约 ABI 与部署地址','This site has no verified governance contract ABI or deployment configured'],['提案、附议、正式投票、Timelock 和执行按钮已保持只读，不会请求钱包签名，也不会广播模拟交易。','Proposal, endorsement, formal voting, Timelock, and execution remain read-only; they neither request a wallet signature nor broadcast simulated transactions.'],['调整投票本金尚未启用','Voting stake adjustment is not enabled'],['需要先确认 addvote / subvote 的主网 ABI 与资产精度','The production addvote/subvote ABI and asset precision must be verified first'],['当前版本不会根据示例余额构造质押或撤票交易。节点选择与投票奖励领取已使用真实链上状态。','This version does not construct stake or unstake transactions from sample balances. BP selection and voter reward claims use real on-chain state.']
 ].forEach(([zh,en])=>translations.set(zh,en));
 const sourceText=new WeakMap();
 const sourceAttrs=new WeakMap();
@@ -157,10 +159,32 @@ async function refreshElection(){
   }
 }
 async function refreshVotingAccount(){
-  votingState=walletSession?await loadVotingAccount(walletSession.account):null;
+  votingState=walletSession?await loadVotingAccount(walletSession.account):{epochTiming:await loadEpochTiming(),hasPendingVote:false};
   renderVotingAccount();syncVotingSelection();updateAllocation();
 }
 function setText(selector,value){document.querySelectorAll(selector).forEach(node=>node.textContent=value)}
+function formatCountdown(milliseconds){
+  const seconds=Math.max(0,Math.ceil(milliseconds/1000));
+  const hours=Math.floor(seconds/3600),minutes=Math.floor((seconds%3600)/60),remaining=seconds%60;
+  return [hours,minutes,remaining].map(value=>String(value).padStart(2,'0')).join(':');
+}
+function updateEpochCountdown(){
+  const label=document.querySelector('[data-vote-epoch-label]'),value=document.querySelector('[data-vote-epoch-countdown]');
+  if(!label||!value)return;
+  const timing=epochCountdownAnchor;
+  if(!timing){label.textContent=currentLanguage==='zh-CN'?'Epoch 时间不可用':'Epoch timing unavailable';value.textContent='--:--:--';return}
+  const estimatedChainNow=timing.chainHeadMs+(Date.now()-timing.observedAt);
+  const remaining=timing.boundaryMs-estimatedChainNow;
+  if(remaining<=0&&timing.hasPendingVote){label.textContent=`Epoch ${timing.targetEpoch} · ${currentLanguage==='zh-CN'?'等待 Epoch 结算':'Awaiting epoch settlement'}`;value.textContent='';return}
+  label.textContent=timing.hasPendingVote?`${currentLanguage==='zh-CN'?'距离 Epoch 生效':'Until epoch activation'} ${timing.targetEpoch}`:`${currentLanguage==='zh-CN'?'距离下一 Epoch':'Until next epoch'} ${timing.targetEpoch}`;
+  value.textContent=formatCountdown(remaining);
+}
+function startEpochCountdown(timing,hasPendingVote){
+  if(epochCountdownTimer)window.clearInterval(epochCountdownTimer);
+  epochCountdownAnchor=timing?{...timing,hasPendingVote,observedAt:Date.now()}:null;
+  updateEpochCountdown();
+  epochCountdownTimer=window.setInterval(updateEpochCountdown,1000);
+}
 function renderVotingAccount(){
   const connected=Boolean(walletSession&&votingState);
   const glon=connected?votingState.glon:'— GLON';
@@ -176,6 +200,7 @@ function renderVotingAccount(){
   setText('[data-claimable-summary]',connected?`链上已结算 ${rewards}`:'连接钱包后读取链上已结算余额');
   setText('[data-vote-source]',connected?'投票后生成等额不可转让 GLON，用于DAO治理':'连接钱包后读取链上 FLON 投票本金');
   applyTranslations();
+  startEpochCountdown(votingState?.epochTiming,votingState?.hasPendingVote===true);
 }
 function syncVotingSelection(){
   if(!votingState)return;
@@ -341,7 +366,7 @@ document.addEventListener('click',async event=>{
 overlay.addEventListener('click',closeSheet);
 document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation()}if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
 document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]'))updateAllocation()});
-document.querySelector('[data-language]').addEventListener('change',event=>{currentLanguage=event.target.value;localStorage.setItem('flon-daogov-language',currentLanguage);applyTranslations();showToast(currentLanguage==='zh-CN'?'语言已切换为中文':'Language changed to English')});
+document.querySelector('[data-language]').addEventListener('change',event=>{currentLanguage=event.target.value;localStorage.setItem('flon-daogov-language',currentLanguage);applyTranslations();updateEpochCountdown();showToast(currentLanguage==='zh-CN'?'语言已切换为中文':'Language changed to English')});
 
 function selectedCount(){return [...document.querySelectorAll('.select-node input[type="checkbox"]:checked')].length}
 function allocationTotal(){try{return draftVoteAllocations().reduce((sum,item)=>sum+item.votes,0n)}catch{return 0n}}
@@ -365,3 +390,4 @@ initializeWallet().catch(error=>{
   renderWallet();
   if(isHuFuApp())showToast(walletErrorMessage(error));
 });
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshVotingAccount().catch(error=>console.error('Failed to refresh epoch timing',error))});
