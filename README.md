@@ -10,6 +10,7 @@ FullOn Network DAO治理 H5 DApp，可在 HuFu 内置浏览器中打开，也支
 - 不可转让 GLON 治理权及待生效节点分配展示
 - 最多选择 30 个 BP，总票权平均分配并广播 `flon::voteproducer`
 - 投票人奖励查询并广播 `voter.reward::claimrewards`
+- BP 本人或第三方代 BP 查询并广播 `flon::claimrewards(caller, producer, max_steps)`；奖励始终直接支付给 BP
 - BP 处罚状态查询及符合条件后的 `flon::resumeprod`
 - HuFu 钱包连接、交易解释、签名请求和状态追踪
 - PC / 手机响应式布局与浏览器语言自动识别（简体中文、英文）
