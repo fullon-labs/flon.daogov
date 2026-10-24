@@ -52,7 +52,7 @@ const translations=new Map([
   ['领取 BP 奖励','Claim BP rewards'],['代 BP 领取','Claim for a BP'],['BP 奖励领取','BP reward claim'],['当前账户可为自己或任意 BP 触发领取','The connected account can trigger a claim for itself or any BP'],['BP 收款账户','BP recipient'],['触发账户','Caller'],['基础奖励','Base rewards'],['GAS 奖励','GAS rewards'],['待领取记录','claim rows'],['本次最多处理','Maximum rows this claim'],['奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。','Rewards are always paid directly to the BP. The caller cannot change the recipient or receive the rewards.'],['检查奖励','Check rewards'],['确认代领','Confirm claim'],['BP 奖励领取交易已广播','BP reward claim broadcast'],['请输入有效的 BP 账户名','Enter a valid BP account name'],['未找到该 BP','BP not found'],['当前合约尚未启用 BP 奖励领取','BP reward claims are not enabled by the current contract'],['处理中…','Processing…'],['可由任意钱包代为触发','Any wallet can trigger this claim'],['可为 BP 代触发','Can trigger for a BP'],['治理权','Governance power'],['暂无可领取的 BP 奖励','No BP rewards are currently claimable']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
-  ['完成','Done'],['不可领取','Not claimable'],['GAS 待领取奖励','Unclaimed GAS rewards'],['尚未积累足够的已分配出块样本','Not enough assigned production samples have accumulated yet'],['未设置','N/A']
+  ['完成','Done'],['不可领取','Not claimable'],['GAS 待领取奖励','Unclaimed GAS rewards'],['尚未积累足够的已分配出块样本','Not enough assigned production samples have accumulated yet'],['未设置','N/A'],['暂无已结算奖励可领取','No settled rewards to claim']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['连接钱包后读取链上已结算余额','Connect wallet to load the settled on-chain balance'],['提案、附议、投票与 Timelock','Proposals, endorsement, voting, and Timelock'],['当前尚未配置可验证的治理合约数据源；本页不会构造或广播模拟治理交易。','No verified governance contract data source is configured. This page does not construct or broadcast simulated governance transactions.'],['待接入','Pending integration'],['候选','Candidates'],
@@ -210,7 +210,10 @@ function renderVotingAccount(){
   setText('[data-glon-balance]',`${glonAmount} GLON`);setText('[data-profile-glon]',`${glonAmount} GLON`);setText('[data-vote-stake]',connected?nodeVoteStake:'— FLON');setText('[data-vote-liquid]',connected?votingState.flon:'— FLON');setText('[data-vote-owned]',connected?`${formatUnits(owned)} FLON`:'— FLON');
   setText('[data-voting-stake]',connected?nodeVoteAmount:'—');setText('[data-voted-bps]',connected?`${producers.length} / 30`:'— / 30');setText('[data-profile-votes]',connected?`${producers.length} 个 BP`:'— 个 BP');
   setText('[data-unclaimed-rewards]',rewards);setText('[data-profile-rewards]',rewards);setText('[data-profile-claimable]',connected?rewards:'连接钱包后读取');
-  setText('[data-claimable-summary]',connected?`链上已结算 ${rewards}`:'连接钱包后读取链上已结算余额');
+  const hasClaimableRewards=connected&&assetAmount(rewards)>0;
+  setText('[data-claimable-summary]',connected?(hasClaimableRewards?`链上已结算 ${rewards}`:'暂无已结算奖励可领取'):'连接钱包后读取链上已结算余额');
+  setText('[data-claim-action-label]',connected?(hasClaimableRewards?'领取':'不可领取'):'领取');
+  document.querySelectorAll('[data-action="claim"]').forEach(button=>{button.disabled=connected&&!hasClaimableRewards;button.classList.toggle('is-unavailable',connected&&!hasClaimableRewards)});
   setText('[data-vote-source]',connected?'投票后生成等额不可转让 GLON，用于DAO治理':'连接钱包后读取链上 FLON 投票本金');
   applyTranslations();
   startEpochCountdown(votingState?.epochTiming,votingState?.hasPendingVote===true);
@@ -334,6 +337,7 @@ async function claimVoteRefund(target){
 async function confirmClaimRewards(){
   if(!walletSession){openWalletSheet();return}
   try{await refreshVotingAccount()}catch(error){showToast(`读取奖励失败：${String(error?.message||error)}`);return}
+  if(assetAmount(votingState?.unclaimedRewards)<=0){showToast('暂无已结算奖励可领取');return}
   openSheet(`<h2 id="sheet-title">领取投票奖励</h2><p class="sheet-subtitle">奖励不会自动空投；未领取余额持续累积，不会因错过 Epoch 丢失</p><div class="sign-summary"><div><span>链上已结算</span><strong>${escapeHtml(votingState?.unclaimedRewards||'0.00000000 FLON')}</strong></div><div><span>合约</span><strong>voter.reward</strong></div><div><span>Action</span><strong>claimrewards</strong></div><div><span>领取账户</span><strong>${escapeHtml(walletSession.account)}</strong></div></div><p class="sign-warning">领取必须由当前受益账户本人签名，第三方不能代领。最终到账金额以交易执行结果为准。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">稍后</button><button class="primary-button" data-action="claim-sign">确认签名</button></div>`);
 }
 async function submitClaimRewards(target){
