@@ -6,6 +6,7 @@ const config=()=>({anchorService:'https://fwd.hufu.io',...(window.__DAO_GOV_CONF
 const rpcUrl=()=>new URL(config().rpcUrl,window.location.origin).href.replace(/\/$/,'');
 const appId=()=>`flon-daogov-${config().network||'mainnet'}`;
 const storageKey=()=>`flon.daogov.wallet.${config().network||'mainnet'}`;
+const rewardEpochMilliseconds=21600000;
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
@@ -38,6 +39,25 @@ async function rpcInfo(){
   const info=await rpcPost('/v1/chain/get_info',{});
   if(String(info.chain_id)!==config().chainId)throw new Error('RPC_CHAIN_ID_MISMATCH');
   return info;
+}
+function utcMilliseconds(value){
+  const text=String(value||'');
+  return Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(text)?text:`${text}Z`);
+}
+function epochTiming(chainInfo,globalRow,activationEpoch=null){
+  const chainHeadMs=utcMilliseconds(chainInfo?.head_block_time);
+  const rewardStartMs=utcMilliseconds(globalRow?.reward_started_time);
+  if(!Number.isFinite(chainHeadMs)||!Number.isFinite(rewardStartMs)||chainHeadMs<rewardStartMs)return null;
+  const currentEpoch=Math.floor((chainHeadMs-rewardStartMs)/rewardEpochMilliseconds);
+  const targetEpoch=Number.isInteger(Number(activationEpoch))?Number(activationEpoch):currentEpoch+1;
+  return {chainHeadMs,rewardStartMs,currentEpoch,targetEpoch,boundaryMs:rewardStartMs+targetEpoch*rewardEpochMilliseconds};
+}
+export async function loadEpochTiming(activationEpoch=null){
+  const [chainInfo,globalRows]=await Promise.all([
+    rpcInfo(),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}),
+  ]);
+  return epochTiming(chainInfo,globalRows.rows?.[0],activationEpoch);
 }
 function assertFreshChainTime(info,now=Date.now()){
   const value=String(info?.head_block_time||'');
@@ -225,7 +245,7 @@ export async function loadBPAccount(account){
   return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,selfStakeSupported,selfStakeConfig,selfStake,supported:true};
 }
 export async function loadVotingAccount(account){
-  const [balances,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi]=await Promise.all([
+  const [balances,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows]=await Promise.all([
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'GLON'}).catch(()=>[]),
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'FLON'}).catch(()=>[]),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
@@ -236,6 +256,8 @@ export async function loadVotingAccount(account){
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:account,table:'voterefund',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>({abi:{actions:[]}})),
+    rpcInfo(),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}).catch(()=>({rows:[]})),
   ]);
   const voter=voterRows.rows?.find(row=>row.owner===account)||null;
   const pending=pendingRows.rows?.find(row=>row.voter===account)||null;
@@ -247,6 +269,7 @@ export async function loadVotingAccount(account){
   const flon=Array.isArray(flonBalances)&&flonBalances.length?flonBalances[0]:'0.00000000 FLON';
   const actions=new Set((abi.abi?.actions||[]).map(item=>item.name));
   const nodeVoteUnits=pending?.votes??voter?.votes??0;
+  const pendingActivationEpoch=Number(pendingAllocation?.activation_epoch??pending?.activation_epoch);
   return {
     account,glon,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,effectiveAllocation,pendingAllocation,rewards,refund,
     stakeSupported:actions.has('addvote')&&actions.has('subvote')&&actions.has('voterefund'),
@@ -258,6 +281,8 @@ export async function loadVotingAccount(account){
     effectiveAllocations:Array.isArray(effectiveAllocation?.allocations)?effectiveAllocation.allocations:null,
     pendingAllocations:Array.isArray(pendingAllocation?.allocations)?pendingAllocation.allocations:null,
     unclaimedRewards:rewards?.unclaimed_rewards||'0.00000000 FLON',
+    epochTiming:epochTiming(chainInfo,globalRows.rows?.[0],Number.isInteger(pendingActivationEpoch)?pendingActivationEpoch:null),
+    hasPendingVote:Boolean(pendingAllocation||pending),
   };
 }
 export async function loadElection(){
