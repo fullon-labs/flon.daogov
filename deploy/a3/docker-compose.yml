@@ -19,7 +19,7 @@ services:
       - ./api.testnet.conf:/etc/nginx/daogov/api.conf:ro
 
   daogov-keeper-mainnet:
-    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.0}
+    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.1}
     container_name: flon-daogov-keeper-mainnet
     restart: unless-stopped
     environment:
@@ -31,7 +31,7 @@ services:
       - "127.0.0.1:20111:8788"
 
   daogov-keeper-testnet:
-    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.0}
+    image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.1.1}
     container_name: flon-daogov-keeper-testnet
     restart: unless-stopped
     environment:
