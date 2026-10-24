@@ -270,19 +270,25 @@ export async function loadVotingAccount(account){
   const actions=new Set((abi.abi?.actions||[]).map(item=>item.name));
   const nodeVoteUnits=pending?.votes??voter?.votes??0;
   const pendingActivationEpoch=Number(pendingAllocation?.activation_epoch??pending?.activation_epoch);
+  const nextEpoch=Number(epochRows.rows?.[0]?.next_epoch_to_close||0);
+  // Pending rows are materialized lazily by the voter actions. Once the epoch
+  // cursor has advanced past activation_epoch, their vote deltas are already
+  // effective even if the per-voter pending row still exists.
+  const hasUnsettledVote=Boolean(pendingAllocation||pending)&&
+    Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>=nextEpoch;
   return {
     account,glon,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,effectiveAllocation,pendingAllocation,rewards,refund,
     stakeSupported:actions.has('addvote')&&actions.has('subvote')&&actions.has('voterefund'),
     voteAllocationSupported:actions.has('votealloc'),
-    nextEpoch:Number(epochRows.rows?.[0]?.next_epoch_to_close||0),
+    nextEpoch,
     effectiveVotes:Number(voter?.votes||0),
     effectiveProducers:Array.isArray(voter?.producers)?voter.producers:[],
     pendingProducers:Array.isArray(pending?.producers)?pending.producers:null,
     effectiveAllocations:Array.isArray(effectiveAllocation?.allocations)?effectiveAllocation.allocations:null,
     pendingAllocations:Array.isArray(pendingAllocation?.allocations)?pendingAllocation.allocations:null,
     unclaimedRewards:rewards?.unclaimed_rewards||'0.00000000 FLON',
-    epochTiming:epochTiming(chainInfo,globalRows.rows?.[0],Number.isInteger(pendingActivationEpoch)?pendingActivationEpoch:null),
-    hasPendingVote:Boolean(pendingAllocation||pending),
+    epochTiming:epochTiming(chainInfo,globalRows.rows?.[0],hasUnsettledVote?pendingActivationEpoch:null),
+    hasPendingVote:hasUnsettledVote,
   };
 }
 export async function loadElection(){
