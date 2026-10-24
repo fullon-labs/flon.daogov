@@ -2,7 +2,9 @@
 
 `flon-daogov-keeper` is a standalone TypeScript service that monitors and closes
 the six-hour producer reward epochs. It submits only the permissionless
-`flon::closeepoch` action and never loads a wallet or private key.
+`flon::closeepoch` action. Broadcast mode signs locally with a dedicated,
+action-linked permission key read from a mounted secret file; it never loads a
+general-purpose wallet.
 
 It does **not** submit `flon::standbyproof`. Each Standby BP must run its own
 authorized proof bot because that action requires the BP's authorization.
@@ -55,6 +57,9 @@ transaction rejection and alert deduplication are explicitly handled.
 | `KEEPER_RPC_URL` | required | Trusted RPC base URL |
 | `KEEPER_CHAIN_ID` | required | Exact 64-hex target chain ID |
 | `KEEPER_BROADCAST` | `false` | Enable `closeepoch` broadcasts |
+| `KEEPER_SIGNER_ACTOR` | empty | Dedicated account used to authorize `closeepoch` in broadcast mode |
+| `KEEPER_SIGNER_PERMISSION` | `active` | Permission linked only to `flon::closeepoch` |
+| `KEEPER_PRIVATE_KEY_FILE` | empty | Mounted secret file containing the permission's private key |
 | `KEEPER_EPOCH_MS` | `21600000` | Six-hour reward epoch; override only for a chain configured differently |
 | `KEEPER_MAX_HEAD_AGE_MS` | `90000` | Maximum accepted chain-head age |
 | `KEEPER_MAX_CATCHUP_PER_CYCLE` | `16` | Safety cap before yielding to the next loop |

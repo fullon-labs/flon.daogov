@@ -16,3 +16,14 @@ test('invalid chain IDs fail closed', () => {
     /64-character hexadecimal chain ID/,
   );
 });
+
+test('broadcast mode requires an explicit signer and key file', () => {
+  assert.throws(
+    () => loadConfig({
+      KEEPER_RPC_URL: 'https://rpc.example',
+      KEEPER_CHAIN_ID: chainId,
+      KEEPER_BROADCAST: 'true',
+    }),
+    /requires KEEPER_SIGNER_ACTOR and KEEPER_PRIVATE_KEY_FILE/,
+  );
+});

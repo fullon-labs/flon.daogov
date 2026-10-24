@@ -1,6 +1,7 @@
 import {
   Action,
   APIClient,
+  PrivateKey,
   SignedTransaction,
   Transaction,
   type ABI,
@@ -34,10 +35,12 @@ function asNumber(value: unknown, field: string): number {
 
 export class ChainClient {
   private readonly api: APIClient;
+  private readonly privateKey?: PrivateKey;
   private abi?: ABI.Def;
 
   constructor(private readonly config: KeeperConfig) {
     this.api = new APIClient({url: config.rpcUrl});
+    this.privateKey = config.privateKey ? PrivateKey.from(config.privateKey) : undefined;
   }
 
   async getInfo(): Promise<ChainInfo> {
@@ -88,14 +91,19 @@ export class ChainClient {
     const action = Action.from({
       account: this.config.contract,
       name: 'closeepoch',
-      authorization: [],
+      authorization: [{
+        actor: this.config.signerActor!,
+        permission: this.config.signerPermission!,
+      }],
       data: {epoch_id: epochId},
     }, this.abi);
     const transaction = Transaction.from({
       ...info.getTransactionHeader(120),
       actions: [action],
     });
-    const signed = SignedTransaction.from({...transaction, signatures: []});
+    if (!this.privateKey) throw new Error('keeper signing key is unavailable');
+    const signature = this.privateKey.signDigest(transaction.signingDigest(info.chain_id));
+    const signed = SignedTransaction.from({...transaction, signatures: [signature]});
     const result = await this.api.v1.chain.push_transaction(signed);
     return {
       transactionId: result.transaction_id,
