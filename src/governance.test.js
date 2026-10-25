@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {effectiveProposalPhase,governanceAction,proposalCounts} from './governance.js';
+import {effectiveProposalPhase,enabledAllowlist,governanceAction,proposalCounts,validateFrozenActions} from './governance.js';
 
 const now=Date.parse('2026-10-25T04:00:00Z');
 const proposal=(status,overrides={})=>({proposal_id:7,status,endorsement_end:'2026-10-25T03:00:00',vote_start:'2026-10-25T03:30:00',vote_end:'2026-10-25T03:59:00',execute_after:'2026-10-25T03:30:00',execute_before:'2026-10-25T05:00:00',actions:[],...overrides});
@@ -28,4 +28,14 @@ test('counts actionable proposal phases',()=>{
     proposal(2,{vote_end:'2026-10-25T05:00:00'}),
     proposal(6),
   ],now),{endorsement:1,voting:1,execution:1});
+});
+
+test('normalizes enabled allowlist rules and validates frozen action bytes',()=>{
+  const rules=enabledAllowlist([
+    {contract:'dao.treasury',action_name:'pay',max_data_bytes:512,enabled:1},
+    {contract:'dao.gov',action_name:'setconfig',max_data_bytes:256,enabled:0},
+  ]);
+  assert.deepEqual(rules,[{contract:'dao.treasury',action:'pay',maxBytes:512}]);
+  assert.equal(validateFrozenActions([{contract:'dao.treasury',action_name:'pay',data:'00ff'}],rules,{max_actions:10,max_action_bytes:4096,max_total_action_bytes:16384}),2);
+  assert.throws(()=>validateFrozenActions([{contract:'dao.gov',action_name:'setconfig',data:'00'}],rules,{max_actions:10,max_action_bytes:4096,max_total_action_bytes:16384}),/ACTION_NOT_ALLOWLISTED/);
 });

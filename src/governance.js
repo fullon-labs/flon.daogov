@@ -42,3 +42,26 @@ export function proposalCounts(proposals,now=Date.now()){
   }
   return counts;
 }
+
+export function enabledAllowlist(rows=[]){
+  return rows.filter(row=>row.enabled===true||Number(row.enabled)===1)
+    .map(row=>({contract:String(row.contract),action:String(row.action_name),maxBytes:Number(row.max_data_bytes)}))
+    .filter(row=>/^[a-z1-5.]{1,12}$/.test(row.contract)&&/^[a-z1-5.]{1,12}$/.test(row.action)&&Number.isInteger(row.maxBytes)&&row.maxBytes>0)
+    .sort((left,right)=>`${left.contract}::${left.action}`.localeCompare(`${right.contract}::${right.action}`));
+}
+
+export function validateFrozenActions(actions,rules,config){
+  const maxActions=Number(config?.max_actions||0),maxActionBytes=Number(config?.max_action_bytes||0),maxTotalBytes=Number(config?.max_total_action_bytes||0);
+  if(!actions.length)throw new Error('NO_PROPOSAL_ACTIONS');
+  if(actions.length>maxActions)throw new Error('TOO_MANY_PROPOSAL_ACTIONS');
+  const permitted=new Map(rules.map(rule=>[`${rule.contract}::${rule.action}`,rule]));
+  let total=0;
+  for(const action of actions){
+    const rule=permitted.get(`${action.contract}::${action.action_name}`);if(!rule)throw new Error('ACTION_NOT_ALLOWLISTED');
+    const bytes=String(action.data||'').length/2;
+    if(!Number.isInteger(bytes)||bytes>maxActionBytes||bytes>rule.maxBytes)throw new Error('ACTION_DATA_TOO_LARGE');
+    total+=bytes;
+  }
+  if(total>maxTotalBytes)throw new Error('TOTAL_ACTION_DATA_TOO_LARGE');
+  return total;
+}

@@ -384,6 +384,13 @@ export async function loadGovernance(account=''){
   }
   return {governance,supported,global,config:governanceConfig,allowlist:allowRows.rows||[],proposals,power,ballots,endorsements,chainInfo};
 }
+export async function serializeGovernanceAction(contract,action,args){
+  if(!/^[a-z1-5.]{1,12}$/.test(String(contract||''))||!/^[a-z1-5.]{1,12}$/.test(String(action||'')))throw new Error('INVALID_GOVERNANCE_ACTION');
+  const result=await rpcPost('/v1/chain/abi_json_to_bin',{code:contract,action,args});
+  const data=String(result?.binargs||'');
+  if(!/^(?:[0-9a-f]{2})*$/i.test(data))throw new Error('INVALID_SERIALIZED_ACTION');
+  return data.toLowerCase();
+}
 export async function transact(session,actions){
   assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
