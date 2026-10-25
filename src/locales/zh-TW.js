@@ -534,5 +534,8 @@ export default {
   "My votes": "我的投票",
   "Review and confirm": "審核並確認",
   "Search & sort": "搜尋和排序",
-  "Hide filters": "隱藏過濾器"
+  "Hide filters": "隱藏過濾器",
+  "BP composition": "BP 構成",
+  "Total BP self-stake": "BP 總質押",
+  "Total node votes": "節點投票總量"
 };

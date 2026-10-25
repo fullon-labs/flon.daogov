@@ -534,5 +534,8 @@ export default {
   "My votes": "私の投票",
   "Review and confirm": "確認して確認する",
   "Search & sort": "検索と並べ替え",
-  "Hide filters": "フィルターを非表示にする"
+  "Hide filters": "フィルターを非表示にする",
+  "BP composition": "BP構成",
+  "Total BP self-stake": "BP自己ステーク合計",
+  "Total node votes": "ノード投票総数"
 };
