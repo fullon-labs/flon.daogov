@@ -537,5 +537,6 @@ export default {
   "Hide filters": "隱藏過濾器",
   "BP composition": "BP 構成",
   "Total BP self-stake": "BP 總質押",
-  "Total node votes": "節點投票總量"
+  "Total node votes": "節點投票總量",
+  "Registered": "已註冊"
 };

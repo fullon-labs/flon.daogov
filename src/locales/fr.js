@@ -537,5 +537,6 @@ export default {
   "Hide filters": "Masquer les filtres",
   "BP composition": "Composition des BP",
   "Total BP self-stake": "Auto-stake total des BP",
-  "Total node votes": "Total des votes des nœuds"
+  "Total node votes": "Total des votes des nœuds",
+  "Registered": "Inscrits"
 };
