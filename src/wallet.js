@@ -424,9 +424,18 @@ export async function transact(session,actions){
   if(session.provider==='hufu'){
     const provider=window.HuFu||(await prepareHuFu());if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
-    await confirmInjectedChain(provider,current,session.chainId);
+    // Account selection belongs to the explicit connect flow. HuFu versions
+    // without a passive account/network getter may reopen their account picker
+    // when the bridge is prepared again. For an existing domain-scoped session,
+    // validate any synchronously exposed identity and otherwise rely on the
+    // cached chain id (already checked above) plus rpcInfo() and the wallet's
+    // transaction authorization. This sends the user directly to transaction
+    // details instead of prompting for the same account again.
+    const exposedChainId=chainIdFrom(current)||chainIdFrom(provider);
+    if(exposedChainId)assertChain(exposedChainId);
+    else assertChain(session.chainId);
     const remaining=accountPromptReadyAt-Date.now();if(remaining>0)await wait(remaining);
-    return provider.transact({transaction:{actions:authorized}},transactionOptions);
+    return provider.transact({transaction:{actions:authorized}});
   }
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
