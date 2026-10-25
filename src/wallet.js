@@ -14,7 +14,6 @@ const hufuTransactionTimeoutMilliseconds=45000;
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
-let accountPromptReadyAt=0;
 
 function normalizeAccount(value){
   if(typeof value==='string'){try{return normalizeAccount(JSON.parse(value))}catch{return /^[a-z1-5.]{1,12}$/.test(value)?{account:value,permission:'active',chainId:''}:null}}
@@ -129,10 +128,6 @@ async function prepareHuFu(){
   for(let count=0;count<50&&!window.HuFu;count++)await wait(100);
   return window.HuFu||null;
 }
-async function waitForHuFuProvider(){
-  for(let count=0;count<50&&!window.HuFu;count++)await wait(100);
-  return window.HuFu||null;
-}
 function chainIdFrom(value,depth=0){
   if(!value||depth>4)return '';
   if(typeof value==='string'){
@@ -212,7 +207,6 @@ export async function connectWallet(){
   const provider=isHuFuApp()?await prepareHuFu():window.HuFu;
   if(provider?.requestAccountsHuFu){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
-    accountPromptReadyAt=Date.now()+650;
     const account=normalizeAccount(response);
     if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
     await wait(650);
@@ -474,23 +468,27 @@ export async function loadChainGovernanceParameters(){
   return{rewardEpochSlots:rewardPlan?.epochSlots||null,activeBpTarget:Number(electionConfig?.active_bp_quorum)||null,bpStakeConfig,gasRewardConfig};
 }
 export async function transact(session,actions){
-  assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
+  assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
-  if(session.provider==='iframe')return window.__DAO_HUFU_CLIENT__.transact(authorized);
   if(session.provider==='hufu'){
-    const provider=window.HuFu||(await waitForHuFuProvider());if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
+    // HuFu must receive transact in the original button-click task. Awaiting
+    // RPC or provider discovery first loses the native WebView interaction
+    // context in affected app versions, leaving the returned promise pending
+    // without ever presenting the approval sheet.
+    const provider=window.HuFu;if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
-    // Keep the signing gesture free of provider reads or native switch calls.
-    // In affected HuFu builds those calls reopen account selection. The RPC
-    // and cached session were verified above; only transact may open native UI.
+    // Keep the signing gesture free of RPC, provider reads, native switch
+    // calls, and account selection. The domain-scoped session and page RPC
+    // were verified while loading the transaction preview.
     confirmTransactionSnapshot(provider,current,session.chainId);
-    const remaining=accountPromptReadyAt-Date.now();if(remaining>0)await wait(remaining);
     return timeout(
       Promise.resolve(provider.transact({transaction:{actions:authorized}})),
       hufuTransactionTimeoutMilliseconds,
       'HUFU_TRANSACTION_TIMEOUT',
     );
   }
+  const info=await rpcInfo();assertFreshChainTime(info);
+  if(session.provider==='iframe')return window.__DAO_HUFU_CLIENT__.transact(authorized);
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
 }
