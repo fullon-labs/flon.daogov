@@ -292,11 +292,13 @@ function proposalCard(proposal){
   const forAmount=assetAmount(proposal.for_votes),againstAmount=assetAmount(proposal.against_votes),abstainAmount=assetAmount(proposal.abstain_votes),total=forAmount+againstAmount+abstainAmount,forPercent=total>0?Math.round(forAmount/total*100):0;
   return `<article class="proposal-item" data-status="${escapeHtml(phase)}"><button class="proposal-open" type="button" data-action="dao-details" data-proposal-id="${id}"><div><span class="status ${escapeHtml(meta[1])}">${escapeHtml(meta[0])}</span><span class="proposal-id">#${id} · ${escapeHtml(proposal.proposal_type)}</span><time>${escapeHtml(String(proposal.created_at||''))}</time></div><h3>${escapeHtml(proposal.title)}</h3><p>${escapeHtml(proposal.summary)}</p>${total>0?`<div class="vote-result"><small><b>赞成 ${forPercent}%</b><em>${escapeHtml(proposal.for_votes)} / ${escapeHtml(proposal.against_votes)}</em></small><div class="progress"><i style="width:${forPercent}%"></i></div></div>`:''}</button>${action?`<footer><span>${Number(proposal.endorsement_count||0)} 人附议</span><button type="button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${id}"><em>${escapeHtml(action.label)}</em></button></footer>`:`<footer><span>${Number(proposal.endorsement_count||0)} 人附议</span></footer>`}</article>`;
 }
+function setGovernanceAttention(visible){const dot=document.querySelector('[data-governance-dot]');if(dot)dot.hidden=!visible}
 function renderGovernance(){
   const list=document.querySelector('.proposal-list'),preview=document.querySelector('[data-governance-preview]');if(!list||!preview)return;
-  if(!governanceState?.supported){list.innerHTML='<div class="inline-error">无法验证 dao.gov ABI，治理交易已禁用。</div>';preview.innerHTML='<div class="inline-error">DAO 治理状态不可用</div>';return}
+  if(!governanceState?.supported){setGovernanceAttention(false);list.innerHTML='<div class="inline-error">无法验证 dao.gov ABI，治理交易已禁用。</div>';preview.innerHTML='<div class="inline-error">DAO 治理状态不可用</div>';return}
   const configured=Boolean(governanceState.config),proposals=governanceState.proposals||[];
   const counts=proposalCounts(proposals,chainTimeMs());
+  setGovernanceAttention(configured&&proposals.some(proposal=>Boolean(governanceActionFor(proposal))));
   setText('[data-dao-endorsement]',String(counts.endorsement));setText('[data-dao-voting]',String(counts.voting));setText('[data-dao-execution]',String(counts.execution));
   setText('[data-governance-summary]',configured?`${proposals.length} 个链上提案 · 总治理权 ${governanceState.global?.total_power||'0.00000000 GLON'}`:'治理参数尚未配置');
   const create=document.querySelector('[data-action="create-proposal"]');if(create)create.disabled=!configured;
@@ -306,7 +308,7 @@ function renderGovernance(){
   applyTranslations();
 }
 async function refreshGovernance(){
-  try{governanceState=await loadGovernance(walletSession?.account||'');renderGovernance()}catch(error){console.error('Failed to load DAO governance',error);governanceState=null;const list=document.querySelector('.proposal-list');if(list)list.innerHTML=`<div class="inline-error">链上治理数据读取失败：${escapeHtml(String(error?.message||error))}</div>`}
+  try{governanceState=await loadGovernance(walletSession?.account||'');renderGovernance()}catch(error){console.error('Failed to load DAO governance',error);governanceState=null;setGovernanceAttention(false);const list=document.querySelector('.proposal-list');if(list)list.innerHTML=`<div class="inline-error">链上治理数据读取失败：${escapeHtml(String(error?.message||error))}</div>`}
 }
 function findProposal(id){return governanceState?.proposals?.find(item=>Number(item.proposal_id)===Number(id))||null}
 function proposalPolicy(id){return governanceState?.policySnapshots?.find(item=>Number(item.proposal_id)===Number(id))||null}
