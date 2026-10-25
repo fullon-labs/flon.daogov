@@ -35,3 +35,21 @@
 @media(min-width:900px){.vote-layout{grid-template-columns:minmax(0,1fr) 264px;align-items:start}.vote-sidebar{grid-column:2;grid-row:1}.vote-summary-card{position:sticky;top:92px}.select-node{grid-template-columns:24px 26px 38px minmax(150px,1fr) 74px minmax(132px,166px)}}
 @media(max-width:899px){.node-directory-tools{grid-template-columns:1fr}.node-sort{width:100%}.vote-sidebar{grid-row:1}.vote-directory{grid-row:2}.vote-summary-card{padding:14px}.vote-summary-card>header strong{font-size:17px}.vote-summary-card .vote-funds,.vote-summary-metrics{grid-template-columns:1fr 1fr}.epoch-inline{margin:10px 0}.node-list-title small{display:none}.select-node.is-selected::before{top:10px;bottom:10px}.vote-summary-card .node-vote-actions{position:sticky;bottom:calc(68px + env(safe-area-inset-bottom));z-index:8;padding-top:8px;background:#fff}}
 .stake-amount-field{position:relative}.stake-amount-field input{padding-right:62px!important}.stake-amount-field button{position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:7px 10px;border-radius:8px;background:var(--soft);color:var(--brand);font-size:10px;font-weight:700}.stake-amount-field button[hidden]{display:none}
+
+/* Mobile BP voting separates discovery from the allocation summary. */
+.mobile-vote-tabs,.mobile-vote-dock{display:none}
+@media(max-width:899px){
+  .vote-content{padding-bottom:92px}
+  .mobile-vote-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:12px;padding:4px;border-radius:14px;background:#e7eaf1}
+  .mobile-vote-tabs button{min-height:42px;padding:7px 10px;border-radius:11px;color:var(--muted);font-size:12px;font-weight:700}
+  .mobile-vote-tabs button.is-active{background:#fff;color:var(--brand);box-shadow:0 3px 10px rgba(28,49,91,.08)}
+  .mobile-vote-tabs span{display:block;margin-top:2px;font-size:8px;font-weight:600}
+  .vote-layout{display:block}
+  .vote-summary-card .node-vote-actions{position:static}
+  .mobile-vote-dock{position:fixed;z-index:18;left:calc(var(--canvas-inset) + 12px);right:calc(var(--canvas-inset) + 12px);bottom:calc(72px + env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.96);box-shadow:0 12px 32px rgba(25,46,88,.18);backdrop-filter:blur(12px)}
+  .mobile-vote-dock small,.mobile-vote-dock strong{display:block}
+  .mobile-vote-dock small{color:var(--muted);font-size:8px}
+  .mobile-vote-dock strong{margin-top:2px;font-size:11px}
+  .mobile-vote-dock button{height:40px;padding:0 18px}
+  .mobile-vote-dock[hidden]{display:none}
+}

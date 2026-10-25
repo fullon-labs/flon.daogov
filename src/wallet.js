@@ -10,6 +10,7 @@ const storageKey=()=>`flon.daogov.wallet.${config().network||'mainnet'}`;
 const rewardEpochMilliseconds=21600000;
 const blockTimestampEpochMilliseconds=Date.UTC(2000,0,1);
 const transactionOptions={blocksBehind:3,expireSeconds:300};
+const hufuTransactionTimeoutMilliseconds=45000;
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
@@ -458,18 +459,17 @@ export async function transact(session,actions){
   if(session.provider==='hufu'){
     const provider=window.HuFu||(await prepareHuFu());if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
-    // Account selection belongs to the explicit connect flow. HuFu versions
-    // without a passive account/network getter may reopen their account picker
-    // when the bridge is prepared again. For an existing domain-scoped session,
-    // validate any synchronously exposed identity and otherwise rely on the
-    // cached chain id (already checked above) plus rpcInfo() and the wallet's
-    // transaction authorization. This sends the user directly to transaction
-    // details instead of prompting for the same account again.
-    const exposedChainId=chainIdFrom(current)||chainIdFrom(provider);
-    if(exposedChainId)assertChain(exposedChainId);
-    else assertChain(session.chainId);
+    // Match the HuFu flow used by numguess: refresh and verify the injected
+    // FullOn network before asking the native wallet to present transaction
+    // details. This deliberately avoids the interactive account API, so an
+    // established session goes straight to signing instead of reopening selection.
+    await confirmInjectedChain(provider,current,session.chainId);
     const remaining=accountPromptReadyAt-Date.now();if(remaining>0)await wait(remaining);
-    return provider.transact({transaction:{actions:authorized}});
+    return timeout(
+      Promise.resolve(provider.transact({transaction:{actions:authorized}})),
+      hufuTransactionTimeoutMilliseconds,
+      'HUFU_TRANSACTION_TIMEOUT',
+    );
   }
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
