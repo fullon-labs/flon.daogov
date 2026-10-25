@@ -398,6 +398,20 @@ export async function loadContractAbi(contract){
   if(!result?.abi)throw new Error('CONTRACT_ABI_UNAVAILABLE');
   return result.abi;
 }
+
+export async function loadGovernanceActionDefaults(contract,action){
+  const key=`${contract}::${action}`,tables={
+    'flon::setbpquorum':'electconfig',
+    'flon::setbpstake':'bpstakecfg',
+    'flon::setgasrwcfg':'gasrewcfg'
+  },table=tables[key];
+  if(!table)return null;
+  const result=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table,limit:1}),row=result.rows?.[0];
+  if(!row)throw new Error('CURRENT_ACTION_VALUES_UNAVAILABLE');
+  if(key==='flon::setbpquorum')return{active_bp_quorum:row.active_bp_quorum};
+  if(key==='flon::setbpstake')return{enforce_schedule:Boolean(Number(row.enforce_schedule)),min_self_stake:row.min_self_stake,unstake_delay_sec:row.unstake_delay_sec};
+  return{enabled:Boolean(Number(row.enabled)),epoch_slots:row.epoch_slots,active_min_bp:row.active_min_bp,pool_bp:row.pool_bp,active_share_bp:row.active_share_bp};
+}
 export async function transact(session,actions){
   assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
