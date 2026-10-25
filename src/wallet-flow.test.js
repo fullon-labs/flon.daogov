@@ -11,7 +11,10 @@ test('an existing HuFu session follows the proven HuFu signing flow without reop
 
   assert.ok(start>=0&&end>start,'HuFu transaction branch was not found');
   assert.doesNotMatch(hufuTransactionBranch,/requestAccountsHuFu/);
-  assert.match(hufuTransactionBranch,/confirmInjectedChain\(provider,current,session\.chainId\)/);
+  assert.match(hufuTransactionBranch,/confirmTransactionSnapshot\(provider,current,session\.chainId\)/);
+  assert.doesNotMatch(hufuTransactionBranch,/confirmInjectedChain\(/);
+  assert.doesNotMatch(hufuTransactionBranch,/prepareHuFu\(/);
+  assert.doesNotMatch(hufuTransactionBranch,/provider\.(?:request|getInfo|getChainId|getChainID)\(/);
   assert.match(hufuTransactionBranch,/provider\.transact\(\{transaction:\{actions:authorized\}\}\)/);
   assert.match(hufuTransactionBranch,/HUFU_TRANSACTION_TIMEOUT/);
 });

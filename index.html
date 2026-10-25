@@ -31,6 +31,7 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 4.5 6.2 4.5 9S15 17.8 12 21M12 3C9 6.2 7.5 9.2 7.5 12S9 17.8 12 21"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4zM13 7l4 4"/></symbol>
     <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v6H5V6h6"/></symbol>
   </svg>
@@ -40,6 +41,18 @@
       <button class="icon-button" type="button" aria-label="返回 HuFu" data-action="back"><svg><use href="#i-back"/></svg></button>
       <div class="top-title"><strong class="brand-lockup"><img src="/assets/brand/fullon-dao-mark-192.png" alt=""><span>FullOn DAO</span></strong><button class="network" type="button" data-action="network"><i></i><span data-network-name>FullOn 测试网</span></button></div>
       <div class="top-actions">
+        <div class="top-language">
+          <button class="language-trigger" type="button" data-action="language-toggle" aria-label="选择语言" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-globe"/></svg><span data-language-label>中文</span><b>⌄</b></button>
+          <div class="language-menu" role="menu" data-language-menu hidden>
+            <button type="button" role="menuitemradio" data-language-option="en">English</button>
+            <button type="button" role="menuitemradio" data-language-option="fr">Français</button>
+            <button type="button" role="menuitemradio" data-language-option="ja">日本語</button>
+            <button type="button" role="menuitemradio" data-language-option="ko">한국어</button>
+            <button type="button" role="menuitemradio" data-language-option="es">Español</button>
+            <button type="button" role="menuitemradio" data-language-option="zh-CN">简体中文</button>
+            <button type="button" role="menuitemradio" data-language-option="zh-TW">繁體中文</button>
+          </div>
+        </div>
         <button class="icon-button" type="button" aria-label="治理帮助" data-action="help"><svg><use href="#i-info"/></svg></button>
       </div>
     </header>
@@ -100,7 +113,7 @@
               </main>
               <aside class="vote-sidebar" data-mobile-vote-panel="summary">
                 <section class="vote-balance vote-summary-card">
-                  <header><span><small>本次分配</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></span><span class="selection-badge din" data-selected-count>0 个 BP</span></header>
+                  <header><span><small>我的投票</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></span><span class="selection-badge din" data-selected-count>0 个 BP</span></header>
                   <div class="vote-summary-metrics"><span><small>账户总可投</small><strong class="din" data-vote-owned>— FLON</strong></span><span><small>尚可分配</small><strong class="din" data-vote-remaining>— FLON</strong></span></div>
                   <p class="vote-source" data-vote-source>连接钱包后读取链上 FLON 投票本金</p>
                   <div class="epoch-inline"><svg><use href="#i-clock"/></svg><span><strong>下一 Epoch 生效</strong><small><span data-vote-epoch-label>正在读取链上时间…</span> <b class="din" data-vote-epoch-countdown>--:--:--</b></small></span></div>
@@ -111,7 +124,7 @@
               </aside>
             </div>
             <div class="mobile-vote-dock" data-mobile-vote-dock>
-              <span><small>本次分配</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></span>
+              <span><small>我的投票</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></span>
               <button class="primary-button" type="button" data-mobile-vote-tab="summary">查看并确认</button>
             </div>
           </div>
@@ -134,9 +147,6 @@
             <div class="identity-row"><span><small>当前治理账户</small><strong data-wallet-account>未连接</strong></span><button type="button" data-action="account"><span data-wallet-label>连接钱包</span> <svg><use href="#i-chevron"/></svg></button></div>
             <div class="power-row"><span><small>我的治理权</small><strong class="din" data-glon-balance>— <em>GLON</em></strong></span></div>
             <div class="hero-stats"><span><small>已投 FLON</small><strong class="din" data-voting-stake>—</strong></span><span><small>已选 BP</small><strong class="din" data-voted-bps>—</strong></span><span><small>待领取</small><strong class="din" data-unclaimed-rewards>— FLON</strong></span></div>
-          </section>
-          <section class="profile-preferences">
-            <label><span><svg><use href="#i-info"/></svg><strong>语言</strong></span><select data-language aria-label="语言"><option value="zh-CN">中文</option><option value="en">English</option></select></label>
           </section>
           <section class="section bp-recovery-card" data-bp-recovery>
             <div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>连接 BP 账户钱包后读取链上状态</small></div>
