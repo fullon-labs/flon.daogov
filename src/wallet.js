@@ -356,11 +356,14 @@ export async function loadElection(){
 }
 export async function loadGovernance(account=''){
   const governance=config().governance||'dao.gov';
-  const [abi,globalRows,configRows,allowRows,proposalRows,chainInfo]=await Promise.all([
+  const [abi,globalRows,configRows,allowRows,riskRows,policyRows,snapshotRows,proposalRows,chainInfo]=await Promise.all([
     rpcPost('/v1/chain/get_abi',{account_name:governance}),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'global',limit:1}),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'config',limit:1}),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'allowlist',limit:100}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'riskconfigs',limit:4}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'actpolicies',limit:200}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'policysnaps',limit:200,reverse:true}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'proposals',limit:200,reverse:true}),
     rpcInfo(),
   ]);
@@ -383,7 +386,7 @@ export async function loadGovernance(account=''){
       if(endorsementRows.rows?.some(row=>row.endorser===account))endorsements.add(Number(proposal.proposal_id));
     }));
   }
-  return {governance,supported,global,config:governanceConfig,allowlist:allowRows.rows||[],proposals,power,ballots,endorsements,chainInfo};
+  return {governance,supported,global,config:governanceConfig,allowlist:allowRows.rows||[],riskConfigs:riskRows.rows||[],actionPolicies:policyRows.rows||[],policySnapshots:snapshotRows.rows||[],riskSupported:actions.has('setriskcfg')&&actions.has('setactrisk')&&tables.has('riskconfigs')&&tables.has('actpolicies')&&tables.has('policysnaps'),proposals,power,ballots,endorsements,chainInfo};
 }
 export async function serializeGovernanceAction(contract,action,args){
   if(!/^[a-z1-5.]{1,12}$/.test(String(contract||''))||!/^[a-z1-5.]{1,12}$/.test(String(action||'')))throw new Error('INVALID_GOVERNANCE_ACTION');
