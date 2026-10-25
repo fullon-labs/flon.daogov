@@ -1,0 +1,3 @@
+/* Proposal choices stay readable inside both the mobile sheet and desktop drawer. */
+.proposal-type-picker{grid-template-columns:1fr}
+.proposal-type-picker legend{grid-column:1}
