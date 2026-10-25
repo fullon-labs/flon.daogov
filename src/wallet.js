@@ -8,6 +8,7 @@ const appId=()=>`flon-daogov-${config().network||'mainnet'}`;
 const storageKey=()=>`flon.daogov.wallet.${config().network||'mainnet'}`;
 const rewardEpochMilliseconds=21600000;
 const blockTimestampEpochMilliseconds=Date.UTC(2000,0,1);
+const transactionOptions={blocksBehind:3,expireSeconds:300};
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
@@ -400,8 +401,8 @@ export async function transact(session,actions){
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
     await confirmInjectedChain(provider,current,session.chainId);
     const remaining=accountPromptReadyAt-Date.now();if(remaining>0)await wait(remaining);
-    return provider.transact({transaction:{actions:authorized}});
+    return provider.transact({transaction:{actions:authorized}},transactionOptions);
   }
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
-  return anchorSession.transact({actions:authorized},{broadcast:true,blocksBehind:3,expireSeconds:120});
+  return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
 }
