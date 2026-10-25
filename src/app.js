@@ -1,6 +1,7 @@
 import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadElection,loadEpochTiming,loadGovernance,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,transact} from './wallet.js';
 
 import {accountExplorerUrl} from './explorer.js';
+import {DAO_STATUS_META,effectiveProposalPhase,governanceAction,proposalCounts} from './governance.js';
 
 const views=[...document.querySelectorAll('.view')];
 const nav=[...document.querySelectorAll('.bottom-nav [data-view-target]')];
@@ -200,31 +201,13 @@ async function refreshVotingAccount(){
   }
   renderVotingAccount();syncVotingSelection();updateAllocation();
 }
-const daoStatusMeta={0:['附议中','endorsement'],1:['投票等待期','voting'],2:['投票中','voting'],3:['未通过','closed'],4:['已通过','execution'],5:['已取消','closed'],6:['Timelock','execution'],7:['已执行','closed'],8:['已过期','closed']};
 function chainTimeMs(){const value=governanceState?.chainInfo?.head_block_time;return value?Date.parse(String(value).endsWith('Z')?value:`${value}Z`):Date.now()}
-function proposalEffectiveStatus(proposal){
-  const now=chainTimeMs(),status=Number(proposal.status),at=value=>Date.parse(String(value||'').endsWith('Z')?value:`${value}Z`);
-  if(status===0&&now>=at(proposal.endorsement_end))return 'activation';
-  if((status===1||status===2)&&now>=at(proposal.vote_end))return 'finalization';
-  if(status===1&&now>=at(proposal.vote_start))return 'voting';
-  if(status===4&&Array.isArray(proposal.actions)&&proposal.actions.length)return 'queue';
-  if(status===6&&now>=at(proposal.execute_before))return 'expiry';
-  if(status===6&&now>=at(proposal.execute_after))return 'execution';
-  return daoStatusMeta[status]?.[1]||'closed';
-}
+function proposalEffectiveStatus(proposal){return effectiveProposalPhase(proposal,chainTimeMs())}
 function governanceActionFor(proposal){
-  const phase=proposalEffectiveStatus(proposal),id=Number(proposal.proposal_id);
-  if(phase==='activation')return {action:'dao-advance',label:'进入投票',name:'activate',id};
-  if(phase==='finalization')return {action:'dao-advance',label:'结算投票',name:'finalize',id};
-  if(phase==='queue')return {action:'dao-advance',label:'进入 Timelock',name:'queue',id};
-  if(phase==='execution')return {action:'dao-advance',label:'执行',name:'execute',id};
-  if(phase==='expiry')return {action:'dao-advance',label:'标记过期',name:'expire',id};
-  if(phase==='endorsement'&&!governanceState?.endorsements?.has(id))return {action:'dao-endorse',label:'附议',id};
-  if(phase==='voting'&&!governanceState?.ballots?.has(id))return {action:'dao-vote',label:'投票',id};
-  return null;
+  const id=Number(proposal.proposal_id);return governanceAction(proposal,{endorsed:governanceState?.endorsements?.has(id),voted:governanceState?.ballots?.has(id),now:chainTimeMs()});
 }
 function proposalCard(proposal){
-  const id=Number(proposal.proposal_id),meta=daoStatusMeta[Number(proposal.status)]||['未知','closed'],phase=proposalEffectiveStatus(proposal),action=governanceActionFor(proposal);
+  const id=Number(proposal.proposal_id),meta=DAO_STATUS_META[Number(proposal.status)]||['未知','closed'],phase=proposalEffectiveStatus(proposal),action=governanceActionFor(proposal);
   const forAmount=assetAmount(proposal.for_votes),againstAmount=assetAmount(proposal.against_votes),abstainAmount=assetAmount(proposal.abstain_votes),total=forAmount+againstAmount+abstainAmount,forPercent=total>0?Math.round(forAmount/total*100):0;
   return `<article class="proposal-item" data-status="${escapeHtml(phase)}"><button class="proposal-open" type="button" data-action="dao-details" data-proposal-id="${id}"><div><span class="status ${escapeHtml(meta[1])}">${escapeHtml(meta[0])}</span><span class="proposal-id">#${id} · ${escapeHtml(proposal.proposal_type)}</span><time>${escapeHtml(String(proposal.created_at||''))}</time></div><h3>${escapeHtml(proposal.title)}</h3><p>${escapeHtml(proposal.summary)}</p>${total>0?`<div class="vote-result"><small><b>赞成 ${forPercent}%</b><em>${escapeHtml(proposal.for_votes)} / ${escapeHtml(proposal.against_votes)}</em></small><div class="progress"><i style="width:${forPercent}%"></i></div></div>`:''}</button>${action?`<footer><span>${Number(proposal.endorsement_count||0)} 人附议</span><button type="button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${id}"><em>${escapeHtml(action.label)}</em></button></footer>`:`<footer><span>${Number(proposal.endorsement_count||0)} 人附议</span></footer>`}</article>`;
 }
@@ -232,7 +215,7 @@ function renderGovernance(){
   const list=document.querySelector('.proposal-list'),preview=document.querySelector('[data-governance-preview]');if(!list||!preview)return;
   if(!governanceState?.supported){list.innerHTML='<div class="inline-error">无法验证 dao.gov ABI，治理交易已禁用。</div>';preview.innerHTML='<div class="inline-error">DAO 治理状态不可用</div>';return}
   const configured=Boolean(governanceState.config),proposals=governanceState.proposals||[];
-  const counts={endorsement:0,voting:0,execution:0};for(const proposal of proposals){const phase=proposalEffectiveStatus(proposal);if(phase==='endorsement'||phase==='activation')counts.endorsement++;else if(phase==='voting'||phase==='finalization')counts.voting++;else if(['queue','execution','expiry'].includes(phase))counts.execution++}
+  const counts=proposalCounts(proposals,chainTimeMs());
   setText('[data-dao-endorsement]',String(counts.endorsement));setText('[data-dao-voting]',String(counts.voting));setText('[data-dao-execution]',String(counts.execution));
   setText('[data-governance-summary]',configured?`${proposals.length} 个链上提案 · 总治理权 ${governanceState.global?.total_power||'0.00000000 GLON'}`:'治理参数尚未配置');
   const create=document.querySelector('[data-action="create-proposal"]');if(create)create.disabled=!configured;
@@ -247,7 +230,7 @@ async function refreshGovernance(){
 function findProposal(id){return governanceState?.proposals?.find(item=>Number(item.proposal_id)===Number(id))||null}
 function openProposalDetails(id){
   const proposal=findProposal(id);if(!proposal)return;const action=governanceActionFor(proposal),forum=safePublicUrl(proposal.discussion_uri),metadata=safePublicUrl(proposal.metadata_uri);
-  openSheet(`<h2 id="sheet-title">${escapeHtml(proposal.title)}</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml((daoStatusMeta[Number(proposal.status)]||['未知'])[0])}</p><div class="sign-summary"><div><span>提案人</span><strong>${escapeHtml(proposal.proposer)}</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal.proposal_type)}</strong></div><div><span>附议</span><strong>${Number(proposal.endorsement_count||0)}</strong></div><div><span>赞成</span><strong>${escapeHtml(proposal.for_votes)}</strong></div><div><span>反对</span><strong>${escapeHtml(proposal.against_votes)}</strong></div><div><span>弃权</span><strong>${escapeHtml(proposal.abstain_votes)}</strong></div><div><span>冻结执行动作</span><strong>${proposal.actions?.length||0}</strong></div></div><p class="proposal-summary">${escapeHtml(proposal.summary)}</p><div class="profile-review">${metadata?`<strong>提案文档</strong><a href="${escapeHtml(metadata)}" target="_blank" rel="noopener noreferrer">${escapeHtml(metadata)}</a>`:''}${forum?`<strong>社区讨论</strong><a href="${escapeHtml(forum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(forum)}</a>`:'<strong>社区讨论</strong><small>尚未关联论坛讨论</small>'}</div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">关闭</button>${action?`<button class="primary-button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${proposal.proposal_id}">${escapeHtml(action.label)}</button>`:''}</div>`);
+  openSheet(`<h2 id="sheet-title">${escapeHtml(proposal.title)}</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml((DAO_STATUS_META[Number(proposal.status)]||['未知'])[0])}</p><div class="sign-summary"><div><span>提案人</span><strong>${escapeHtml(proposal.proposer)}</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal.proposal_type)}</strong></div><div><span>附议</span><strong>${Number(proposal.endorsement_count||0)}</strong></div><div><span>赞成</span><strong>${escapeHtml(proposal.for_votes)}</strong></div><div><span>反对</span><strong>${escapeHtml(proposal.against_votes)}</strong></div><div><span>弃权</span><strong>${escapeHtml(proposal.abstain_votes)}</strong></div><div><span>冻结执行动作</span><strong>${proposal.actions?.length||0}</strong></div></div><p class="proposal-summary">${escapeHtml(proposal.summary)}</p><div class="profile-review">${metadata?`<strong>提案文档</strong><a href="${escapeHtml(metadata)}" target="_blank" rel="noopener noreferrer">${escapeHtml(metadata)}</a>`:''}${forum?`<strong>社区讨论</strong><a href="${escapeHtml(forum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(forum)}</a>`:'<strong>社区讨论</strong><small>尚未关联论坛讨论</small>'}</div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">关闭</button>${action?`<button class="primary-button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${proposal.proposal_id}">${escapeHtml(action.label)}</button>`:''}</div>`);
 }
 function openCreateProposal(){
   if(!walletSession){openWalletSheet();return}if(!governanceState?.config){showToast('治理参数尚未配置');return}

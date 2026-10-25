@@ -12,12 +12,15 @@ FullOn Network DAO治理 H5 DApp，可在 HuFu 内置浏览器中打开，也支
 - 投票人奖励查询并广播 `voter.reward::claimrewards`
 - BP 本人或第三方代 BP 查询并广播 `flon::claimrewards(caller, producer, max_steps)`；奖励始终直接支付给 BP
 - BP 处罚状态查询及符合条件后的 `flon::resumeprod`
+- 从 `dao.gov` 实时读取配置、治理权、提案、附议和选票状态
+- 支持信号提案创建、附议、快照投票，以及 permissionless `activate`、`finalize`、`queue`、`execute`、`expire`
+- 提案正文保存 URI 与 SHA-256，社区讨论通过链上 `discussion_uri` 接入论坛
 - HuFu 钱包连接、交易解释、签名请求和状态追踪
 - PC / 手机响应式布局与浏览器语言自动识别（简体中文、英文）
 
 当前版本已经把节点排名、钱包账户票权、节点选择、投票人待领奖励、BP 注册和 BP 恢复接到链上 RPC；对应确认页会展示实际 action，并由钱包签名广播。RPC 返回失败时界面显示错误，不回退到伪造数据。
 
-DAO 提案/附议/投票/Timelock/执行使用 `dao.gov`，预算预留与付款使用 `dao.treasury`。前端必须在链上合约完成部署、初始化和 ABI 校验后才开放对应签名入口；未部署的网络保持只读，不广播模拟交易。历史在线率、论坛评论和全文检索仍需要索引服务或论坛 API。
+DAO 提案/附议/投票/Timelock/执行使用 `dao.gov`，预算预留与付款使用 `dao.treasury`。前端先校验链上 ABI 和 `config`；治理参数未配置时保持只读，不广播模拟交易。创建提案会先通过 `syncpower` 读取账户实际 GLON，再提交提案。附议同样先同步当前治理权；正式投票严格使用提案激活时的链上快照。历史在线率、论坛评论和全文检索仍需要索引服务或论坛 API。
 
 ## 开发
 
@@ -50,6 +53,7 @@ flon.daogov/
 ├── index.html                 H5 入口与页面结构
 ├── src/
 │   ├── app.js                 页面交互、链上状态呈现与签名流程
+│   ├── governance.js          提案阶段推导与 permissionless 生命周期动作
 │   ├── wallet.js              RPC、HuFu / Anchor 钱包与交易适配
 │   └── styles.css             HuFu 移动端视觉实现
 ├── public/assets/fonts/       自托管字体
