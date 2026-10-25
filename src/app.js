@@ -1,4 +1,4 @@
-import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadContractAbi,loadElection,loadEpochTiming,loadGovernance,loadGovernanceActionDefaults,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
+import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadChainGovernanceParameters,loadContractAbi,loadElection,loadEpochTiming,loadGovernance,loadGovernanceActionDefaults,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
 
 import {accountExplorerUrl} from './explorer.js';
 import {DAO_STATUS_META,abiFieldValue,actionAbiFields,effectiveProposalPhase,enabledAllowlist,governanceAction,proposalCounts,validateFrozenActions} from './governance.js';
@@ -92,6 +92,9 @@ const translations=new Map([
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['拟议变更','Proposed changes'],['配置类操作会自动填入链上当前值，请只修改希望变更的字段。提交提案后，操作与参数将被锁定，投票期间不能替换。','Configuration operations are prefilled with current on-chain values. Change only the intended fields. Once submitted, the operation and arguments are locked for the vote.'],['通过后执行提交时锁定的白名单 action','Executes the allowlisted action locked when submitted after approval'],['信号提案表达社区意见；可执行提案通过后只执行创建时锁定的白名单 action。','Signal proposals express community intent. Executable proposals may only run the allowlisted action locked when created.'],['已载入链上当前值','Current on-chain values loaded'],['无法读取链上当前值，不能安全创建此配置提案。','Current on-chain values could not be loaded, so this configuration proposal cannot be created safely.']
+].forEach(([zh,en])=>translations.set(zh,en));
+[
+  ['链上未配置','Not configured on-chain'],['天','days'],['分钟','minutes'],['秒','seconds'],['奖励与投票 Epoch','Reward and voting epoch'],['Active BP 目标席位','Target Active BP seats'],['最多投票节点','Maximum voted BPs'],['撤票退款冷却期','Vote refund cooldown'],['提案附议期','Proposal endorsement period'],['正式投票期','Formal voting period']
 ].forEach(([zh,en])=>translations.set(zh,en));
 const sourceText=new WeakMap();
 const sourceAttrs=new WeakMap();
@@ -332,10 +335,31 @@ function syncProposalType(){
   const active=form.proposalType.value==='parameter';editor.hidden=!active;if(active&&!list.children.length){list.insertAdjacentHTML('beforeend',proposalActionRow());void renderProposalActionFields(list.lastElementChild)}
 }
 async function sha256Hex(value){const bytes=new TextEncoder().encode(value),digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('')}
-function openHelpCenter(){
+function humanDuration(seconds,zh){
+  const value=Number(seconds);if(!Number.isFinite(value)||value<=0)return zh?'链上未配置':'Not configured on-chain';
+  if(value%86400===0)return zh?`${value/86400} 天`:`${value/86400} days`;
+  if(value%3600===0)return zh?`${value/3600} 小时`:`${value/3600} hours`;
+  if(value%60===0)return zh?`${value/60} 分钟`:`${value/60} minutes`;
+  return zh?`${value} 秒`:`${value} seconds`;
+}
+async function openHelpCenter(){
   const zh=currentLanguage==='zh-CN';
+  openSheet(`<h2 id="sheet-title">${zh?'治理帮助中心':'Governance Help Center'}</h2><div class="loading-state"><i></i><span>${zh?'正在读取链上参数…':'Loading on-chain parameters…'}</span></div>`);
+  let parameters=null;try{parameters=await loadChainGovernanceParameters()}catch(error){console.error('Failed to load chain governance parameters',error)}
+  const rewardEpochSeconds=parameters?.rewardEpochSlots?parameters.rewardEpochSlots/2:null,gasEpochSeconds=parameters?.gasRewardConfig?.epoch_slots?Number(parameters.gasRewardConfig.epoch_slots)/2:null,governanceConfig=governanceState?.config;
+  const parameterRows=[
+    [zh?'奖励与投票 Epoch':'Reward and voting epoch',humanDuration(rewardEpochSeconds,zh),'flon::rewardcfgv2'],
+    [zh?'GAS 奖励 Epoch':'GAS reward epoch',humanDuration(gasEpochSeconds,zh),'flon::gasrewcfg'],
+    [zh?'Active BP 目标席位':'Target Active BP seats',parameters?.activeBpTarget??(zh?'链上未配置':'Not configured on-chain'),'flon::electconfig'],
+    [zh?'最多投票节点':'Maximum voted BPs','30','flon::votealloc'],
+    [zh?'撤票退款冷却期':'Vote refund cooldown',humanDuration(runtimeConfig.voteRefundDelaySeconds,zh),'flon::voterefund'],
+    [zh?'提案附议期':'Proposal endorsement period',humanDuration(governanceConfig?.endorsement_seconds,zh),'dao.gov::config'],
+    [zh?'正式投票期':'Formal voting period',humanDuration(governanceConfig?.voting_seconds,zh),'dao.gov::config'],
+    ['Timelock',humanDuration(governanceConfig?.timelock_seconds,zh),'dao.gov::config']
+  ];
   openSheet(`<h2 id="sheet-title">${zh?'治理帮助中心':'Governance Help Center'}</h2><p class="sheet-subtitle">${zh?'了解节点投票、DAO 决策、Epoch 与奖励领取':'Learn node voting, DAO decisions, epochs, and reward claims'}</p><div class="help-sections">
     <details open><summary>${zh?'FLON、GLON 与治理权':'FLON, GLON, and governance power'}</summary><p>${zh?'用户锁定 FLON 参与节点投票，并获得等额、不可转让的 GLON。GLON 用于衡量 DAO 治理权，不是支付代币；提案与投票不会转走或消耗 GLON。':'Users lock FLON for node voting and receive an equal amount of non-transferable GLON. GLON measures DAO governance power; proposals and votes do not transfer or consume it.'}</p></details>
+    <details open><summary>${zh?'当前链上基本参数':'Current on-chain parameters'}</summary><p>${zh?'以下数值从当前网络的合约状态表实时读取。FLON 每个区块槽位为 0.5 秒，Epoch 时长由链上 epoch_slots × 0.5 秒计算；治理提案的各阶段使用独立时长，不等同于奖励 Epoch。':'These values are read live from the current network contract tables. Each FLON block slot is 0.5 seconds, so an epoch lasts epoch_slots × 0.5 seconds. Governance proposal phases use separate durations and are not reward epochs.'}</p><div class="help-parameter-grid">${parameterRows.map(([label,value,source])=>`<span><small>${escapeHtml(String(label))}</small><strong>${escapeHtml(String(value))}</strong><code>${escapeHtml(source)}</code></span>`).join('')}</div></details>
     <details><summary>${zh?'节点投票与 Epoch':'Node voting and epochs'}</summary><p>${zh?'每个 BP 可以分配不同数量的 FLON，最多选择 30 个候选节点。变更先写入 pending 状态，在下一 Epoch 边界生效。Epoch 是确定排名、快照、绩效和奖励归属的链上时间窗口。':'Each BP can receive a different FLON allocation, with up to 30 candidates. Changes enter pending state and take effect at the next epoch boundary. An epoch is the on-chain window for ranking, snapshots, performance, and rewards.'}</p></details>
     <details><summary>${zh?'提案生命周期':'Proposal lifecycle'}</summary><p>${zh?'提案依次经过附议、治理权快照、投票、结算、Timelock 和执行。任何账户都可以触发 activate、finalize、queue、execute 或 expire；触发者不能修改提案中已经冻结的 action。':'Proposals move through endorsement, governance-power snapshot, voting, finalization, timelock, and execution. Any account may trigger activate, finalize, queue, execute, or expire, but cannot alter frozen proposal actions.'}</p></details>
     <details><summary>${zh?'奖励不会自动空投':'Rewards are claimed, not airdropped'}</summary><p>${zh?'BP 基础出块奖励和 GAS 奖励先形成链上待领取记录。奖励可以跨 Epoch 累积，不会因为没有立即领取而丢失。投票人奖励由受益账户本人调用 voter.reward::claimrewards。':'BP block and GAS rewards first become on-chain claim records. They accumulate across epochs and do not expire merely because they were not claimed immediately. Voters claim through voter.reward::claimrewards.'}</p></details>
@@ -595,7 +619,7 @@ document.addEventListener('click',async event=>{
   if(action==='toast')showToast(target.dataset.message||'操作已完成');
   if(action==='close-sheet')closeSheet();
   if(action==='network')showToast(`当前为 ${networkName()} · Chain ID ${runtimeConfig.chainId.slice(0,4)}…${runtimeConfig.chainId.slice(-3)}`);
-  if(action==='help')openHelpCenter();
+  if(action==='help')await openHelpCenter();
   if(action==='help-voting'){closeSheet();showView('nodes');setNodeMode('vote')}
   if(action==='account')openWalletSheet();
   if(action==='connect-wallet'){

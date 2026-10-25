@@ -412,6 +412,11 @@ export async function loadGovernanceActionDefaults(contract,action){
   if(key==='flon::setbpstake')return{enforce_schedule:Boolean(Number(row.enforce_schedule)),min_self_stake:row.min_self_stake,unstake_delay_sec:row.unstake_delay_sec};
   return{enabled:Boolean(Number(row.enabled)),epoch_slots:row.epoch_slots,active_min_bp:row.active_min_bp,pool_bp:row.pool_bp,active_share_bp:row.active_share_bp};
 }
+export async function loadChainGovernanceParameters(){
+  const table=async name=>(await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:name,limit:1}).catch(()=>({rows:[]}))).rows?.[0]||null;
+  const [rewardConfig,electionConfig,bpStakeConfig,gasRewardConfig]=await Promise.all([table('rewardcfgv2'),table('electconfig'),table('bpstakecfg'),table('gasrewcfg')]);
+  return{rewardEpochSlots:Number(rewardConfig?.epoch_slots)||null,activeBpTarget:Number(electionConfig?.active_bp_quorum)||null,bpStakeConfig,gasRewardConfig};
+}
 export async function transact(session,actions){
   assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
