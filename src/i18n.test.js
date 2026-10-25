@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {generatedLocaleTerms} from './locales/index.js';
 
 const appSource=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
 const htmlSource=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
@@ -36,4 +37,17 @@ test('language selector is global and supports the configured locales',()=>{
   assert.match(topbar,/data-action="language-toggle"/);
   for(const locale of ['en','fr','ja','ko','es','zh-CN','zh-TW'])assert.match(topbar,new RegExp(`data-language-option="${locale}"`));
   assert.doesNotMatch(profile,/data-language(?:-option|-label|=)/);
+});
+
+test('every non-English locale covers all page vocabulary',()=>{
+  const baseSource=appSource.slice(0,appSource.indexOf('const languageLabels='));
+  const keys=[...new Set([...baseSource.matchAll(/\['([^']*[\u3400-\u9fff][^']*)','([^']+)'\]/g)].map(match=>match[2]))];
+  for(const locale of ['fr','ja','ko','es','zh-TW']){
+    const dictionary=generatedLocaleTerms[locale];
+    assert.ok(dictionary,`${locale} locale dictionary was not found`);
+    for(const key of keys){
+      assert.equal(typeof dictionary[key],'string',`${locale} is missing ${key}`);
+      assert.notEqual(dictionary[key].trim(),'');
+    }
+  }
 });
