@@ -98,7 +98,7 @@ const translations=new Map([
   ['链上未配置','Not configured on-chain'],['天','days'],['分钟','minutes'],['秒','seconds'],['奖励与投票 Epoch','Reward and voting epoch'],['Active BP 目标席位','Target Active BP seats'],['最多投票节点','Maximum voted BPs'],['撤票退款冷却期','Vote refund cooldown'],['提案附议期','Proposal endorsement period'],['投票延迟期','Voting delay'],['正式投票期','Formal voting period'],['执行宽限期','Execution grace period'],['没有可返回的上一页','No previous page is available']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
-  ['BP 与投票页面','BPs & Voting page'],['我的投票','My votes'],['查看并确认','Review and confirm']
+  ['BP 与投票页面','BPs & Voting page'],['我的投票','My votes'],['查看并确认','Review and confirm'],['搜索与排序','Search & sort'],['收起筛选','Hide filters']
 ].forEach(([zh,en])=>translations.set(zh,en));
 const languageLabels={en:'English',fr:'Français',ja:'日本語',ko:'한국어',es:'Español','zh-CN':'简体中文','zh-TW':'繁體中文'};
 const supportedLanguages=new Set(Object.keys(languageLabels));
@@ -675,6 +675,7 @@ document.addEventListener('click',async event=>{
   const action=target.dataset.action;
   if(action==='language-toggle'){const menu=document.querySelector('[data-language-menu]'),open=menu?.hidden!==false;if(menu)menu.hidden=!open;target.setAttribute('aria-expanded',String(open));return}
   if(target.dataset.languageOption){setLanguage(target.dataset.languageOption);return}
+  if(action==='toggle-node-tools'){const tools=document.querySelector('[data-node-directory-tools],#node-directory-tools'),open=tools?.hidden!==false;if(tools)tools.hidden=!open;target.setAttribute('aria-expanded',String(open));const label=target.querySelector('[data-node-tools-label]');if(label)label.textContent=translateText(open?'收起筛选':'搜索与排序');return}
   if(action==='back')navigateBack();
   if(action==='toast')showToast(target.dataset.message||'操作已完成');
   if(action==='close-sheet')closeSheet();
