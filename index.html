@@ -60,27 +60,21 @@
     <main id="main">
       <section class="view is-active" data-view="overview">
         <div class="content overview-content">
-          <section class="epoch-card">
-            <div class="epoch-head"><span><i class="live-dot"></i>链上选举状态</span><strong class="din">实时 RPC</strong></div>
-            <div class="progress"><i style="width:100%"></i></div>
-            <div class="epoch-foot"><span>当前席位 <strong data-epoch-active>— / —</strong></span><span>Standby <strong data-epoch-standby>—</strong></span><span>候选 <strong data-epoch-candidates>—</strong></span></div>
-          </section>
-
-          <section class="section">
-            <div class="section-title"><h2>需要你处理</h2><button type="button" data-view-target="mine">全部</button></div>
-            <div class="task-list">
-              <button class="task" type="button" data-view-target="dao"><span class="task-icon blue"><svg><use href="#i-dao"/></svg></span><span><strong>DAO 治理</strong><small data-governance-summary>正在读取链上治理状态</small></span><em>查看</em></button>
-              <button class="task" type="button" data-view-target="overview" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><span><strong>领取投票奖励</strong><small data-claimable-summary>连接钱包后读取链上已结算余额</small></span><em data-claim-action-label>领取</em></button>
-            </div>
-          </section>
-
-          <section class="section">
+          <section class="section network-overview">
             <div class="section-title"><h2>网络概况</h2><button type="button" data-view-target="nodes">节点排名</button></div>
             <div class="metric-grid">
               <article><small>Active BP</small><strong class="din" data-active-count>—</strong><span data-active-target>目标 —</span></article>
               <article><small>Standby BP</small><strong class="din" data-standby-count>—</strong><span>链上候选排名</span></article>
               <article><small>候选节点</small><strong class="din" data-candidate-count>—</strong><span>flon::producers</span></article>
               <article><small>网络出块率</small><strong class="din" data-production-rate>—</strong><span data-production-source>正在读取链上封存 Epoch…</span></article>
+            </div>
+          </section>
+
+          <section class="section action-required">
+            <div class="section-title"><h2>需要你处理</h2><button type="button" data-view-target="mine">全部</button></div>
+            <div class="task-list">
+              <button class="task" type="button" data-view-target="dao"><span class="task-icon blue"><svg><use href="#i-dao"/></svg></span><span><strong>DAO 治理</strong><small data-governance-summary>正在读取链上治理状态</small></span><em>查看</em></button>
+              <button class="task" type="button" data-view-target="overview" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><span><strong>领取投票奖励</strong><small data-claimable-summary>连接钱包后读取链上已结算余额</small></span><em data-claim-action-label>领取</em></button>
             </div>
           </section>
 
@@ -102,8 +96,8 @@
             <div class="vote-layout">
               <main class="vote-directory" data-mobile-vote-panel="directory">
                 <div class="node-directory-toolbar">
-                  <div class="tabs" role="tablist"><button class="is-active" data-node-filter="all">全部候选</button><button data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-selected-only>已选择</button></div>
-                  <div class="node-directory-tools">
+                  <div class="node-filter-row"><div class="tabs" role="tablist"><button class="is-active" data-node-filter="all">全部候选</button><button data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-selected-only>已选择</button></div><button class="filter-tools-toggle" type="button" data-action="toggle-node-tools" aria-expanded="false" aria-controls="node-directory-tools"><svg><use href="#i-search"/></svg><span data-node-tools-label>搜索与排序</span></button></div>
+                  <div class="node-directory-tools" id="node-directory-tools" hidden>
                     <label class="search"><svg><use href="#i-search"/></svg><input type="search" placeholder="搜索账户、名称或地区" data-node-search></label>
                     <label class="node-sort"><span>排序</span><select data-node-sort><option value="rank">综合排名</option><option value="votes">票权最高</option><option value="share">分享比例</option><option value="selected">已选择优先</option></select></label>
                   </div>
