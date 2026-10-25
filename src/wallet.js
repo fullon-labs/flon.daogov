@@ -392,6 +392,12 @@ export async function serializeGovernanceAction(contract,action,args){
   if(!/^(?:[0-9a-f]{2})*$/i.test(data))throw new Error('INVALID_SERIALIZED_ACTION');
   return data.toLowerCase();
 }
+export async function loadContractAbi(contract){
+  if(!/^[a-z1-5.]{1,12}$/.test(String(contract||'')))throw new Error('INVALID_CONTRACT');
+  const result=await rpcPost('/v1/chain/get_abi',{account_name:contract});
+  if(!result?.abi)throw new Error('CONTRACT_ABI_UNAVAILABLE');
+  return result.abi;
+}
 export async function transact(session,actions){
   assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));

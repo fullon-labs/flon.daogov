@@ -14,7 +14,7 @@ FullOn Network DAO治理 H5 DApp，可在 HuFu 内置浏览器中打开，也支
 - BP 处罚状态查询及符合条件后的 `flon::resumeprod`
 - 从 `dao.gov` 实时读取配置、治理权、提案、附议和选票状态
 - 支持信号提案创建、附议、快照投票，以及 permissionless `activate`、`finalize`、`queue`、`execute`、`expire`
-- 支持从链上执行白名单选择一个或多个 action，按目标 ABI 序列化参数并在创建时冻结
+- 支持从链上执行白名单选择一个或多个 action，根据目标合约 ABI 自动生成类型化参数输入框，由当前网络 RPC 序列化并在创建时冻结
 - 提案正文保存 URI 与 SHA-256，社区讨论通过链上 `discussion_uri` 接入论坛
 - HuFu 钱包连接、交易解释、签名请求和状态追踪
 - PC / 手机响应式布局与浏览器语言自动识别（简体中文、英文）

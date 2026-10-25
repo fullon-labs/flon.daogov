@@ -50,6 +50,38 @@ export function enabledAllowlist(rows=[]){
     .sort((left,right)=>`${left.contract}::${left.action}`.localeCompare(`${right.contract}::${right.action}`));
 }
 
+const splitAbiType=type=>{
+  let value=String(type||''),array=false,optional=false,extension=false;
+  if(value.endsWith('[]')){array=true;value=value.slice(0,-2)}
+  if(value.endsWith('?')){optional=true;value=value.slice(0,-1)}
+  if(value.endsWith('$')){extension=true;value=value.slice(0,-1)}
+  return {value,array,optional,extension};
+};
+
+export function actionAbiFields(abi,actionName){
+  const actions=Array.isArray(abi?.actions)?abi.actions:[],structs=Array.isArray(abi?.structs)?abi.structs:[],aliases=new Map((abi?.types||[]).map(item=>[item.new_type_name,item.type]));
+  const action=actions.find(item=>item.name===actionName);if(!action)throw new Error('ACTION_ABI_NOT_FOUND');
+  const resolve=type=>{let current=String(type||''),guard=0;while(aliases.has(current)&&guard++<32)current=aliases.get(current);return current};
+  const structMap=new Map(structs.map(item=>[item.name,item]));
+  const fields=[];const collect=type=>{const struct=structMap.get(resolve(type));if(!struct)throw new Error('ACTION_STRUCT_NOT_FOUND');if(struct.base)collect(struct.base);fields.push(...(struct.fields||[]))};
+  collect(action.type);
+  return fields.map(field=>{
+    const modifier=splitAbiType(field.type),resolved=resolve(modifier.value);
+    return {name:String(field.name),type:String(field.type),baseType:resolved,array:modifier.array,optional:modifier.optional||modifier.extension,structured:structMap.has(resolved)};
+  });
+}
+
+export function abiFieldValue(field,raw,checked=false){
+  if(field.optional&&field.baseType!=='bool'&&!String(raw??'').trim())return null;
+  if(field.array||field.structured){try{const value=JSON.parse(String(raw||''));if(field.array&&!Array.isArray(value))throw new Error();if(field.structured&&(value===null||Array.isArray(value)||typeof value!=='object'))throw new Error();return value}catch{throw new Error(`INVALID_ABI_FIELD:${field.name}`)}}
+  if(field.baseType==='bool')return Boolean(checked);
+  const value=String(raw??'').trim();if(!value&&field.optional)return null;
+  if(!value)throw new Error(`REQUIRED_ABI_FIELD:${field.name}`);
+  if(/^uint(?:8|16|32|64|128)$/.test(field.baseType)&&!/^\d+$/.test(value))throw new Error(`INVALID_ABI_FIELD:${field.name}`);
+  if(/^int(?:8|16|32|64|128)$/.test(field.baseType)&&!/^-?\d+$/.test(value))throw new Error(`INVALID_ABI_FIELD:${field.name}`);
+  return value;
+}
+
 export function validateFrozenActions(actions,rules,config){
   const maxActions=Number(config?.max_actions||0),maxActionBytes=Number(config?.max_action_bytes||0),maxTotalBytes=Number(config?.max_total_action_bytes||0);
   if(!actions.length)throw new Error('NO_PROPOSAL_ACTIONS');
