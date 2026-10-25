@@ -1,7 +1,7 @@
-import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadElection,loadEpochTiming,loadGovernance,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
+import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadContractAbi,loadElection,loadEpochTiming,loadGovernance,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
 
 import {accountExplorerUrl} from './explorer.js';
-import {DAO_STATUS_META,effectiveProposalPhase,enabledAllowlist,governanceAction,proposalCounts,validateFrozenActions} from './governance.js';
+import {DAO_STATUS_META,abiFieldValue,actionAbiFields,effectiveProposalPhase,enabledAllowlist,governanceAction,proposalCounts,validateFrozenActions} from './governance.js';
 
 const views=[...document.querySelectorAll('.view')];
 const nav=[...document.querySelectorAll('.bottom-nav [data-view-target]')];
@@ -25,6 +25,8 @@ let votingState=null;
 let profileBPRewards=null;
 let electionState=null;
 let governanceState=null;
+const contractAbiCache=new Map();
+const proposalActionChecks=new WeakMap();
 let pendingVoteAllocations=null;
 let epochCountdownTimer=null;
 let refundCountdownTimer=null;
@@ -77,7 +79,7 @@ const translations=new Map([
   ['尚无链上提案','No on-chain proposals yet'],['正在读取链上提案…','Loading on-chain proposals…'],['无法验证 dao.gov ABI，治理交易已禁用。','Unable to verify the dao.gov ABI. Governance transactions are disabled.'],['DAO 治理状态不可用','DAO governance status is unavailable'],['治理参数尚未配置','Governance parameters are not configured'],['dao.gov 已部署，但治理参数尚未配置。配置完成前不能发起提案。','dao.gov is deployed, but its governance parameters are not configured. Proposals cannot be created until configuration is complete.'],['链上治理数据读取失败','Failed to load on-chain governance data'],['个链上提案','on-chain proposals'],['总治理权','Total governance power'],
   ['未知','Unknown'],['投票等待期','Voting delay'],['未通过','Rejected'],['已通过','Passed'],['已取消','Cancelled'],['已执行','Executed'],['已过期','Expired'],['进入投票','Start voting'],['结算投票','Finalize voting'],['进入 Timelock','Enter Timelock'],['执行','Execute'],['标记过期','Mark expired'],
   ['支持本提案','Support this proposal'],['拒绝本提案','Reject this proposal'],['人附议','endorsers'],['提案类型','Proposal type'],['冻结执行动作','Frozen actions'],['提案文档','Proposal document'],['社区讨论','Community discussion'],['尚未关联论坛讨论','No forum discussion linked'],['关闭','Close'],
-  ['信号提案表达社区意见；可执行提案通过后只执行创建时冻结的白名单 action。','Signal proposals express community intent. Executable proposals may only run allowlisted actions frozen when the proposal was created.'],['可执行参数提案','Executable parameter proposal'],['（白名单为空）',' (allowlist is empty)'],['标题','Title'],['摘要','Summary'],['提案文档 URI','Proposal document URI'],['社区讨论 URI','Community discussion URI'],['白名单 action','Allowlisted action'],['Action 参数 JSON','Action arguments JSON'],['移除此 action','Remove this action'],['添加 action','Add action'],['参数必须是目标 action ABI 对应的 JSON。签名前由测试网 RPC 序列化，并检查白名单及字节上限。','Arguments must be JSON matching the target action ABI. Before signing, the testnet RPC serializes them and validates the allowlist and byte limits.'],['提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。','Proposal content is stored in a public document or decentralized storage. The chain stores its hash and URI; the forum link is frozen when endorsement ends.'],['提案交易已广播','Proposal transaction broadcast'],['个冻结 action','frozen actions'],['交易已广播','Transaction broadcast'],['单个提案最多','A proposal supports at most'],['个 action','actions'],['附议交易已广播','Endorsement transaction broadcast'],
+  ['信号提案表达社区意见；可执行提案通过后只执行创建时冻结的白名单 action。','Signal proposals express community intent. Executable proposals may only run allowlisted actions frozen when the proposal was created.'],['可执行参数提案','Executable parameter proposal'],['（白名单为空）',' (allowlist is empty)'],['标题','Title'],['摘要','Summary'],['提案文档 URI','Proposal document URI'],['社区讨论 URI','Community discussion URI'],['白名单 action','Allowlisted action'],['移除此 action','Remove this action'],['添加 action','Add action'],['参数输入框根据目标 action 的链上 ABI 自动生成。签名前由当前网络 RPC 序列化，并检查白名单及字节上限。','Input fields are generated from the target action ABI. Before signing, the current network RPC serializes the arguments and validates allowlist and byte limits.'],['正在读取 action ABI…','Loading action ABI…'],['此 action 不需要参数。','This action has no arguments.'],['无法读取 action ABI：','Unable to load action ABI: '],['Action ABI 尚未加载完成','The action ABI is still loading'],['请检查 action 参数','Check the action arguments'],['提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。','Proposal content is stored in a public document or decentralized storage. The chain stores its hash and URI; the forum link is frozen when endorsement ends.'],['提案交易已广播','Proposal transaction broadcast'],['个冻结 action','frozen actions'],['交易已广播','Transaction broadcast'],['单个提案最多','A proposal supports at most'],['个 action','actions'],['附议交易已广播','Endorsement transaction broadcast'],
   ['正在读取链上治理状态','Loading on-chain governance status'],['读取链上治理状态','Load on-chain governance status'],['治理帮助','Governance help'],['治理中心导航','Governance center navigation'],['你有 3 项治理任务','You have 3 governance tasks'],['治理记录来自链上数据','Governance history comes from on-chain data'],['个 BP','BPs'],['— 个 BP','— BPs']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
@@ -260,15 +262,62 @@ function openProposalDetails(id){
 function openCreateProposal(){
   if(!walletSession){openWalletSheet();return}if(!governanceState?.config){showToast('治理参数尚未配置');return}
   const rules=enabledAllowlist(governanceState.allowlist),executable=rules.length>0;
-  openSheet(`<h2 id="sheet-title">发起治理提案</h2><p class="sheet-subtitle">信号提案表达社区意见；可执行提案通过后只执行创建时冻结的白名单 action。</p><form class="wizard-form" data-proposal-form><fieldset class="proposal-type-picker"><legend>提案类型</legend><label><input type="radio" name="proposalType" value="signal" checked><span><strong>文本 / 信号提案</strong><small>表达社区意见，不执行链上 action</small></span><i aria-hidden="true"></i></label><label class="${executable?'':'is-disabled'}"><input type="radio" name="proposalType" value="parameter" ${executable?'':'disabled'}><span><strong>可执行参数提案</strong><small>${executable?'通过后执行已冻结的白名单 action':'白名单为空，暂不可用'}</small></span><i aria-hidden="true"></i></label></fieldset><label><span>标题</span><input name="title" maxlength="128" required></label><label><span>摘要</span><textarea name="summary" maxlength="1024" rows="5" required></textarea></label><label><span>提案文档 URI</span><input name="metadataUri" type="url" maxlength="512" placeholder="https://…" required></label><label><span>社区讨论 URI</span><input name="discussionUri" type="url" maxlength="512" placeholder="https://forum…"></label><section class="proposal-actions-editor" data-proposal-actions hidden><header><strong>冻结执行动作</strong><button type="button" data-action="dao-add-proposal-action">+ 添加 action</button></header><div data-proposal-action-list></div><p class="field-note">参数必须是目标 action ABI 对应的 JSON。签名前由测试网 RPC 序列化，并检查白名单及字节上限。</p></section><p class="field-note">提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。</p></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-sign">检查并签名</button></div>`);
+  openSheet(`<h2 id="sheet-title">发起治理提案</h2><p class="sheet-subtitle">信号提案表达社区意见；可执行提案通过后只执行创建时冻结的白名单 action。</p><form class="wizard-form" data-proposal-form><fieldset class="proposal-type-picker"><legend>提案类型</legend><label><input type="radio" name="proposalType" value="signal" checked><span><strong>文本 / 信号提案</strong><small>表达社区意见，不执行链上 action</small></span><i aria-hidden="true"></i></label><label class="${executable?'':'is-disabled'}"><input type="radio" name="proposalType" value="parameter" ${executable?'':'disabled'}><span><strong>可执行参数提案</strong><small>${executable?'通过后执行已冻结的白名单 action':'白名单为空，暂不可用'}</small></span><i aria-hidden="true"></i></label></fieldset><label><span>标题</span><input name="title" maxlength="128" required></label><label><span>摘要</span><textarea name="summary" maxlength="1024" rows="5" required></textarea></label><label><span>提案文档 URI</span><input name="metadataUri" type="url" maxlength="512" placeholder="https://…" required></label><label><span>社区讨论 URI</span><input name="discussionUri" type="url" maxlength="512" placeholder="https://forum…"></label><section class="proposal-actions-editor" data-proposal-actions hidden><header><strong>冻结执行动作</strong><button type="button" data-action="dao-add-proposal-action">+ 添加 action</button></header><div data-proposal-action-list></div><p class="field-note">参数输入框根据目标 action 的链上 ABI 自动生成。签名前由当前网络 RPC 序列化，并检查白名单及字节上限。</p></section><p class="field-note">提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。</p></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-sign">检查并签名</button></div>`);
 }
+const governanceActionLabels={
+  'dao.gov::setallow':['管理执行白名单','Manage execution allowlist'],
+  'dao.gov::setconfig':['更新治理参数','Update governance settings'],
+  'dao.treasury::pay':['财政付款','Treasury payment'],
+  'dao.treasury::release':['释放预留预算','Release reserved budget'],
+  'dao.treasury::reserve':['预留财政预算','Reserve treasury budget'],
+  'dao.treasury::setasset':['设置财政资产','Configure treasury asset'],
+  'flon::setbpquorum':['调整 Active BP 席位','Update Active BP seats'],
+  'flon::setbpstake':['调整 BP 自质押门槛','Update BP self-stake requirement'],
+  'flon::setgasrwcfg':['调整 GAS 奖励参数','Update GAS reward settings']
+};
+function governanceActionLabel(key){const labels=governanceActionLabels[key];return labels?labels[currentLanguage==='zh-CN'?0:1]:key}
 function proposalActionRow(){
-  const rules=enabledAllowlist(governanceState?.allowlist),options=rules.map(rule=>`<option value="${escapeHtml(`${rule.contract}::${rule.action}`)}">${escapeHtml(`${rule.contract}::${rule.action}`)} · ≤ ${rule.maxBytes} bytes</option>`).join('');
-  return `<article class="proposal-action-row"><label><span>白名单 action</span><select name="targetAction" required>${options}</select></label><label><span>Action 参数 JSON</span><textarea name="actionArgs" rows="5" spellcheck="false" placeholder='{"field":"value"}' required></textarea></label><button type="button" class="danger-button" data-action="dao-remove-proposal-action">移除此 action</button></article>`;
+  const rules=enabledAllowlist(governanceState?.allowlist),options=rules.map(rule=>{const key=`${rule.contract}::${rule.action}`;return`<option value="${escapeHtml(key)}">${escapeHtml(governanceActionLabel(key))}</option>`}).join(''),first=rules[0],technical=first?`${first.contract}::${first.action}`:'';
+  return `<article class="proposal-action-row"><label><span>${currentLanguage==='zh-CN'?'执行操作':'Operation'}</span><select name="targetAction" required>${options}</select></label><p class="action-technical" data-action-technical>${escapeHtml(technical)}</p><div class="abi-action-fields" data-abi-action-fields><p class="field-note">正在读取 action ABI…</p></div><p class="action-size-status" data-action-size-status hidden></p><button type="button" class="danger-button" data-action="dao-remove-proposal-action">移除此 action</button></article>`;
+}
+function abiFieldControl(field){
+  const required=field.optional?'':' required',label=`${escapeHtml(field.name)} <small>${escapeHtml(field.type)}</small>`;
+  if(field.baseType==='bool'&&!field.array)return `<label class="abi-bool-field"><span>${label}</span><input type="checkbox" data-abi-field="${escapeHtml(field.name)}"></label>`;
+  if(field.array||field.structured)return `<label><span>${label}</span><textarea data-abi-field="${escapeHtml(field.name)}" rows="3" spellcheck="false" placeholder="${field.array?'[]':'{}'}"${required}></textarea></label>`;
+  if(field.baseType==='time_point'||field.baseType==='time_point_sec')return `<label><span>${label}</span><input type="datetime-local" data-abi-field="${escapeHtml(field.name)}"${required}></label>`;
+  const inputmode=/^u?int|asset|float/.test(field.baseType)?' inputmode="decimal"':'';
+  return `<label><span>${label}</span><input type="text" data-abi-field="${escapeHtml(field.name)}" placeholder="${escapeHtml(field.baseType)}"${inputmode}${required}></label>`;
+}
+async function contractAbi(contract){
+  if(!contractAbiCache.has(contract))contractAbiCache.set(contract,loadContractAbi(contract).catch(error=>{contractAbiCache.delete(contract);throw error}));
+  return contractAbiCache.get(contract);
+}
+async function renderProposalActionFields(row){
+  const container=row?.querySelector('[data-abi-action-fields]'),target=row?.querySelector('[name="targetAction"]');if(!container||!target)return;
+  const key=target.value,request=String(Date.now()+Math.random()),technical=row.querySelector('[data-action-technical]');row.dataset.abiRequest=request;row._abiFields=null;if(technical)technical.textContent=key;
+  container.innerHTML='<p class="field-note">正在读取 action ABI…</p>';
+  try{
+    const [contract,action]=key.split('::'),fields=actionAbiFields(await contractAbi(contract),action);if(row.dataset.abiRequest!==request)return;
+    row._abiFields=fields;container.innerHTML=fields.length?fields.map(abiFieldControl).join(''):'<p class="field-note">此 action 不需要参数。</p>';applyTranslations(container);
+  }catch(error){if(row.dataset.abiRequest!==request)return;container.innerHTML=`<p class="inline-error">无法读取 action ABI：${escapeHtml(String(error?.message||error))}</p>`}
+}
+function scheduleProposalActionSizeCheck(row){
+  clearTimeout(proposalActionChecks.get(row));proposalActionChecks.set(row,setTimeout(()=>void updateProposalActionSize(row),250));
+}
+async function updateProposalActionSize(row){
+  const status=row?.querySelector('[data-action-size-status]'),target=row?.querySelector('[name="targetAction"]');if(!status||!target||!Array.isArray(row._abiFields))return;
+  try{
+    const [contract,action_name]=target.value.split('::'),data=await serializeGovernanceAction(contract,action_name,proposalActionArgs(row)),bytes=data.length/2,rule=enabledAllowlist(governanceState?.allowlist).find(item=>item.contract===contract&&item.action===action_name),limit=Math.min(Number(rule?.maxBytes||Infinity),Number(governanceState?.config?.max_action_bytes||Infinity)),ratio=bytes/limit;
+    status.hidden=ratio<.8;status.className=`action-size-status ${ratio>1?'is-error':'is-warning'}`;status.textContent=ratio>1?(currentLanguage==='zh-CN'?'参数内容过长，请缩短后再提交。':'The action arguments are too long. Shorten them before submitting.'):(currentLanguage==='zh-CN'?'参数内容接近链上限制，请尽量精简。':'The action arguments are close to the on-chain limit. Consider shortening them.');
+  }catch{status.hidden=true}
+}
+function proposalActionArgs(row){
+  if(!Array.isArray(row._abiFields))throw new Error('ACTION_ABI_NOT_READY');
+  return Object.fromEntries(row._abiFields.map(field=>{const input=[...row.querySelectorAll('[data-abi-field]')].find(element=>element.dataset.abiField===field.name);if(!input)throw new Error(`ACTION_ABI_FIELD_MISSING:${field.name}`);let raw=input.value;if((field.baseType==='time_point'||field.baseType==='time_point_sec')&&raw)raw=new Date(raw).toISOString().replace(/\.000Z$/,'');return[field.name,abiFieldValue(field,raw,input.checked)]}));
 }
 function syncProposalType(){
   const form=sheetContent.querySelector('[data-proposal-form]'),editor=form?.querySelector('[data-proposal-actions]'),list=form?.querySelector('[data-proposal-action-list]');if(!form||!editor||!list)return;
-  const active=form.proposalType.value==='parameter';editor.hidden=!active;if(active&&!list.children.length)list.insertAdjacentHTML('beforeend',proposalActionRow());
+  const active=form.proposalType.value==='parameter';editor.hidden=!active;if(active&&!list.children.length){list.insertAdjacentHTML('beforeend',proposalActionRow());void renderProposalActionFields(list.lastElementChild)}
 }
 async function sha256Hex(value){const bytes=new TextEncoder().encode(value),digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('')}
 function openHelpCenter(){
@@ -288,15 +337,14 @@ async function submitProposal(target){
   try{
     const actions=[];
     if(proposal_type==='parameter')for(const row of form.querySelectorAll('.proposal-action-row')){
-      const [contract,action_name]=row.querySelector('[name="targetAction"]').value.split('::');let args;
-      try{args=JSON.parse(row.querySelector('[name="actionArgs"]').value)}catch{throw new Error('ACTION_ARGS_INVALID_JSON')}
+      const [contract,action_name]=row.querySelector('[name="targetAction"]').value.split('::'),args=proposalActionArgs(row);
       const data=await serializeGovernanceAction(contract,action_name,args);actions.push({contract,action_name,data});
     }
     const bytes=actions.length?validateFrozenActions(actions,enabledAllowlist(governanceState.allowlist),governanceState.config):0;
     const content_hash=await sha256Hex(JSON.stringify({title,summary,metadata_uri,discussion_uri,actions}));
     const result=await transact(walletSession,[{account:'dao.gov',name:'syncpower',data:{voter:walletSession.account}},{account:'dao.gov',name:'propose',data:{proposer:walletSession.account,proposal_type,title,summary,content_hash,metadata_uri,discussion_uri,actions}}]),id=transactionId(result);
     openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">提案交易已广播</h2><p>${actions.length} 个冻结 action · ${bytes} bytes</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshGovernance();
-  }catch(error){target.disabled=false;const code=String(error?.message||error);showToast(code.includes('ACTION_ARGS_INVALID_JSON')?'Action 参数必须是有效 JSON':walletErrorMessage(error))}
+  }catch(error){target.disabled=false;const code=String(error?.message||error);showToast(code.includes('ACTION_ABI_NOT_READY')?'Action ABI 尚未加载完成':code.includes('INVALID_ABI_FIELD')||code.includes('REQUIRED_ABI_FIELD')?'请检查 action 参数':code.includes('ACTION_DATA_TOO_LARGE')||code.includes('TOTAL_ACTION_DATA_TOO_LARGE')?(currentLanguage==='zh-CN'?'Action 参数内容过长，请缩短后再提交。':'The action arguments are too long. Shorten them before submitting.'):walletErrorMessage(error))}
 }
 function openVoteProposal(id){const proposal=findProposal(id);if(!proposal)return;if(!walletSession){openWalletSheet();return}openSheet(`<h2 id="sheet-title">参与投票</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml(proposal.title)}</p><div class="proposal-choice-grid"><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="1">赞成<small>支持本提案</small></button><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="0">反对<small>拒绝本提案</small></button><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="2">弃权<small>计入 quorum</small></button></div>`)}
 async function submitDaoAction(target,name,id,data={}){if(!walletSession){openWalletSheet();return}target.disabled=true;try{const result=await transact(walletSession,[{account:'dao.gov',name,data:{...data,proposal_id:Number(id)}}]),tx=transactionId(result);showToast(tx?`交易已广播 ${tx.slice(0,10)}…`:'交易已广播');closeSheet();await refreshGovernance()}catch(error){target.disabled=false;showToast(walletErrorMessage(error))}}
@@ -551,7 +599,7 @@ document.addEventListener('click',async event=>{
   if(action==='create-proposal')openCreateProposal();
   if(action==='dao-add-proposal-action'){
     const list=sheetContent.querySelector('[data-proposal-action-list]'),maximum=Number(governanceState?.config?.max_actions||0);
-    if(list&&list.children.length<maximum)list.insertAdjacentHTML('beforeend',proposalActionRow());else showToast(`单个提案最多 ${maximum} 个 action`);
+    if(list&&list.children.length<maximum){list.insertAdjacentHTML('beforeend',proposalActionRow());void renderProposalActionFields(list.lastElementChild)}else showToast(`单个提案最多 ${maximum} 个 action`);
   }
   if(action==='dao-remove-proposal-action')target.closest('.proposal-action-row')?.remove();
   if(action==='dao-propose-sign')await submitProposal(target);
@@ -585,7 +633,8 @@ document.addEventListener('click',async event=>{
   if(action==='unstake-all-sign')await submitUnstakeAll(target);
   if(action==='claim-vote-refund')await claimVoteRefund(target);
 });
-sheetContent.addEventListener('change',event=>{if(event.target?.name==='proposalType')syncProposalType()});
+sheetContent.addEventListener('change',event=>{if(event.target?.name==='proposalType')syncProposalType();if(event.target?.name==='targetAction')void renderProposalActionFields(event.target.closest('.proposal-action-row'))});
+sheetContent.addEventListener('input',event=>{const row=event.target.closest?.('.proposal-action-row');if(row)scheduleProposalActionSizeCheck(row)});
 overlay.addEventListener('click',closeSheet);
 document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
 document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]')){updateAllocation();applyNodeFilters()}});
