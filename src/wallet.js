@@ -21,7 +21,13 @@ function normalizeAccount(value){
   if(Array.isArray(value)){for(const item of value){const found=normalizeAccount(item);if(found)return found}return null}
   if(!value||typeof value!=='object')return null;
   const account=value.account||value.accountName||value.name||value.actor;
-  if(account)return {account:String(account),permission:String(value.permission||'active'),chainId:String(value.chainId||value.chain_id||'')};
+  if(account)return {
+    account:String(account),
+    permission:String(value.permission||'active'),
+    chainId:String(value.chainId||value.chain_id||''),
+    ...(value.publicKey||value.public_key?{publicKey:String(value.publicKey||value.public_key)}:{}),
+    ...(value.network!==undefined?{network:value.network}:{}),
+  };
   for(const key of ['selectedAccount','currentAccount','accounts','data','result']){const found=normalizeAccount(value[key]);if(found)return found}
   return null;
 }
@@ -123,6 +129,10 @@ async function prepareHuFu(){
   for(let count=0;count<50&&!window.HuFu;count++)await wait(100);
   return window.HuFu||null;
 }
+async function waitForHuFuProvider(){
+  for(let count=0;count<50&&!window.HuFu;count++)await wait(100);
+  return window.HuFu||null;
+}
 function chainIdFrom(value,depth=0){
   if(!value||depth>4)return '';
   if(typeof value==='string'){
@@ -146,6 +156,17 @@ async function confirmInjectedChain(provider,account=null,restoredChainId=''){
   if(refreshedId){assertChain(refreshedId);return refreshedId}
   if(isFullOnChain(hufuChainInfo)){assertChain(restoredChainId||config().chainId);return restoredChainId||config().chainId}
   throw new Error('WALLET_CHAIN_UNCONFIRMED');
+}
+function confirmTransactionSnapshot(provider,account=null,restoredChainId=''){
+  // A transaction click must open exactly one native HuFu surface: approval.
+  // Some HuFu releases route provider network reads and native switch calls
+  // through the account chooser, so never invoke them for an established,
+  // domain-scoped session. Validate synchronously exposed metadata when it is
+  // available and otherwise rely on the verified session and DApp RPC.
+  const chainId=chainIdFrom(account)||chainIdFrom(provider);
+  if(chainId){assertChain(chainId);return chainId}
+  assertChain(restoredChainId);
+  return restoredChainId||config().chainId;
 }
 async function getAnchorLink(){
   if(anchorLink)return anchorLink;
@@ -457,13 +478,12 @@ export async function transact(session,actions){
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
   if(session.provider==='iframe')return window.__DAO_HUFU_CLIENT__.transact(authorized);
   if(session.provider==='hufu'){
-    const provider=window.HuFu||(await prepareHuFu());if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
+    const provider=window.HuFu||(await waitForHuFuProvider());if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
-    // Match the HuFu flow used by numguess: refresh and verify the injected
-    // FullOn network before asking the native wallet to present transaction
-    // details. This deliberately avoids the interactive account API, so an
-    // established session goes straight to signing instead of reopening selection.
-    await confirmInjectedChain(provider,current,session.chainId);
+    // Keep the signing gesture free of provider reads or native switch calls.
+    // In affected HuFu builds those calls reopen account selection. The RPC
+    // and cached session were verified above; only transact may open native UI.
+    confirmTransactionSnapshot(provider,current,session.chainId);
     const remaining=accountPromptReadyAt-Date.now();if(remaining>0)await wait(remaining);
     return timeout(
       Promise.resolve(provider.transact({transaction:{actions:authorized}})),

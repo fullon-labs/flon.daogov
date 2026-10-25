@@ -16,7 +16,8 @@ function removeTranslatedText(value){
 }
 
 test('all static page copy is covered by the English dictionary',()=>{
-  const remaining=removeTranslatedText(htmlSource).replaceAll('中文','').replaceAll('文','');
+  const withoutLanguageOptions=htmlSource.replace(/<div class="language-menu"[\s\S]*?<\/div>/,'');
+  const remaining=removeTranslatedText(withoutLanguageOptions).replaceAll('中文','').replaceAll('文','');
   assert.equal(han.test(remaining),false,remaining.match(/[\u3400-\u9fff]+/g)?.join(', '));
 });
 
@@ -27,4 +28,12 @@ test('all dynamically rendered copy is translated or explicitly bilingual',()=>{
     return han.test(removeTranslatedText(line));
   });
   assert.deepEqual(uncovered,[]);
+});
+
+test('language selector is global and supports the configured locales',()=>{
+  const topbar=htmlSource.match(/<header class="topbar">[\s\S]*?<\/header>/)?.[0]||'';
+  const profile=htmlSource.match(/<section class="view" data-view="mine"[\s\S]*?<\/section>\s*<\/main>/)?.[0]||'';
+  assert.match(topbar,/data-action="language-toggle"/);
+  for(const locale of ['en','fr','ja','ko','es','zh-CN','zh-TW'])assert.match(topbar,new RegExp(`data-language-option="${locale}"`));
+  assert.doesNotMatch(profile,/data-language(?:-option|-label|=)/);
 });
