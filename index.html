@@ -60,7 +60,7 @@
           <section class="section">
             <div class="section-title"><h2>需要你处理</h2><button type="button" data-view-target="mine">全部</button></div>
             <div class="task-list">
-              <button class="task" type="button" data-action="governance-unavailable"><span class="task-icon blue"><svg><use href="#i-dao"/></svg></span><span><strong>DAO 提案功能待接入</strong><small>治理合约 ABI 与部署地址确认后开放</small></span><em>说明</em></button>
+              <button class="task" type="button" data-view-target="dao"><span class="task-icon blue"><svg><use href="#i-dao"/></svg></span><span><strong>DAO 治理</strong><small data-governance-summary>正在读取链上治理状态</small></span><em>查看</em></button>
               <button class="task" type="button" data-view-target="overview" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><span><strong>领取投票奖励</strong><small data-claimable-summary>连接钱包后读取链上已结算余额</small></span><em data-claim-action-label>领取</em></button>
             </div>
           </section>
@@ -77,43 +77,50 @@
 
           <section class="section proposal-preview">
             <div class="section-title"><h2>DAO治理</h2><button type="button" data-view-target="dao">查看全部</button></div>
-            <button class="proposal-card" type="button" data-action="governance-unavailable">
-              <div><span class="status endorsement">待接入</span><span class="proposal-id">DAO治理</span></div>
-              <h3>提案、附议、投票与 Timelock</h3>
-              <p>当前尚未配置可验证的治理合约数据源；本页不会构造或广播模拟治理交易。</p>
-            </button>
+            <div data-governance-preview><div class="loading-state"><i></i><span>正在读取链上提案…</span></div></div>
           </section>
         </div>
       </section>
 
       <section class="view" data-view="nodes" hidden>
         <div class="content">
-          <div class="page-heading"><span><small>网络节点</small><h1>BP 与投票</h1></span><button class="outline-button" type="button" data-action="candidate">申请竞选</button></div>
+          <div class="page-heading node-page-heading"><span><small>选择并支持可信的区块生产者</small><h1>BP 与投票</h1></span><button class="outline-button" type="button" data-action="candidate">申请竞选</button></div>
           <div class="vote-content">
-            <section class="vote-balance vote-balance-compact">
-              <div class="vote-total"><small>本次分配合计</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></div>
-              <div class="vote-funds"><span>链上已投 <strong class="din" data-vote-stake>— FLON</strong></span><span>可用余额 <strong class="din" data-vote-liquid>— FLON</strong></span><span>账户总可投 <strong class="din" data-vote-owned>— FLON</strong></span></div>
-              <span data-vote-source>连接钱包后读取链上 FLON 投票本金</span>
-              <div class="allocation"><span><small>已选择</small><strong class="din" data-selected-count>0 / 30</strong></span><span><small>分配方式</small><strong class="din" data-per-node>自定义</strong></span></div>
-            </section>
-            <div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>投票分配在下一 Epoch 生效</strong><small>待生效状态以 flon::pendingvote 链上记录为准</small><small class="epoch-countdown"><span data-vote-epoch-label>正在读取链上时间…</span><b class="din" data-vote-epoch-countdown>--:--:--</b></small></span></div>
-            <div class="node-list-toolbar">
-              <div class="tabs" role="tablist"><button class="is-active" data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-filter="all">全部候选</button></div>
-              <div class="node-vote-actions"><button class="secondary-button" type="button" data-action="stake">本金与退款</button><button class="primary-button" type="button" data-action="sign-vote">确认投票</button></div>
+            <div class="vote-layout">
+              <main class="vote-directory">
+                <div class="node-directory-toolbar">
+                  <div class="tabs" role="tablist"><button class="is-active" data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-filter="all">全部候选</button><button data-node-selected-only>已选择</button></div>
+                  <div class="node-directory-tools">
+                    <label class="search"><svg><use href="#i-search"/></svg><input type="search" placeholder="搜索账户、名称或地区" data-node-search></label>
+                    <label class="node-sort"><span>排序</span><select data-node-sort><option value="rank">综合排名</option><option value="votes">票权最高</option><option value="share">分享比例</option><option value="selected">已选择优先</option></select></label>
+                  </div>
+                </div>
+                <div class="section-title node-list-title"><span><h2>BP 列表</h2><small>选择节点并直接填写分配的 FLON 数量</small></span><button type="button" data-action="clear-selection">清空选择</button></div>
+                <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
+              </main>
+              <aside class="vote-sidebar">
+                <section class="vote-balance vote-summary-card">
+                  <header><span><small>本次分配</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></span><span class="selection-badge din" data-selected-count>0 / 30</span></header>
+                  <div class="vote-summary-metrics"><span><small>账户总可投</small><strong class="din" data-vote-owned>— FLON</strong></span><span><small>分配后剩余</small><strong class="din" data-vote-remaining>— FLON</strong></span></div>
+                  <div class="vote-funds"><span>链上已投 <strong class="din" data-vote-stake>— FLON</strong></span><span>可用余额 <strong class="din" data-vote-liquid>— FLON</strong></span></div>
+                  <p class="vote-source" data-vote-source>连接钱包后读取链上 FLON 投票本金</p>
+                  <div class="epoch-inline"><svg><use href="#i-clock"/></svg><span><strong>下一 Epoch 生效</strong><small><span data-vote-epoch-label>正在读取链上时间…</span> <b class="din" data-vote-epoch-countdown>--:--:--</b></small></span></div>
+                  <div class="node-vote-actions"><button class="secondary-button" type="button" data-action="stake">本金与退款</button><button class="primary-button" type="button" data-action="sign-vote">确认投票</button></div>
+                  <small class="vote-submit-hint" data-vote-submit-hint>修改节点或票数后即可提交</small>
+                  <span hidden data-per-node>自定义</span>
+                </section>
+              </aside>
             </div>
-            <label class="search"><svg><use href="#i-search"/></svg><input type="search" placeholder="搜索账户、名称或地区" data-node-search></label>
-            <div class="section-title"><h2>BP 列表</h2><button type="button" data-action="clear-selection">清空选择</button></div>
-            <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
           </div>
         </div>
       </section>
 
       <section class="view" data-view="dao" hidden>
         <div class="content">
-          <div class="page-heading"><span><small>社区决策</small><h1>DAO治理</h1></span><button class="primary-small" type="button" data-action="governance-unavailable"><svg><use href="#i-edit"/></svg>发起提案</button></div>
-          <div class="governance-stats"><span><strong class="din">—</strong><small>附议中</small></span><span><strong class="din">—</strong><small>投票中</small></span><span><strong class="din">—</strong><small>待执行</small></span></div>
+          <div class="page-heading"><span><small>社区决策</small><h1>DAO治理</h1></span><button class="primary-small" type="button" data-action="create-proposal"><svg><use href="#i-edit"/></svg>发起提案</button></div>
+          <div class="governance-stats"><span><strong class="din" data-dao-endorsement>—</strong><small>附议中</small></span><span><strong class="din" data-dao-voting>—</strong><small>投票中</small></span><span><strong class="din" data-dao-execution>—</strong><small>待执行</small></span></div>
           <div class="tabs dao-tabs"><button class="is-active" data-proposal-filter="all">全部</button><button data-proposal-filter="endorsement">附议中</button><button data-proposal-filter="voting">投票中</button><button data-proposal-filter="execution">待执行</button></div>
-          <div class="proposal-list"><div class="inline-error">DAO治理合约尚未配置。提案、附议、投票和执行功能当前不可用，也不会广播模拟交易。</div></div>
+          <div class="proposal-list"><div class="loading-state"><i></i><span>正在读取链上提案…</span></div></div>
         </div>
       </section>
 

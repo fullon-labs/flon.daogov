@@ -353,6 +353,37 @@ export async function loadElection(){
   }
   return {producers,activeTarget,activeCount:active.size};
 }
+export async function loadGovernance(account=''){
+  const governance=config().governance||'dao.gov';
+  const [abi,globalRows,configRows,allowRows,proposalRows,chainInfo]=await Promise.all([
+    rpcPost('/v1/chain/get_abi',{account_name:governance}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'global',limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'config',limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'allowlist',limit:100}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'proposals',limit:200,reverse:true}),
+    rpcInfo(),
+  ]);
+  const actions=new Set((abi.abi?.actions||[]).map(item=>item.name));
+  const tables=new Set((abi.abi?.tables||[]).map(item=>item.name));
+  const requiredActions=['propose','endorse','activate','castvote','finalize','queue','execute','expire','cancel','syncpower'];
+  const supported=requiredActions.every(action=>actions.has(action))&&tables.has('proposals')&&tables.has('powers');
+  const global=globalRows.rows?.[0]||null,governanceConfig=configRows.rows?.[0]||null;
+  let power=null,ballots=new Map(),endorsements=new Set();
+  const proposals=proposalRows.rows||[];
+  if(account&&/^[a-z1-5.]{1,12}$/.test(account)){
+    const powerRows=await rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'powers',lower_bound:account,upper_bound:account,limit:1});
+    power=powerRows.rows?.find(row=>row.voter===account)||null;
+    await Promise.all(proposals.map(async proposal=>{
+      const [ballotRows,endorsementRows]=await Promise.all([
+        rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:String(proposal.proposal_id),table:'ballots',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
+        rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:String(proposal.proposal_id),table:'endorsements',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
+      ]);
+      const ballot=ballotRows.rows?.find(row=>row.voter===account);if(ballot)ballots.set(Number(proposal.proposal_id),ballot);
+      if(endorsementRows.rows?.some(row=>row.endorser===account))endorsements.add(Number(proposal.proposal_id));
+    }));
+  }
+  return {governance,supported,global,config:governanceConfig,allowlist:allowRows.rows||[],proposals,power,ballots,endorsements,chainInfo};
+}
 export async function transact(session,actions){
   assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
