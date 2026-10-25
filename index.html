@@ -82,8 +82,12 @@
         <div class="content">
           <div class="page-heading node-page-heading"><span><small>选择并支持可信的区块生产者</small><h1>BP 与投票</h1></span><button class="outline-button" type="button" data-action="candidate">申请竞选</button></div>
           <div class="vote-content">
+            <div class="mobile-vote-tabs" role="tablist" aria-label="BP 与投票页面">
+              <button class="is-active" type="button" role="tab" aria-selected="true" data-mobile-vote-tab="directory">BP 列表</button>
+              <button type="button" role="tab" aria-selected="false" data-mobile-vote-tab="summary">我的投票 <span class="din" data-selected-count>0 个 BP</span></button>
+            </div>
             <div class="vote-layout">
-              <main class="vote-directory">
+              <main class="vote-directory" data-mobile-vote-panel="directory">
                 <div class="node-directory-toolbar">
                   <div class="tabs" role="tablist"><button class="is-active" data-node-filter="all">全部候选</button><button data-node-filter="active">Active</button><button data-node-filter="standby">Standby</button><button data-node-selected-only>已选择</button></div>
                   <div class="node-directory-tools">
@@ -94,7 +98,7 @@
                 <div class="section-title node-list-title"><span><h2>BP 列表</h2><small>选择节点并直接填写分配的 FLON 数量</small></span><button type="button" data-action="clear-selection">清空选择</button></div>
                 <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
               </main>
-              <aside class="vote-sidebar">
+              <aside class="vote-sidebar" data-mobile-vote-panel="summary">
                 <section class="vote-balance vote-summary-card">
                   <header><span><small>本次分配</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></span><span class="selection-badge din" data-selected-count>0 个 BP</span></header>
                   <div class="vote-summary-metrics"><span><small>账户总可投</small><strong class="din" data-vote-owned>— FLON</strong></span><span><small>尚可分配</small><strong class="din" data-vote-remaining>— FLON</strong></span></div>
@@ -105,6 +109,10 @@
                   <span hidden data-per-node>自定义</span>
                 </section>
               </aside>
+            </div>
+            <div class="mobile-vote-dock" data-mobile-vote-dock>
+              <span><small>本次分配</small><strong class="din" data-allocation-total>0.00000000 FLON</strong></span>
+              <button class="primary-button" type="button" data-mobile-vote-tab="summary">查看并确认</button>
             </div>
           </div>
         </div>

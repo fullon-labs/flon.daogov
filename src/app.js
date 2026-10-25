@@ -97,6 +97,9 @@ const translations=new Map([
 [
   ['链上未配置','Not configured on-chain'],['天','days'],['分钟','minutes'],['秒','seconds'],['奖励与投票 Epoch','Reward and voting epoch'],['Active BP 目标席位','Target Active BP seats'],['最多投票节点','Maximum voted BPs'],['撤票退款冷却期','Vote refund cooldown'],['提案附议期','Proposal endorsement period'],['投票延迟期','Voting delay'],['正式投票期','Formal voting period'],['执行宽限期','Execution grace period'],['没有可返回的上一页','No previous page is available']
 ].forEach(([zh,en])=>translations.set(zh,en));
+[
+  ['BP 与投票页面','BPs & Voting page'],['我的投票','My votes'],['查看并确认','Review and confirm']
+].forEach(([zh,en])=>translations.set(zh,en));
 const sourceText=new WeakMap();
 const sourceAttrs=new WeakMap();
 let currentLanguage=localStorage.getItem('flon-daogov-language')||((navigator.languages||[navigator.language||'en'])[0].toLowerCase().startsWith('zh')?'zh-CN':'en');
@@ -134,6 +137,7 @@ function showView(name){
   views.forEach(view=>{const active=view.dataset.view===name;view.hidden=!active;view.classList.toggle('is-active',active)});
   nav.forEach(button=>button.classList.toggle('is-active',button.dataset.viewTarget===name));
   window.scrollTo({top:0,behavior:'smooth'});
+  if(name==='nodes')setMobileVoteTab('directory');
   if(name==='mine')refreshBPRecovery();
   if(name==='dao')refreshGovernance();
 }
@@ -147,6 +151,21 @@ function setNodeMode(mode='directory'){
   document.querySelectorAll('[data-node-mode]').forEach(button=>button.classList.toggle('is-active',button.dataset.nodeMode===mode));
   document.querySelectorAll('[data-node-mode-panel]').forEach(panel=>panel.hidden=panel.dataset.nodeModePanel!==mode);
 }
+const mobileVoteMedia=window.matchMedia('(max-width: 899px)');
+let mobileVoteTab='directory';
+function setMobileVoteTab(tab='directory'){
+  mobileVoteTab=tab==='summary'?'summary':'directory';
+  const mobile=mobileVoteMedia.matches;
+  document.querySelectorAll('[data-mobile-vote-tab]').forEach(button=>{
+    const active=button.dataset.mobileVoteTab===mobileVoteTab;
+    button.classList.toggle('is-active',active);
+    if(button.getAttribute('role')==='tab')button.setAttribute('aria-selected',String(active));
+  });
+  document.querySelectorAll('[data-mobile-vote-panel]').forEach(panel=>{panel.hidden=mobile&&panel.dataset.mobileVotePanel!==mobileVoteTab});
+  const dock=document.querySelector('[data-mobile-vote-dock]');if(dock)dock.hidden=!mobile||mobileVoteTab!=='directory';
+  if(mobile)window.scrollTo({top:0,behavior:'smooth'});
+}
+mobileVoteMedia.addEventListener?.('change',()=>setMobileVoteTab(mobileVoteTab));
 function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
 function openSheet(html){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden'}
 function closeSheet(){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
@@ -182,7 +201,7 @@ async function submitResumeProducer(target){
   try{const result=await transact(walletSession,[{account:'flon',name:'resumeprod',data:{producer:walletSession.account}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">恢复交易已广播</h2><p>已进入试运行 · ${escapeHtml(networkName())}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshBPRecovery()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'签名并进入试运行':'Sign and enter probation';showToast(String(error?.message||error))}
 }
 function openWalletSheet(){if(!walletSession){openSheet(`<h2 id="sheet-title">钱包连接</h2><p class="sheet-subtitle">${isHuFuApp()?'使用 HuFu 钱包连接':'使用 HuFu 或 Anchor 钱包连接'}</p><div class="wallet-connect-card"><span class="avatar">FL</span><div><strong>FullOn Network</strong><small>${networkName()}</small></div></div><p class="sign-warning">普通浏览器将显示 Anchor 二维码；HuFu 内会直接请求当前账户。钱包只负责账户授权与交易签名，DApp 不接触私钥。</p><div class="sheet-actions one"><button class="primary-button" data-action="connect-wallet">连接钱包</button></div>`);return}openSheet(`<h2 id="sheet-title">钱包连接</h2><p class="sheet-subtitle">${walletProviderName(walletSession.provider)}</p><div class="sign-summary"><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>Chain ID</span><strong class="truncate-value">${escapeHtml(walletSession.chainId)}</strong></div></div><div class="sheet-actions one"><button class="secondary-button danger-button" data-action="disconnect-wallet">断开连接</button></div>`)}
-function walletErrorMessage(error){const code=String(error?.message||error);if(/expired transaction/i.test(code))return currentLanguage==='zh-CN'?'交易在广播前已过期，请重新检查并签名。':'The transaction expired before broadcast. Please review and sign again.';const zh={WALLET_CHAIN_ID_MISMATCH:'钱包网络与当前站点不一致，请在 HuFu 中切换到对应网络',WALLET_CHAIN_UNCONFIRMED:'无法确认 HuFu 当前网络，请切换到对应 FullOn 网络后重试',RPC_CHAIN_ID_MISMATCH:'RPC Chain ID 配置错误',RPC_TIMEOUT:'链上 RPC 连接超时',HUFU_NETWORK_TIMEOUT:'HuFu 网络查询超时',CHAIN_TIME_STALE:'节点区块时间异常或同步已停滞，请等待网络恢复后重试',HUFU_ACCOUNT_TIMEOUT:'HuFu 账户选择超时',HUFU_ACCOUNT_UNAVAILABLE:'未获取到 HuFu 账户',HUFU_PROVIDER_UNAVAILABLE:'未检测到 HuFu 钱包',ACCOUNT_CHANGED:'HuFu 当前账户已变化，请重新连接'};const en={WALLET_CHAIN_ID_MISMATCH:'The wallet network does not match this site. Switch to the corresponding network in HuFu.',WALLET_CHAIN_UNCONFIRMED:'Unable to confirm the HuFu network. Switch to the matching FullOn network and retry.',RPC_TIMEOUT:'The chain RPC timed out.',HUFU_NETWORK_TIMEOUT:'The HuFu network query timed out.',CHAIN_TIME_STALE:'RPC block time is stale or incorrect. Retry after the network recovers.',ACCOUNT_CHANGED:'The active HuFu account changed. Reconnect the wallet.'};return currentLanguage==='zh-CN'?(zh[code]||`钱包连接失败：${code}`):(en[code]||`Wallet connection failed: ${code}`)}
+function walletErrorMessage(error){const code=String(error?.message||error);if(/expired transaction/i.test(code))return currentLanguage==='zh-CN'?'交易在广播前已过期，请重新检查并签名。':'The transaction expired before broadcast. Please review and sign again.';const zh={WALLET_CHAIN_ID_MISMATCH:'钱包网络与当前站点不一致，请在 HuFu 中切换到对应网络',WALLET_CHAIN_UNCONFIRMED:'无法确认 HuFu 当前网络，请切换到对应 FullOn 网络后重试',RPC_CHAIN_ID_MISMATCH:'RPC Chain ID 配置错误',RPC_TIMEOUT:'链上 RPC 连接超时',HUFU_NETWORK_TIMEOUT:'HuFu 网络查询超时',HUFU_TRANSACTION_TIMEOUT:'HuFu 未弹出交易签名窗口，请确认钱包位于对应 FullOn 网络后重试',CHAIN_TIME_STALE:'节点区块时间异常或同步已停滞，请等待网络恢复后重试',HUFU_ACCOUNT_TIMEOUT:'HuFu 账户选择超时',HUFU_ACCOUNT_UNAVAILABLE:'未获取到 HuFu 账户',HUFU_PROVIDER_UNAVAILABLE:'未检测到 HuFu 钱包',ACCOUNT_CHANGED:'HuFu 当前账户已变化，请重新连接'};const en={WALLET_CHAIN_ID_MISMATCH:'The wallet network does not match this site. Switch to the corresponding network in HuFu.',WALLET_CHAIN_UNCONFIRMED:'Unable to confirm the HuFu network. Switch to the matching FullOn network and retry.',RPC_TIMEOUT:'The chain RPC timed out.',HUFU_NETWORK_TIMEOUT:'The HuFu network query timed out.',HUFU_TRANSACTION_TIMEOUT:'HuFu did not open the transaction signer. Confirm the matching FullOn network and retry.',CHAIN_TIME_STALE:'RPC block time is stale or incorrect. Retry after the network recovers.',ACCOUNT_CHANGED:'The active HuFu account changed. Reconnect the wallet.'};return currentLanguage==='zh-CN'?(zh[code]||`钱包连接失败：${code}`):(en[code]||`Wallet connection failed: ${code}`)}
 function escapeHtml(value){return String(value).replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]))}
 function assetAmount(value){const amount=Number.parseFloat(String(value||'0'));return Number.isFinite(amount)?amount:0}
 function decimalUnits(value){const text=String(value??'').trim();if(!/^\d+(?:\.\d{0,8})?$/.test(text))throw new Error('INVALID_FLON_AMOUNT');const [whole,fraction='']=text.split('.');return BigInt(whole)*100000000n+BigInt((fraction+'00000000').slice(0,8))}
@@ -627,6 +646,7 @@ async function submitBPClaim(target){
 
 document.addEventListener('click',async event=>{
   const target=event.target.closest('button,[data-action]');if(!target)return;
+  if(target.dataset.mobileVoteTab){setMobileVoteTab(target.dataset.mobileVoteTab);return}
   if(target.dataset.viewTarget){showView(target.dataset.viewTarget);if(target.dataset.viewTarget==='nodes')setNodeMode(target.dataset.nodeModeTarget||'directory')}
   if(target.dataset.nodeMode)setNodeMode(target.dataset.nodeMode);
   const action=target.dataset.action;
