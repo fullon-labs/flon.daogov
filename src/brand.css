@@ -1,0 +1,14 @@
+.brand-lockup{display:flex;align-items:center;gap:7px}
+.brand-lockup img{width:25px;height:25px;object-fit:contain}
+
+@media(min-width:900px){
+  .brand-lockup img{width:28px;height:28px}
+  .bottom-nav::before{
+    top:24px;
+    height:36px;
+    padding-left:42px;
+    display:flex;
+    align-items:center;
+    background:url('/assets/brand/fullon-dao-mark-192.png') left center/34px 34px no-repeat;
+  }
+}
