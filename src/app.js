@@ -246,6 +246,17 @@ function syncProposalType(){
   const active=form.proposalType.value==='parameter';editor.hidden=!active;if(active&&!list.children.length)list.insertAdjacentHTML('beforeend',proposalActionRow());
 }
 async function sha256Hex(value){const bytes=new TextEncoder().encode(value),digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('')}
+function openHelpCenter(){
+  const zh=currentLanguage==='zh-CN';
+  openSheet(`<h2 id="sheet-title">${zh?'治理帮助中心':'Governance Help Center'}</h2><p class="sheet-subtitle">${zh?'了解节点投票、DAO 决策、Epoch 与奖励领取':'Learn node voting, DAO decisions, epochs, and reward claims'}</p><div class="help-sections">
+    <details open><summary>${zh?'FLON、GLON 与治理权':'FLON, GLON, and governance power'}</summary><p>${zh?'用户锁定 FLON 参与节点投票，并获得等额、不可转让的 GLON。GLON 用于衡量 DAO 治理权，不是支付代币；提案与投票不会转走或消耗 GLON。':'Users lock FLON for node voting and receive an equal amount of non-transferable GLON. GLON measures DAO governance power; proposals and votes do not transfer or consume it.'}</p></details>
+    <details><summary>${zh?'节点投票与 Epoch':'Node voting and epochs'}</summary><p>${zh?'每个 BP 可以分配不同数量的 FLON，最多选择 30 个候选节点。变更先写入 pending 状态，在下一 Epoch 边界生效。Epoch 是确定排名、快照、绩效和奖励归属的链上时间窗口。':'Each BP can receive a different FLON allocation, with up to 30 candidates. Changes enter pending state and take effect at the next epoch boundary. An epoch is the on-chain window for ranking, snapshots, performance, and rewards.'}</p></details>
+    <details><summary>${zh?'提案生命周期':'Proposal lifecycle'}</summary><p>${zh?'提案依次经过附议、治理权快照、投票、结算、Timelock 和执行。任何账户都可以触发 activate、finalize、queue、execute 或 expire；触发者不能修改提案中已经冻结的 action。':'Proposals move through endorsement, governance-power snapshot, voting, finalization, timelock, and execution. Any account may trigger activate, finalize, queue, execute, or expire, but cannot alter frozen proposal actions.'}</p></details>
+    <details><summary>${zh?'奖励不会自动空投':'Rewards are claimed, not airdropped'}</summary><p>${zh?'BP 基础出块奖励和 GAS 奖励先形成链上待领取记录。奖励可以跨 Epoch 累积，不会因为没有立即领取而丢失。投票人奖励由受益账户本人调用 voter.reward::claimrewards。':'BP block and GAS rewards first become on-chain claim records. They accumulate across epochs and do not expire merely because they were not claimed immediately. Voters claim through voter.reward::claimrewards.'}</p></details>
+    <details><summary>epoch.keeper</summary><p>${zh?'epoch.keeper 对应的 Keeper 程序会定期触发 Epoch 关闭和 BP 奖励领取等 permissionless 操作。Keeper 不持有 BP 私钥、不托管奖励，也不能更改收款账户；奖励始终支付给链上记录的 BP。':'The Keeper program associated with epoch.keeper periodically triggers permissionless operations such as epoch closing and BP reward claims. It does not hold BP keys, custody rewards, or change recipients; rewards always go to the BP recorded on-chain.'}</p><p>${zh?'Keeper 是便利设施，不是单点依赖。如果 Keeper 下线，BP 本人或任何用户都可以在本 DApp 手动调用 flon::claimrewards，代为触发后奖励仍直接进入 BP 账户。':'Keeper is a convenience, not a single point of failure. If it is offline, the BP or any user may manually call flon::claimrewards from this DApp; the reward still goes directly to the BP.'}</p></details>
+    <details><summary>${zh?'签名前检查':'Before signing'}</summary><p>${zh?'核对网络、Chain ID、账户、合约、action、参数和收款人。帮助文档不构成交易授权；只有钱包确认页中的实际交易内容会被签名。':'Verify the network, Chain ID, account, contract, action, parameters, and recipient. Help content is not transaction authorization; only the actual transaction shown by the wallet is signed.'}</p></details>
+  </div><div class="sheet-actions"><button class="secondary-button" data-action="help-voting">${zh?'查看节点投票':'Open node voting'}</button><button class="primary-button" data-action="bp-claim">${zh?'手动触发 BP 领取':'Trigger BP claim'}</button></div>`);
+}
 async function submitProposal(target){
   if(!walletSession)return;const form=sheetContent.querySelector('[data-proposal-form]');if(!form?.reportValidity())return;
   const proposal_type=form.proposalType.value,title=form.title.value.trim(),summary=form.summary.value.trim(),metadata_uri=form.metadataUri.value.trim(),discussion_uri=form.discussionUri.value.trim();target.disabled=true;
@@ -499,6 +510,8 @@ document.addEventListener('click',async event=>{
   if(action==='toast')showToast(target.dataset.message||'操作已完成');
   if(action==='close-sheet')closeSheet();
   if(action==='network')showToast(`当前为 ${networkName()} · Chain ID ${runtimeConfig.chainId.slice(0,4)}…${runtimeConfig.chainId.slice(-3)}`);
+  if(action==='help')openHelpCenter();
+  if(action==='help-voting'){closeSheet();showView('nodes');setNodeMode('vote')}
   if(action==='account')openWalletSheet();
   if(action==='connect-wallet'){
     target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'连接中…':'Connecting…';

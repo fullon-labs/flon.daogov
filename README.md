@@ -18,6 +18,7 @@ FullOn Network DAO治理 H5 DApp，可在 HuFu 内置浏览器中打开，也支
 - 提案正文保存 URI 与 SHA-256，社区讨论通过链上 `discussion_uri` 接入论坛
 - HuFu 钱包连接、交易解释、签名请求和状态追踪
 - PC / 手机响应式布局与浏览器语言自动识别（简体中文、英文）
+- 内置双语治理帮助中心，并提供 [`docs/governance-help.md`](docs/governance-help.md) 作为完整用户操作说明
 
 当前版本已经把节点排名、钱包账户票权、节点选择、投票人待领奖励、BP 注册和 BP 恢复接到链上 RPC；对应确认页会展示实际 action，并由钱包签名广播。RPC 返回失败时界面显示错误，不回退到伪造数据。
 
