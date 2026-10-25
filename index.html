@@ -37,8 +37,6 @@
       <button class="icon-button" type="button" aria-label="返回 HuFu"><svg><use href="#i-back"/></svg></button>
       <div class="top-title"><strong>FullOn DAO</strong><button class="network" type="button" data-action="network"><i></i><span data-network-name>FullOn 测试网</span></button></div>
       <div class="top-actions">
-        <label class="language-picker" aria-label="语言"><span>文</span><select data-language><option value="zh-CN">中文</option><option value="en">EN</option></select></label>
-        <button class="icon-button" type="button" aria-label="治理帮助" data-action="help"><svg><use href="#i-info"/></svg></button>
         <button class="icon-button notify" type="button" aria-label="治理通知" data-action="toast" data-message="你有 3 项治理任务"><svg><use href="#i-bell"/></svg><span>3</span></button>
       </div>
     </header>
@@ -46,12 +44,6 @@
     <main id="main">
       <section class="view is-active" data-view="overview">
         <div class="content overview-content">
-          <section class="governance-hero">
-            <div class="identity-row"><span><small>当前治理账户</small><strong data-wallet-account>未连接</strong></span><button type="button" data-action="account"><span data-wallet-label>连接钱包</span> <svg><use href="#i-chevron"/></svg></button></div>
-            <div class="power-row"><span><small>我的治理权</small><strong class="din" data-glon-balance>— <em>GLON</em></strong></span></div>
-            <div class="hero-stats"><span><small>已投 FLON</small><strong class="din" data-voting-stake>—</strong></span><span><small>已选 BP</small><strong class="din" data-voted-bps>—</strong></span><span><small>待领取</small><strong class="din" data-unclaimed-rewards>— FLON</strong></span></div>
-          </section>
-
           <section class="epoch-card">
             <div class="epoch-head"><span><i class="live-dot"></i>链上选举状态</span><strong class="din">实时 RPC</strong></div>
             <div class="progress"><i style="width:100%"></i></div>
@@ -125,9 +117,17 @@
       </section>
 
       <section class="view" data-view="mine" hidden>
-        <div class="content">
-          <div class="page-heading"><span><small>账户概览</small><h1>我的治理</h1></span><button class="help-button" type="button" data-action="toast" data-message="治理记录来自链上数据"><svg><use href="#i-external"/></svg></button></div>
-          <section class="mine-card"><div class="mine-title"><span class="avatar">FL</span><span><strong data-wallet-label>连接钱包</strong><small><span data-wallet-account>未连接</span> · <span data-network-name>FullOn 测试网</span></small></span></div><div class="mine-grid"><span><small>治理权</small><strong class="din" data-profile-glon>— GLON</strong></span><span><small>待领取奖励</small><strong class="din" data-profile-rewards>— FLON</strong></span></div></section>
+        <div class="content profile-content">
+          <div class="page-heading"><span><small>账户概览</small><h1>我的治理</h1></span></div>
+          <section class="governance-hero">
+            <div class="identity-row"><span><small>当前治理账户</small><strong data-wallet-account>未连接</strong></span><button type="button" data-action="account"><span data-wallet-label>连接钱包</span> <svg><use href="#i-chevron"/></svg></button></div>
+            <div class="power-row"><span><small>我的治理权</small><strong class="din" data-glon-balance>— <em>GLON</em></strong></span></div>
+            <div class="hero-stats"><span><small>已投 FLON</small><strong class="din" data-voting-stake>—</strong></span><span><small>已选 BP</small><strong class="din" data-voted-bps>—</strong></span><span><small>待领取</small><strong class="din" data-unclaimed-rewards>— FLON</strong></span></div>
+          </section>
+          <section class="profile-preferences">
+            <button type="button" data-action="help"><span><svg><use href="#i-info"/></svg><strong>治理帮助</strong></span><small>节点投票、Epoch、提案与奖励</small></button>
+            <label><span><svg><use href="#i-info"/></svg><strong>语言</strong></span><select data-language aria-label="语言"><option value="zh-CN">中文</option><option value="en">English</option></select></label>
+          </section>
           <section class="section bp-recovery-card" data-bp-recovery>
             <div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>连接 BP 账户钱包后读取链上状态</small></div>
           </section>
