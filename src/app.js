@@ -362,7 +362,7 @@ async function openHelpCenter(){
   let parameters=null;try{parameters=await loadChainGovernanceParameters()}catch(error){console.error('Failed to load chain governance parameters',error)}
   const rewardEpochSeconds=parameters?.rewardEpochSlots?parameters.rewardEpochSlots/2:null,gasEpochSeconds=parameters?.gasRewardConfig?.epoch_slots?Number(parameters.gasRewardConfig.epoch_slots)/2:null,governanceConfig=governanceState?.config;
   const parameterRows=[
-    [zh?'奖励与投票 Epoch':'Reward and voting epoch',humanDuration(rewardEpochSeconds,zh),'flon::rewardcfgv2'],
+    [zh?'奖励与投票 Epoch':'Reward and voting epoch',humanDuration(rewardEpochSeconds,zh),'flon::rewardplans'],
     [zh?'GAS 奖励 Epoch':'GAS reward epoch',humanDuration(gasEpochSeconds,zh),'flon::gasrewcfg'],
     [zh?'Active BP 目标席位':'Target Active BP seats',parameters?.activeBpTarget??(zh?'链上未配置':'Not configured on-chain'),'flon::electconfig'],
     [zh?'最多投票节点':'Maximum voted BPs','30','flon::votealloc'],
@@ -564,23 +564,8 @@ async function openStakeSheet(){
   if(!votingState?.stakeSupported){showToast('当前链上合约不支持调整投票本金');return}
   const liquid=votingState.flon||'0.00000000 FLON',staked=votingState.nodeVoteStake||'0.00000000 FLON';
   const refund=votingState.refund,readyAt=refundReadyAt(refund),ready=refund&&Date.now()>=readyAt;
-  openSheet(`<h2 id="sheet-title">投票本金与退款</h2><p class="sheet-subtitle">质押 FLON 生成等额不可转让 GLON</p><div class="sign-summary"><div><span>可用 FLON</span><strong>${escapeHtml(liquid)}</strong></div><div><span>已投本金</span><strong>${escapeHtml(staked)}</strong></div><div><span>治理凭证</span><strong>${escapeHtml(votingState.glon)}</strong></div></div>${refund?`<div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>撤票退款 ${escapeHtml(refund.vote_staked)}</strong><small>预计可领取时间 ${escapeHtml(new Date(readyAt).toLocaleString())}</small><small class="epoch-countdown"><span>解锁倒计时</span><b class="din" data-refund-countdown>${ready?'退款已可领取':formatCountdown(readyAt-Date.now())}</b></small></span></div>`:''}<form class="wizard-form" data-stake-form><label><span>操作</span><select name="operation"><option value="add">增加投票本金</option><option value="sub" ${refund?'disabled':''}>撤回投票本金并申请退款</option></select></label><label><span>金额</span><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" required placeholder="0.00000000"></label><p class="field-note">增加本金在下一 Epoch 计入节点票权；撤票会立即销毁等量 GLON，BP 票权在下一 Epoch 移除，FLON 在 72 小时冷却期后领取。每个账户同一时间只能有一笔待领取退款。</p></form><div class="sheet-actions">${refund?`<button class="secondary-button" data-action="claim-vote-refund" ${ready?'':'disabled'}>${ready?'领取解锁 FLON':'等待退款成熟'}</button>`:`<button class="secondary-button danger-button" data-action="unstake-all">全部撤票并申请退款</button>`}<button class="primary-button" data-action="stake-sign">检查并签名</button></div>`);
+  openSheet(`<h2 id="sheet-title">投票本金与退款</h2><p class="sheet-subtitle">质押 FLON 生成等额不可转让 GLON</p><div class="sign-summary"><div><span>可用 FLON</span><strong>${escapeHtml(liquid)}</strong></div><div><span>已投本金</span><strong>${escapeHtml(staked)}</strong></div><div><span>治理凭证</span><strong>${escapeHtml(votingState.glon)}</strong></div></div>${refund?`<div class="pending-note"><svg><use href="#i-clock"/></svg><span><strong>撤票退款 ${escapeHtml(refund.vote_staked)}</strong><small>预计可领取时间 ${escapeHtml(new Date(readyAt).toLocaleString())}</small><small class="epoch-countdown"><span>解锁倒计时</span><b class="din" data-refund-countdown>${ready?'退款已可领取':formatCountdown(readyAt-Date.now())}</b></small></span></div>`:''}<form class="wizard-form" data-stake-form><label><span>操作</span><select name="operation"><option value="add">增加投票本金</option><option value="sub" ${refund?'disabled':''}>撤回投票本金并申请退款</option></select></label><label><span>金额</span><div class="stake-amount-field"><input name="amount" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" required placeholder="0.00000000"><button type="button" data-action="stake-max" hidden>Max</button></div></label><p class="field-note">增加本金在下一 Epoch 计入节点票权；撤票会立即销毁等量 GLON，BP 票权在下一 Epoch 移除，FLON 在 72 小时冷却期后领取。每个账户同一时间只能有一笔待领取退款。</p></form><div class="sheet-actions ${refund?'':'one'}">${refund?`<button class="secondary-button" data-action="claim-vote-refund" ${ready?'':'disabled'}>${ready?'领取解锁 FLON':'等待退款成熟'}</button>`:''}<button class="primary-button" data-action="stake-sign">检查并签名</button></div>`);
   if(refund)startRefundCountdown();
-}
-function confirmUnstakeAll(){
-  if(!walletSession||!votingState)return;
-  const staked=votingState.nodeVoteStake||'0.00000000 FLON';
-  if(assetAmount(staked)<=0){showToast(currentLanguage==='zh-CN'?'当前没有可撤回的投票本金':'No voting stake is available to unstake');return}
-  if(votingState.refund){showToast(currentLanguage==='zh-CN'?'已有一笔撤票退款待处理':'A vote refund is already pending');return}
-  openSheet(`<h2 id="sheet-title">确认退出节点投票</h2><p class="sheet-subtitle">全部 BP 分配将在下一 Epoch 清零</p><div class="sign-summary"><div><span>撤回本金</span><strong>${escapeHtml(staked)}</strong></div><div><span>Action</span><strong>flon::subvote + flon::votealloc</strong></div><div><span>退款冷却期</span><strong>72 小时</strong></div><div><span>GLON</span><strong>立即销毁等量凭证</strong></div></div><p class="sign-warning">签名后会创建链上退款申请。72 小时到期后仍需调用 flon::voterefund 领取，FLON 不会自动到账。</p><div class="sheet-actions"><button class="secondary-button" data-action="stake">返回</button><button class="primary-button danger-button" data-action="unstake-all-sign">申请退款</button></div>`);
-}
-async function submitUnstakeAll(target){
-  if(!walletSession||!votingState)return;
-  const quantity=votingState.nodeVoteStake;
-  if(assetAmount(quantity)<=0||votingState.refund)return;
-  target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
-  const actions=[{account:'flon',name:'subvote',data:{voter:walletSession.account,vote_staked:quantity}},{account:'flon',name:'votealloc',data:{voter:walletSession.account,allocations:[]}}];
-  try{const result=await transact(walletSession,actions),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">退出交易已广播</h2><p>${escapeHtml(quantity)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><p class="sign-warning">FLON 已进入 72 小时退款冷却期；BP 票权将在下一 Epoch 清零。到期后请返回“投票本金与退款”领取。</p><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'申请退款':'Request refund';showToast(walletErrorMessage(error))}
 }
 async function submitStake(target){
   if(!walletSession||!votingState)return;
@@ -684,12 +669,14 @@ document.addEventListener('click',async event=>{
   if(action==='resume-producer')confirmResumeProducer();
   if(action==='resume-producer-sign')await submitResumeProducer(target);
   if(action==='stake')await openStakeSheet();
+  if(action==='stake-max'){
+    const input=sheetContent.querySelector('[data-stake-form] [name="amount"]');
+    if(input)input.value=formatUnits(assetUnits(votingState?.nodeVoteStake));
+  }
   if(action==='stake-sign')await submitStake(target);
-  if(action==='unstake-all')confirmUnstakeAll();
-  if(action==='unstake-all-sign')await submitUnstakeAll(target);
   if(action==='claim-vote-refund')await claimVoteRefund(target);
 });
-sheetContent.addEventListener('change',event=>{if(event.target?.name==='proposalType')syncProposalType();if(event.target?.name==='targetAction')void renderProposalActionFields(event.target.closest('.proposal-action-row'))});
+sheetContent.addEventListener('change',event=>{if(event.target?.name==='proposalType')syncProposalType();if(event.target?.name==='targetAction')void renderProposalActionFields(event.target.closest('.proposal-action-row'));if(event.target?.name==='operation'){const max=sheetContent.querySelector('[data-action="stake-max"]'),input=sheetContent.querySelector('[data-stake-form] [name="amount"]');if(max)max.hidden=event.target.value!=='sub';if(input)input.value=''}});
 sheetContent.addEventListener('input',event=>{const row=event.target.closest?.('.proposal-action-row');if(row)scheduleProposalActionSizeCheck(row)});
 overlay.addEventListener('click',closeSheet);
 document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});

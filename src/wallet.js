@@ -46,20 +46,36 @@ function utcMilliseconds(value){
   const text=String(value||'');
   return Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(text)?text:`${text}Z`);
 }
-function epochTiming(chainInfo,globalRow,rewardConfig=null,nextEpochToClose=null,activationEpoch=null){
+function normalizeRewardPlans(value){
+  const rows=Array.isArray(value)?value:(value?[value]:[]);
+  return rows.map(row=>({
+    firstEpoch:Number(row?.first_epoch_id),
+    startSlot:Number(row?.start_slot),
+    epochSlots:Number(row?.epoch_slots),
+  })).filter(row=>Number.isSafeInteger(row.firstEpoch)&&Number.isSafeInteger(row.startSlot)&&Number.isSafeInteger(row.epochSlots)&&row.epochSlots>0)
+    .sort((left,right)=>left.firstEpoch-right.firstEpoch);
+}
+async function loadRewardPlans(){
+  const canonical=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardplans',limit:100}).catch(()=>({rows:[]}));
+  if(canonical.rows?.length)return canonical.rows;
+  const legacy=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardcfgv2',limit:1}).catch(()=>({rows:[]}));
+  return legacy.rows||[];
+}
+function epochTiming(chainInfo,globalRow,rewardPlans=[],nextEpochToClose=null,activationEpoch=null){
   const chainHeadMs=utcMilliseconds(chainInfo?.head_block_time);
   const rewardStartMs=utcMilliseconds(globalRow?.reward_started_time);
   if(!Number.isFinite(chainHeadMs)||!Number.isFinite(rewardStartMs)||chainHeadMs<rewardStartMs)return null;
   const headSlot=Math.floor((chainHeadMs-blockTimestampEpochMilliseconds)/500);
-  const firstEpoch=Number(rewardConfig?.first_epoch_id),v2StartSlot=Number(rewardConfig?.start_slot),v2EpochSlots=Number(rewardConfig?.epoch_slots);
-  const hasV2=Number.isSafeInteger(firstEpoch)&&Number.isSafeInteger(v2StartSlot)&&Number.isSafeInteger(v2EpochSlots)&&v2EpochSlots>0;
-  const currentEpoch=hasV2&&headSlot>=v2StartSlot
-    ? firstEpoch+Math.floor((headSlot-v2StartSlot)/v2EpochSlots)
+  const plans=normalizeRewardPlans(rewardPlans);
+  const slotPlan=plans.filter(plan=>plan.startSlot<=headSlot).at(-1);
+  const currentEpoch=slotPlan
+    ? slotPlan.firstEpoch+Math.floor((headSlot-slotPlan.startSlot)/slotPlan.epochSlots)
     : Math.floor((chainHeadMs-rewardStartMs)/rewardEpochMilliseconds);
   const hasActivationEpoch=activationEpoch!==null&&activationEpoch!==undefined&&Number.isSafeInteger(Number(activationEpoch));
   const targetEpoch=hasActivationEpoch?Number(activationEpoch):currentEpoch+1;
-  const boundaryMs=hasV2&&targetEpoch>=firstEpoch
-    ? blockTimestampEpochMilliseconds+(v2StartSlot+(targetEpoch-firstEpoch)*v2EpochSlots)*500
+  const epochPlan=plans.filter(plan=>plan.firstEpoch<=targetEpoch).at(-1);
+  const boundaryMs=epochPlan
+    ? blockTimestampEpochMilliseconds+(epochPlan.startSlot+(targetEpoch-epochPlan.firstEpoch)*epochPlan.epochSlots)*500
     : rewardStartMs+targetEpoch*rewardEpochMilliseconds;
   return {chainHeadMs,rewardStartMs,currentEpoch,targetEpoch,boundaryMs,nextEpochToClose:Number(nextEpochToClose)};
 }
@@ -67,10 +83,10 @@ export async function loadEpochTiming(activationEpoch=null){
   const [chainInfo,globalRows,configRows,epochRows]=await Promise.all([
     rpcInfo(),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardcfgv2',limit:1}).catch(()=>({rows:[]})),
+    loadRewardPlans(),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}).catch(()=>({rows:[]})),
   ]);
-  return epochTiming(chainInfo,globalRows.rows?.[0],configRows.rows?.[0],epochRows.rows?.[0]?.next_epoch_to_close,activationEpoch);
+  return epochTiming(chainInfo,globalRows.rows?.[0],configRows,epochRows.rows?.[0]?.next_epoch_to_close,activationEpoch);
 }
 function assertFreshChainTime(info,now=Date.now()){
   const value=String(info?.head_block_time||'');
@@ -293,7 +309,7 @@ export async function loadVotingAccount(account){
     rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>({abi:{actions:[]}})),
     rpcInfo(),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardcfgv2',limit:1}).catch(()=>({rows:[]})),
+    loadRewardPlans(),
   ]);
   const voter=voterRows.rows?.find(row=>row.owner===account)||null;
   const pending=pendingRows.rows?.find(row=>row.voter===account)||null;
@@ -323,7 +339,7 @@ export async function loadVotingAccount(account){
     effectiveAllocations:Array.isArray(effectiveAllocation?.allocations)?effectiveAllocation.allocations:null,
     pendingAllocations:Array.isArray(pendingAllocation?.allocations)?pendingAllocation.allocations:null,
     unclaimedRewards:rewards?.unclaimed_rewards||'0.00000000 FLON',
-    epochTiming:epochTiming(chainInfo,globalRows.rows?.[0],rewardConfigRows.rows?.[0],nextEpoch,hasUnsettledVote?pendingActivationEpoch:null),
+    epochTiming:epochTiming(chainInfo,globalRows.rows?.[0],rewardConfigRows,nextEpoch,hasUnsettledVote?pendingActivationEpoch:null),
     hasPendingVote:hasUnsettledVote,
   };
 }
@@ -417,8 +433,9 @@ export async function loadGovernanceActionDefaults(contract,action){
 }
 export async function loadChainGovernanceParameters(){
   const table=async name=>(await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:name,limit:1}).catch(()=>({rows:[]}))).rows?.[0]||null;
-  const [rewardConfig,electionConfig,bpStakeConfig,gasRewardConfig]=await Promise.all([table('rewardcfgv2'),table('electconfig'),table('bpstakecfg'),table('gasrewcfg')]);
-  return{rewardEpochSlots:Number(rewardConfig?.epoch_slots)||null,activeBpTarget:Number(electionConfig?.active_bp_quorum)||null,bpStakeConfig,gasRewardConfig};
+  const [rewardPlans,electionConfig,bpStakeConfig,gasRewardConfig]=await Promise.all([loadRewardPlans(),table('electconfig'),table('bpstakecfg'),table('gasrewcfg')]);
+  const rewardPlan=normalizeRewardPlans(rewardPlans).at(-1);
+  return{rewardEpochSlots:rewardPlan?.epochSlots||null,activeBpTarget:Number(electionConfig?.active_bp_quorum)||null,bpStakeConfig,gasRewardConfig};
 }
 export async function transact(session,actions){
   assertChain(session.chainId);const info=await rpcInfo();assertFreshChainTime(info);
