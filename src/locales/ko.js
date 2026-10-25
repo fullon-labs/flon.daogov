@@ -537,5 +537,6 @@ export default {
   "Hide filters": "필터 숨기기",
   "BP composition": "BP 구성",
   "Total BP self-stake": "BP 자체 스테이킹 합계",
-  "Total node votes": "노드 총 투표수"
+  "Total node votes": "노드 총 투표수",
+  "Registered": "등록됨"
 };

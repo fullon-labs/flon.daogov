@@ -22,3 +22,11 @@ export function summarizeNetworkEconomics(producers=[],stakes=[],glonStats={}){
     governancePower:typeof supply==='string'?supply:'— GLON',
   };
 }
+
+export function formatOverviewAsset(value){
+  const match=String(value||'').match(/^(\d+)(?:\.(\d+))?\s+([A-Z]+)$/);
+  if(!match)return String(value||'—');
+  const whole=match[1].replace(/\B(?=(\d{3})+(?!\d))/g,',');
+  const fraction=(match[2]||'').replace(/0+$/,'');
+  return `${whole}${fraction?`.${fraction}`:''} ${match[3]}`;
+}

@@ -537,5 +537,6 @@ export default {
   "Hide filters": "フィルターを非表示にする",
   "BP composition": "BP構成",
   "Total BP self-stake": "BP自己ステーク合計",
-  "Total node votes": "ノード投票総数"
+  "Total node votes": "ノード投票総数",
+  "Registered": "登録済み"
 };

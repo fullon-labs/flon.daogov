@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeNetworkEconomics} from './network-summary.js';
+import {formatOverviewAsset,summarizeNetworkEconomics} from './network-summary.js';
 
 test('summarizes BP stake, allocated votes, and GLON supply without floating point loss',()=>{
   assert.deepEqual(summarizeNetworkEconomics(
@@ -16,4 +16,10 @@ test('summarizes BP stake, allocated votes, and GLON supply without floating poi
 
 test('uses an explicit unavailable value when GLON stats cannot be read',()=>{
   assert.equal(summarizeNetworkEconomics([],[],{}).governancePower,'— GLON');
+});
+
+test('removes meaningless trailing zeroes while preserving real precision',()=>{
+  assert.equal(formatOverviewAsset('2000000.00000000 FLON'),'2,000,000 FLON');
+  assert.equal(formatOverviewAsset('6799.12000000 GLON'),'6,799.12 GLON');
+  assert.equal(formatOverviewAsset('— GLON'),'— GLON');
 });
