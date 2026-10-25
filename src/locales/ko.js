@@ -534,5 +534,8 @@ export default {
   "My votes": "내 투표",
   "Review and confirm": "검토 및 확인",
   "Search & sort": "검색 및 정렬",
-  "Hide filters": "필터 숨기기"
+  "Hide filters": "필터 숨기기",
+  "BP composition": "BP 구성",
+  "Total BP self-stake": "BP 자체 스테이킹 합계",
+  "Total node votes": "노드 총 투표수"
 };

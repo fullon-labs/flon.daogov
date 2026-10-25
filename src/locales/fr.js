@@ -534,5 +534,8 @@ export default {
   "My votes": "Mes votes",
   "Review and confirm": "Vérifier et confirmer",
   "Search & sort": "Rechercher et trier",
-  "Hide filters": "Masquer les filtres"
+  "Hide filters": "Masquer les filtres",
+  "BP composition": "Composition des BP",
+  "Total BP self-stake": "Auto-stake total des BP",
+  "Total node votes": "Total des votes des nœuds"
 };

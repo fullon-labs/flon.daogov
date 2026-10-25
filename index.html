@@ -62,11 +62,19 @@
         <div class="content overview-content">
           <section class="section network-overview">
             <div class="section-title"><h2>网络概况</h2><button type="button" data-view-target="nodes">节点排名</button></div>
-            <div class="metric-grid">
-              <article><small>Active BP</small><strong class="din" data-active-count>—</strong><span data-active-target>目标 —</span></article>
-              <article><small>Standby BP</small><strong class="din" data-standby-count>—</strong><span>链上候选排名</span></article>
-              <article><small>候选节点</small><strong class="din" data-candidate-count>—</strong><span>flon::producers</span></article>
-              <article><small>网络出块率</small><strong class="din" data-production-rate>—</strong><span data-production-source>正在读取链上封存 Epoch…</span></article>
+            <div class="metric-grid network-metric-grid">
+              <article class="bp-composition-card">
+                <small>BP 构成</small>
+                <div class="bp-composition-values">
+                  <span><b class="din" data-active-count>—</b><em>Active</em></span>
+                  <span><b class="din" data-standby-count>—</b><em>Standby</em></span>
+                  <span><b class="din" data-candidate-count>—</b><em>Candidate</em></span>
+                </div>
+                <div class="bp-production"><span><b class="din" data-production-rate>—</b><em>网络出块率</em></span><small data-production-source>正在读取链上封存 Epoch…</small></div>
+              </article>
+              <article><small>BP 总质押</small><strong class="din metric-asset" data-total-bp-stake>— FLON</strong><span>flon::bpstakes</span></article>
+              <article><small>节点投票总量</small><strong class="din metric-asset" data-total-node-votes>— FLON</strong><span>flon::producers</span></article>
+              <article><small>治理总票权</small><strong class="din metric-asset" data-total-governance-power>— GLON</strong><span>GLON supply</span></article>
             </div>
           </section>
 
