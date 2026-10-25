@@ -326,6 +326,11 @@ export async function loadVotingAccount(account){
     hasPendingVote:hasUnsettledVote,
   };
 }
+export async function loadProducerStake(owner){
+  const result=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakes',lower_bound:owner,upper_bound:owner,limit:1});
+  if(!Array.isArray(result.rows))throw new Error('INVALID_BP_STAKE_RESPONSE');
+  return result.rows.find(row=>row.owner===owner)?.staked||'0.00000000 FLON';
+}
 export async function loadElection(){
   const [producerRows,schedule,statusRows,configRows]=await Promise.all([
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'producers',limit:200}),
