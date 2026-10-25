@@ -1,4 +1,4 @@
-import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadElection,loadEpochTiming,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,transact} from './wallet.js';
+import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadElection,loadEpochTiming,loadGovernance,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,transact} from './wallet.js';
 
 import {accountExplorerUrl} from './explorer.js';
 
@@ -23,6 +23,7 @@ let bpRecoveryRequest=0;
 let votingState=null;
 let profileBPRewards=null;
 let electionState=null;
+let governanceState=null;
 let pendingVoteAllocations=null;
 let epochCountdownTimer=null;
 let refundCountdownTimer=null;
@@ -52,6 +53,9 @@ const translations=new Map([
   ['本向导仅用于申请成为 BP。普通 Voter 无需 BP 自质押，可直接增加投票本金并给节点投票。','This wizard is only for BP applicants. Voters do not need BP self-stake and can add voting stake and vote for nodes directly.'],['BP 自质押门限','BP self-stake requirement'],['已质押','Staked'],['最低','Minimum'],['当前链上合约尚未启用 BP 自质押表','The current contract has not enabled the BP self-stake table'],['BP 自质押已达标，可以继续填写候选节点资料。','The BP self-stake requirement is met. You can continue with the candidate profile.'],['仅 BP 候选人需要通过 flon::stakebp 补足自质押；普通 Voter 不受此门槛限制。','Only BP candidates must meet the self-stake requirement through flon::stakebp. Regular voters are not subject to this requirement.'],['我是 Voter，去投票','I am a voter — vote now'],['补足 BP 自质押','Add BP self-stake'],['仅申请 BP 的账户需要此操作','Only BP applicant accounts need this action'],['当前 BP 自质押','Current BP self-stake'],['最低门槛','Minimum requirement'],['质押数量','Stake amount'],['这是 BP 候选人保证金，不是 Voter 节点投票本金。退出 BP 自质押遵循链上 21 天解锁期。','This is the BP candidate bond, not voter node-voting stake. Withdrawing BP self-stake follows the on-chain 21-day unlocking period.'],['返回资格检查','Back to eligibility'],['BP 自质押交易已广播','BP self-stake transaction broadcast'],['重新检查资格','Recheck eligibility'],
   ['参数提案 ·','Parameter proposal ·'],['快照','Snapshot'],['通过后执行','Executes after approval'],['创建并完成附议','Created and endorsed'],['正式投票中','Formal vote in progress'],['你的快照票权','Your snapshot power'],['达到 quorum 与通过率后进入','Begins after quorum and approval thresholds are met'],['任何账户均可触发执行','Any account may trigger execution'],['仅执行上方已冻结的白名单 action','Only the frozen allowlisted action above can execute'],['参与投票','Cast vote'],['反对','Against'],['不同意本次参数修改','Reject this parameter change'],['弃权','Abstain'],['计入 quorum，不计入赞成或反对','Counts toward quorum but not for or against'],['附议不会自动成为赞成票。本次选择需要再次由 HuFu 钱包签名。','An endorsement does not become a For vote automatically. This choice requires another HuFu signature.']
 ]);
+[
+  ['选择并支持可信的区块生产者','Choose and support trusted block producers'],['选择节点并直接填写分配的 FLON 数量','Select nodes and enter the FLON allocation for each'],['排序','Sort'],['综合排名','Overall rank'],['票权最高','Highest voting power'],['分享比例','Reward share'],['已选择优先','Selected first'],['本次分配','Current allocation'],['分配后剩余','Remaining after allocation'],['下一 Epoch 生效','Effective next epoch'],['修改节点或票数后即可提交','Change a node or vote amount to submit'],['分配票数','Vote allocation'],['连接钱包后管理投票','Connect wallet to manage votes'],['请输入最多 8 位小数的有效票数','Enter a valid amount with up to 8 decimals'],['分配总额超过账户可投 FLON','Allocation exceeds available FLON'],['当前分配尚未修改','No allocation changes'],['修改将在下一 Epoch 生效','Changes take effect next epoch']
+].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['BP 生产状态','BP production status'],['连接 BP 账户钱包后读取链上状态','Connect the BP account wallet to load on-chain status'],['正在读取链上状态…','Loading on-chain status…'],['当前账户未注册为 BP','The current account is not registered as a BP'],['当前合约尚未支持 BP 自助恢复','The current contract does not yet support BP self-service recovery'],['链上状态读取失败','Failed to load on-chain status'],['暂停次数','Suspensions'],['当前 Epoch','Current Epoch'],['连续漏块','Consecutive misses'],['恢复生产','Resume production'],['冷却期尚未结束','Cooldown has not ended'],['暂停','Suspended'],['试运行','Probation'],['合格','Qualified'],['降级','Degraded'],['警告','Warning'],['样本不足','Insufficient sample'],['网络事件','Network incident'],['未评估','Not assessed'],['恢复后先进入试运行，不会直接视为合格。','Recovery starts probation and does not immediately restore qualified status.'],['试运行期间连续漏掉 12 个分配槽位会立即再次暂停。','Missing 12 consecutive assigned slots during probation causes immediate re-suspension.'],['再次暂停的冷却期按 6、12、24、48 小时递增，最高 48 小时。','Repeated suspension cooldowns escalate through 6, 12, 24, and 48 hours, capped at 48 hours.'],['需要 BP 账户 active 权限签名','Requires the BP account active permission'],['确认恢复生产','Confirm production recovery'],['交易成功后进入试运行，排班更新后才会重新获得出块槽位。','After the transaction succeeds, probation begins; block slots return only after the schedule updates.'],['我确认节点已在线并可持续签署区块','I confirm the node is online and can continuously sign blocks'],['签名并进入试运行','Sign and enter probation'],['正在请求钱包签名…','Requesting wallet signature…'],['恢复交易已广播','Recovery transaction broadcast'],['已进入试运行','Probation started'],['刷新状态','Refresh status']
 ].forEach(([zh,en])=>translations.set(zh,en));
@@ -96,6 +100,7 @@ function showView(name){
   nav.forEach(button=>button.classList.toggle('is-active',button.dataset.viewTarget===name));
   window.scrollTo({top:0,behavior:'smooth'});
   if(name==='mine')refreshBPRecovery();
+  if(name==='dao')refreshGovernance();
 }
 function setNodeMode(mode='directory'){
   document.querySelectorAll('[data-node-mode]').forEach(button=>button.classList.toggle('is-active',button.dataset.nodeMode===mode));
@@ -165,7 +170,7 @@ async function refreshElection(){
   try{
     electionState=await loadElection();
     const selectList=document.querySelector('.select-list');
-    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').slice(0,51).map((producer,index)=>`<div class="select-node" data-producer="${escapeHtml(producer.owner)}" data-status="${escapeHtml(producer.status)}" data-name="${escapeHtml(`${producer.owner} ${producer.url||''}`.toLowerCase())}"><label class="check-control" aria-label="选择 ${escapeHtml(producer.owner)}"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span></label><span class="rank din">${String(index+1).padStart(2,'0')}</span><span class="node-logo blue-logo">${escapeHtml(producerInitials(producer.owner))}</span><button class="node-main node-details-trigger" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong>${escapeHtml(producer.owner)}</strong><small>${escapeHtml(producer.url||'No public URL')}</small><span><b>${escapeHtml(producer.status)}</b><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></span></button><button class="node-votes" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong class="din">${escapeHtml(formatVotes(producer.total_votes))}</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></button><label class="node-allocation-field"><span>修改选票</span><span class="node-vote-control"><input class="node-vote-input din" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" data-node-votes disabled aria-label="${escapeHtml(producer.owner)} FLON votes"><b>FLON</b></span></label></div>`).join('');
+    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').slice(0,51).map((producer,index)=>`<div class="select-node" data-producer="${escapeHtml(producer.owner)}" data-status="${escapeHtml(producer.status)}" data-name="${escapeHtml(`${producer.owner} ${producer.url||''}`.toLowerCase())}" data-rank="${index+1}" data-votes="${escapeHtml(producer.total_votes||0)}" data-share="${Number(producer.reward_shared_ratio||0)}"><label class="check-control" aria-label="选择 ${escapeHtml(producer.owner)}"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span></label><span class="rank din">${String(index+1).padStart(2,'0')}</span><span class="node-logo blue-logo">${escapeHtml(producerInitials(producer.owner))}</span><button class="node-main node-details-trigger" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong>${escapeHtml(producer.owner)}</strong><small>${escapeHtml(producer.url||'No public URL')}</small><span><b>${escapeHtml(producer.status)}</b><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></span></button><button class="node-votes" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong class="din">${escapeHtml(formatVotes(producer.total_votes))}</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></button><label class="node-allocation-field"><span>分配票数</span><span class="node-vote-control"><input class="node-vote-input din" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" data-node-votes disabled aria-label="${escapeHtml(producer.owner)} FLON votes"><b>FLON</b></span></label></div>`).join('');
     const standbyCount=electionState.producers.filter(producer=>producer.status==='standby').length;
     const summary=document.querySelector('.rank-summary');if(summary)summary.querySelector('strong').textContent=`${electionState.activeCount} / ${electionState.activeTarget}`;
     document.querySelectorAll('[data-active-count]').forEach(node=>node.textContent=String(electionState.activeCount));
@@ -195,6 +200,67 @@ async function refreshVotingAccount(){
   }
   renderVotingAccount();syncVotingSelection();updateAllocation();
 }
+const daoStatusMeta={0:['附议中','endorsement'],1:['投票等待期','voting'],2:['投票中','voting'],3:['未通过','closed'],4:['已通过','execution'],5:['已取消','closed'],6:['Timelock','execution'],7:['已执行','closed'],8:['已过期','closed']};
+function chainTimeMs(){const value=governanceState?.chainInfo?.head_block_time;return value?Date.parse(String(value).endsWith('Z')?value:`${value}Z`):Date.now()}
+function proposalEffectiveStatus(proposal){
+  const now=chainTimeMs(),status=Number(proposal.status),at=value=>Date.parse(String(value||'').endsWith('Z')?value:`${value}Z`);
+  if(status===0&&now>=at(proposal.endorsement_end))return 'activation';
+  if((status===1||status===2)&&now>=at(proposal.vote_end))return 'finalization';
+  if(status===1&&now>=at(proposal.vote_start))return 'voting';
+  if(status===4&&Array.isArray(proposal.actions)&&proposal.actions.length)return 'queue';
+  if(status===6&&now>=at(proposal.execute_before))return 'expiry';
+  if(status===6&&now>=at(proposal.execute_after))return 'execution';
+  return daoStatusMeta[status]?.[1]||'closed';
+}
+function governanceActionFor(proposal){
+  const phase=proposalEffectiveStatus(proposal),id=Number(proposal.proposal_id);
+  if(phase==='activation')return {action:'dao-advance',label:'进入投票',name:'activate',id};
+  if(phase==='finalization')return {action:'dao-advance',label:'结算投票',name:'finalize',id};
+  if(phase==='queue')return {action:'dao-advance',label:'进入 Timelock',name:'queue',id};
+  if(phase==='execution')return {action:'dao-advance',label:'执行',name:'execute',id};
+  if(phase==='expiry')return {action:'dao-advance',label:'标记过期',name:'expire',id};
+  if(phase==='endorsement'&&!governanceState?.endorsements?.has(id))return {action:'dao-endorse',label:'附议',id};
+  if(phase==='voting'&&!governanceState?.ballots?.has(id))return {action:'dao-vote',label:'投票',id};
+  return null;
+}
+function proposalCard(proposal){
+  const id=Number(proposal.proposal_id),meta=daoStatusMeta[Number(proposal.status)]||['未知','closed'],phase=proposalEffectiveStatus(proposal),action=governanceActionFor(proposal);
+  const forAmount=assetAmount(proposal.for_votes),againstAmount=assetAmount(proposal.against_votes),abstainAmount=assetAmount(proposal.abstain_votes),total=forAmount+againstAmount+abstainAmount,forPercent=total>0?Math.round(forAmount/total*100):0;
+  return `<article class="proposal-item" data-status="${escapeHtml(phase)}"><button class="proposal-open" type="button" data-action="dao-details" data-proposal-id="${id}"><div><span class="status ${escapeHtml(meta[1])}">${escapeHtml(meta[0])}</span><span class="proposal-id">#${id} · ${escapeHtml(proposal.proposal_type)}</span><time>${escapeHtml(String(proposal.created_at||''))}</time></div><h3>${escapeHtml(proposal.title)}</h3><p>${escapeHtml(proposal.summary)}</p>${total>0?`<div class="vote-result"><small><b>赞成 ${forPercent}%</b><em>${escapeHtml(proposal.for_votes)} / ${escapeHtml(proposal.against_votes)}</em></small><div class="progress"><i style="width:${forPercent}%"></i></div></div>`:''}</button>${action?`<footer><span>${Number(proposal.endorsement_count||0)} 人附议</span><button type="button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${id}"><em>${escapeHtml(action.label)}</em></button></footer>`:`<footer><span>${Number(proposal.endorsement_count||0)} 人附议</span></footer>`}</article>`;
+}
+function renderGovernance(){
+  const list=document.querySelector('.proposal-list'),preview=document.querySelector('[data-governance-preview]');if(!list||!preview)return;
+  if(!governanceState?.supported){list.innerHTML='<div class="inline-error">无法验证 dao.gov ABI，治理交易已禁用。</div>';preview.innerHTML='<div class="inline-error">DAO 治理状态不可用</div>';return}
+  const configured=Boolean(governanceState.config),proposals=governanceState.proposals||[];
+  const counts={endorsement:0,voting:0,execution:0};for(const proposal of proposals){const phase=proposalEffectiveStatus(proposal);if(phase==='endorsement'||phase==='activation')counts.endorsement++;else if(phase==='voting'||phase==='finalization')counts.voting++;else if(['queue','execution','expiry'].includes(phase))counts.execution++}
+  setText('[data-dao-endorsement]',String(counts.endorsement));setText('[data-dao-voting]',String(counts.voting));setText('[data-dao-execution]',String(counts.execution));
+  setText('[data-governance-summary]',configured?`${proposals.length} 个链上提案 · 总治理权 ${governanceState.global?.total_power||'0.00000000 GLON'}`:'治理参数尚未配置');
+  const create=document.querySelector('[data-action="create-proposal"]');if(create)create.disabled=!configured;
+  if(!configured){list.innerHTML='<div class="inline-error">dao.gov 已部署，但治理参数尚未配置。配置完成前不能发起提案。</div>';preview.innerHTML='<div class="inline-error">治理参数尚未配置</div>';applyTranslations();return}
+  list.innerHTML=proposals.length?proposals.map(proposalCard).join(''):'<div class="empty-state">尚无链上提案</div>';
+  preview.innerHTML=proposals.length?proposalCard(proposals[0]):'<div class="empty-state">尚无链上提案</div>';
+  applyTranslations();
+}
+async function refreshGovernance(){
+  try{governanceState=await loadGovernance(walletSession?.account||'');renderGovernance()}catch(error){console.error('Failed to load DAO governance',error);governanceState=null;const list=document.querySelector('.proposal-list');if(list)list.innerHTML=`<div class="inline-error">链上治理数据读取失败：${escapeHtml(String(error?.message||error))}</div>`}
+}
+function findProposal(id){return governanceState?.proposals?.find(item=>Number(item.proposal_id)===Number(id))||null}
+function openProposalDetails(id){
+  const proposal=findProposal(id);if(!proposal)return;const action=governanceActionFor(proposal),forum=safePublicUrl(proposal.discussion_uri),metadata=safePublicUrl(proposal.metadata_uri);
+  openSheet(`<h2 id="sheet-title">${escapeHtml(proposal.title)}</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml((daoStatusMeta[Number(proposal.status)]||['未知'])[0])}</p><div class="sign-summary"><div><span>提案人</span><strong>${escapeHtml(proposal.proposer)}</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal.proposal_type)}</strong></div><div><span>附议</span><strong>${Number(proposal.endorsement_count||0)}</strong></div><div><span>赞成</span><strong>${escapeHtml(proposal.for_votes)}</strong></div><div><span>反对</span><strong>${escapeHtml(proposal.against_votes)}</strong></div><div><span>弃权</span><strong>${escapeHtml(proposal.abstain_votes)}</strong></div><div><span>冻结执行动作</span><strong>${proposal.actions?.length||0}</strong></div></div><p class="proposal-summary">${escapeHtml(proposal.summary)}</p><div class="profile-review">${metadata?`<strong>提案文档</strong><a href="${escapeHtml(metadata)}" target="_blank" rel="noopener noreferrer">${escapeHtml(metadata)}</a>`:''}${forum?`<strong>社区讨论</strong><a href="${escapeHtml(forum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(forum)}</a>`:'<strong>社区讨论</strong><small>尚未关联论坛讨论</small>'}</div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">关闭</button>${action?`<button class="primary-button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${proposal.proposal_id}">${escapeHtml(action.label)}</button>`:''}</div>`);
+}
+function openCreateProposal(){
+  if(!walletSession){openWalletSheet();return}if(!governanceState?.config){showToast('治理参数尚未配置');return}
+  openSheet(`<h2 id="sheet-title">发起治理提案</h2><p class="sheet-subtitle">首阶段支持文本 / 信号提案；可执行参数提案将在白名单配置后开放。</p><form class="wizard-form" data-proposal-form><label><span>标题</span><input name="title" maxlength="128" required></label><label><span>摘要</span><textarea name="summary" maxlength="1024" rows="5" required></textarea></label><label><span>提案文档 URI</span><input name="metadataUri" type="url" maxlength="512" placeholder="https://…" required></label><label><span>社区讨论 URI</span><input name="discussionUri" type="url" maxlength="512" placeholder="https://forum…"></label><p class="field-note">提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。</p></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-sign">检查并签名</button></div>`);
+}
+async function sha256Hex(value){const bytes=new TextEncoder().encode(value),digest=await crypto.subtle.digest('SHA-256',bytes);return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('')}
+async function submitProposal(target){
+  if(!walletSession)return;const form=sheetContent.querySelector('[data-proposal-form]');if(!form?.reportValidity())return;
+  const title=form.title.value.trim(),summary=form.summary.value.trim(),metadata_uri=form.metadataUri.value.trim(),discussion_uri=form.discussionUri.value.trim();target.disabled=true;
+  try{const content_hash=await sha256Hex(JSON.stringify({title,summary,metadata_uri})),result=await transact(walletSession,[{account:'dao.gov',name:'syncpower',data:{voter:walletSession.account}},{account:'dao.gov',name:'propose',data:{proposer:walletSession.account,proposal_type:'signal',title,summary,content_hash,metadata_uri,discussion_uri,actions:[]}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">提案交易已广播</h2>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshGovernance()}catch(error){target.disabled=false;showToast(walletErrorMessage(error))}
+}
+function openVoteProposal(id){const proposal=findProposal(id);if(!proposal)return;if(!walletSession){openWalletSheet();return}openSheet(`<h2 id="sheet-title">参与投票</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml(proposal.title)}</p><div class="proposal-choice-grid"><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="1">赞成<small>支持本提案</small></button><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="0">反对<small>拒绝本提案</small></button><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="2">弃权<small>计入 quorum</small></button></div>`)}
+async function submitDaoAction(target,name,id,data={}){if(!walletSession){openWalletSheet();return}target.disabled=true;try{const result=await transact(walletSession,[{account:'dao.gov',name,data:{...data,proposal_id:Number(id)}}]),tx=transactionId(result);showToast(tx?`交易已广播 ${tx.slice(0,10)}…`:'交易已广播');closeSheet();await refreshGovernance()}catch(error){target.disabled=false;showToast(walletErrorMessage(error))}}
 function setText(selector,value){document.querySelectorAll(selector).forEach(node=>node.textContent=value)}
 function formatCountdown(milliseconds){
   const seconds=Math.max(0,Math.ceil(milliseconds/1000));
@@ -433,14 +499,25 @@ document.addEventListener('click',async event=>{
   if(action==='account')openWalletSheet();
   if(action==='connect-wallet'){
     target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'连接中…':'Connecting…';
-    try{walletSession=await connectWallet();renderWallet();await refreshVotingAccount();closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已连接':'Wallet connected')}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'连接钱包':'Connect wallet';showToast(walletErrorMessage(error))}
+    try{walletSession=await connectWallet();renderWallet();await Promise.all([refreshVotingAccount(),refreshGovernance()]);closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已连接':'Wallet connected')}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'连接钱包':'Connect wallet';showToast(walletErrorMessage(error))}
   }
-  if(action==='disconnect-wallet'){await disconnectWallet();walletSession=null;votingState=null;profileBPRewards=null;renderWallet();renderVotingAccount();syncVotingSelection();updateAllocation();closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已断开':'Wallet disconnected')}
-  if(action==='clear-selection'){document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),amount=label.querySelector('[data-node-votes]');if(checkbox)checkbox.checked=false;if(amount){amount.value='';amount.disabled=true}});updateAllocation()}
+  if(action==='disconnect-wallet'){await disconnectWallet();walletSession=null;votingState=null;profileBPRewards=null;renderWallet();renderVotingAccount();syncVotingSelection();updateAllocation();closeSheet();await refreshGovernance();showToast(currentLanguage==='zh-CN'?'钱包已断开':'Wallet disconnected')}
+  if(action==='clear-selection'){document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),amount=label.querySelector('[data-node-votes]');if(checkbox)checkbox.checked=false;if(amount){amount.value='';amount.disabled=true}});updateAllocation();applyNodeFilters()}
   if(action==='producer-details')await openProducerDetails(target.dataset.producer);
   if(action==='sign-vote')await confirmVote();
   if(action==='vote-sign')await submitVote(target);
   if(action==='governance-unavailable')openSheet(`<h2 id="sheet-title">DAO治理尚未启用</h2><p class="sheet-subtitle">当前站点未配置可验证的治理合约 ABI 与部署地址</p><p class="sign-warning">提案、附议、正式投票、Timelock 和执行按钮已保持只读，不会请求钱包签名，也不会广播模拟交易。</p><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);
+  if(action==='create-proposal')openCreateProposal();
+  if(action==='dao-propose-sign')await submitProposal(target);
+  if(action==='dao-details')openProposalDetails(target.dataset.proposalId);
+  if(action==='dao-vote')openVoteProposal(target.dataset.proposalId);
+  if(action==='dao-vote-sign')await submitDaoAction(target,'castvote',target.dataset.proposalId,{voter:walletSession?.account,choice:Number(target.dataset.choice)});
+  if(action==='dao-endorse'){
+    if(!walletSession){openWalletSheet();return}
+    target.disabled=true;
+    try{await transact(walletSession,[{account:'dao.gov',name:'syncpower',data:{voter:walletSession.account}},{account:'dao.gov',name:'endorse',data:{endorser:walletSession.account,proposal_id:Number(target.dataset.proposalId)}}]);showToast('附议交易已广播');closeSheet();await refreshGovernance()}catch(error){target.disabled=false;showToast(walletErrorMessage(error))}
+  }
+  if(action==='dao-advance')await submitDaoAction(target,target.dataset.governanceAction,target.dataset.proposalId);
   if(action==='claim')await confirmClaimRewards();
   if(action==='claim-sign')await submitClaimRewards(target);
   if(action==='bp-claim')await openBPClaimSheet(target.dataset.producer);
@@ -463,31 +540,35 @@ document.addEventListener('click',async event=>{
   if(action==='claim-vote-refund')await claimVoteRefund(target);
 });
 overlay.addEventListener('click',closeSheet);
-document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation()}if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
-document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]'))updateAllocation()});
+document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
+document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]')){updateAllocation();applyNodeFilters()}});
 document.querySelector('[data-language]').addEventListener('change',event=>{currentLanguage=event.target.value;localStorage.setItem('flon-daogov-language',currentLanguage);applyTranslations();updateEpochCountdown();showToast(currentLanguage==='zh-CN'?'语言已切换为中文':'Language changed to English')});
 
 function selectedCount(){return [...document.querySelectorAll('.select-node input[type="checkbox"]:checked')].length}
 function allocationTotal(){try{return draftVoteAllocations().reduce((sum,item)=>sum+item.votes,0n)}catch{return 0n}}
-function updateAllocation(){const total=allocationTotal(),count=selectedCount(),owned=assetUnits(votingState?.nodeVoteStake)+assetUnits(votingState?.flon);document.querySelector('[data-selected-count]').textContent=`${count} / 30`;document.querySelector('[data-per-node]').textContent=count?'自定义':'—';document.querySelector('[data-allocation-total]').textContent=`${formatUnits(total)} FLON`;const confirm=document.querySelector('[data-action="sign-vote"]');if(confirm)confirm.disabled=!walletSession||count>30||total>owned}
-function applyNodeFilters(){const filter=document.querySelector('[data-node-filter].is-active')?.dataset.nodeFilter||'all',query=document.querySelector('[data-node-search]')?.value.trim().toLowerCase()||'';document.querySelectorAll('.select-node').forEach(row=>{row.hidden=(filter!=='all'&&row.dataset.status!==filter)||Boolean(query&&!row.dataset.name.includes(query))})}
+function canonicalAllocations(items){return(items||[]).map(item=>({producer:item.producer,votes:String(item.votes||0)})).filter(item=>BigInt(item.votes)>0n).sort((a,b)=>a.producer.localeCompare(b.producer)).map(item=>`${item.producer}:${item.votes}`).join('|')}
+function currentVoteAllocations(){if(!votingState)return[];const source=votingState.pendingAllocations||votingState.effectiveAllocations;if(source)return source;const producers=votingState.pendingProducers||votingState.effectiveProducers||[],total=BigInt(votingState.pending?.votes??votingState.voter?.votes??0),fallback=producers.length?total/BigInt(producers.length):0n;return producers.map(producer=>({producer,votes:fallback.toString()}))}
+function updateAllocation(){let allocations=[],valid=true;try{allocations=draftVoteAllocations()}catch{valid=false}const total=valid?allocations.reduce((sum,item)=>sum+item.votes,0n):0n,count=selectedCount(),owned=assetUnits(votingState?.nodeVoteStake)+assetUnits(votingState?.flon),remaining=owned-total,overLimit=valid&&total>owned,changed=valid&&canonicalAllocations(allocations)!==canonicalAllocations(currentVoteAllocations());document.querySelectorAll('.select-node').forEach(row=>row.classList.toggle('is-selected',row.querySelector('input[type="checkbox"]')?.checked===true));setText('[data-selected-count]',`${count} / 30`);setText('[data-per-node]',count?translateText('自定义'):'—');setText('[data-allocation-total]',`${formatUnits(total)} FLON`);setText('[data-vote-remaining]',walletSession?`${overLimit?'−':''}${formatUnits(overLimit?-remaining:remaining)} FLON`:'— FLON');const card=document.querySelector('.vote-summary-card');if(card)card.classList.toggle('is-over-limit',overLimit||!valid);setText('[data-vote-submit-hint]',translateText(!walletSession?'连接钱包后管理投票':!valid?'请输入最多 8 位小数的有效票数':overLimit?'分配总额超过账户可投 FLON':!changed?'当前分配尚未修改':'修改将在下一 Epoch 生效'));const confirm=document.querySelector('[data-action="sign-vote"]');if(confirm)confirm.disabled=!walletSession||!votingState||!valid||count>30||overLimit||!changed}
+function applyNodeFilters(){const filter=document.querySelector('[data-node-filter].is-active')?.dataset.nodeFilter||'all',query=document.querySelector('[data-node-search]')?.value.trim().toLowerCase()||'',selectedOnly=document.querySelector('[data-node-selected-only]')?.classList.contains('is-active')===true,sort=document.querySelector('[data-node-sort]')?.value||'rank',list=document.querySelector('.select-list'),rows=[...document.querySelectorAll('.select-node')];rows.forEach(row=>{const selected=row.querySelector('input[type="checkbox"]')?.checked===true;row.hidden=(filter!=='all'&&row.dataset.status!==filter)||Boolean(query&&!row.dataset.name.includes(query))||(selectedOnly&&!selected)});rows.sort((a,b)=>{const aSelected=a.querySelector('input[type="checkbox"]')?.checked?1:0,bSelected=b.querySelector('input[type="checkbox"]')?.checked?1:0;if(sort==='selected'&&aSelected!==bSelected)return bSelected-aSelected;if(sort==='votes'){const av=BigInt(a.dataset.votes||0),bv=BigInt(b.dataset.votes||0);if(av!==bv)return av>bv?-1:1}if(sort==='share'){const delta=Number(b.dataset.share||0)-Number(a.dataset.share||0);if(delta)return delta}return Number(a.dataset.rank||0)-Number(b.dataset.rank||0)}).forEach(row=>list?.appendChild(row))}
 document.querySelectorAll('[data-node-filter]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-node-filter]').forEach(b=>b.classList.toggle('is-active',b===button));applyNodeFilters()}));
+document.querySelector('[data-node-selected-only]')?.addEventListener('click',event=>{event.currentTarget.classList.toggle('is-active');applyNodeFilters()});
 document.querySelector('[data-node-search]').addEventListener('input',applyNodeFilters);
 document.querySelectorAll('[data-proposal-filter]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-proposal-filter]').forEach(b=>b.classList.toggle('is-active',b===button));document.querySelectorAll('.proposal-item').forEach(card=>card.hidden=button.dataset.proposalFilter!=='all'&&card.dataset.status!==button.dataset.proposalFilter)}));
 
 applyTranslations();
 renderVotingAccount();
 refreshElection();
+refreshGovernance();
 async function initializeWallet(){
   let session=await restoreWallet();
   if(!session&&isHuFuApp())session=await autoConnectHuFuWallet();
   walletSession=session;
   renderWallet();
-  await refreshVotingAccount();
+  await Promise.all([refreshVotingAccount(),refreshGovernance()]);
 }
 initializeWallet().catch(error=>{
   walletSession=null;
   renderWallet();
   if(isHuFuApp())showToast(walletErrorMessage(error));
 });
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshVotingAccount().catch(error=>console.error('Failed to refresh epoch timing',error))});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')Promise.all([refreshVotingAccount(),refreshGovernance()]).catch(error=>console.error('Failed to refresh chain state',error))});
