@@ -94,7 +94,7 @@ const translations=new Map([
   ['拟议变更','Proposed changes'],['配置类操作会自动填入链上当前值，请只修改希望变更的字段。提交提案后，操作与参数将被锁定，投票期间不能替换。','Configuration operations are prefilled with current on-chain values. Change only the intended fields. Once submitted, the operation and arguments are locked for the vote.'],['通过后执行提交时锁定的白名单 action','Executes the allowlisted action locked when submitted after approval'],['信号提案表达社区意见；可执行提案通过后只执行创建时锁定的白名单 action。','Signal proposals express community intent. Executable proposals may only run the allowlisted action locked when created.'],['已载入链上当前值','Current on-chain values loaded'],['无法读取链上当前值，不能安全创建此配置提案。','Current on-chain values could not be loaded, so this configuration proposal cannot be created safely.']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
-  ['链上未配置','Not configured on-chain'],['天','days'],['分钟','minutes'],['秒','seconds'],['奖励与投票 Epoch','Reward and voting epoch'],['Active BP 目标席位','Target Active BP seats'],['最多投票节点','Maximum voted BPs'],['撤票退款冷却期','Vote refund cooldown'],['提案附议期','Proposal endorsement period'],['正式投票期','Formal voting period']
+  ['链上未配置','Not configured on-chain'],['天','days'],['分钟','minutes'],['秒','seconds'],['奖励与投票 Epoch','Reward and voting epoch'],['Active BP 目标席位','Target Active BP seats'],['最多投票节点','Maximum voted BPs'],['撤票退款冷却期','Vote refund cooldown'],['提案附议期','Proposal endorsement period'],['正式投票期','Formal voting period'],['没有可返回的上一页','No previous page is available']
 ].forEach(([zh,en])=>translations.set(zh,en));
 const sourceText=new WeakMap();
 const sourceAttrs=new WeakMap();
@@ -135,6 +135,12 @@ function showView(name){
   window.scrollTo({top:0,behavior:'smooth'});
   if(name==='mine')refreshBPRecovery();
   if(name==='dao')refreshGovernance();
+}
+function navigateBack(){
+  if(window.history.length>1){window.history.back();return}
+  const current=views.find(view=>view.classList.contains('is-active'))?.dataset.view;
+  if(current&&current!=='overview'){showView('overview');return}
+  showToast(currentLanguage==='zh-CN'?'没有可返回的上一页':'No previous page is available');
 }
 function setNodeMode(mode='directory'){
   document.querySelectorAll('[data-node-mode]').forEach(button=>button.classList.toggle('is-active',button.dataset.nodeMode===mode));
@@ -616,6 +622,7 @@ document.addEventListener('click',async event=>{
   if(target.dataset.viewTarget){showView(target.dataset.viewTarget);if(target.dataset.viewTarget==='nodes')setNodeMode(target.dataset.nodeModeTarget||'directory')}
   if(target.dataset.nodeMode)setNodeMode(target.dataset.nodeMode);
   const action=target.dataset.action;
+  if(action==='back')navigateBack();
   if(action==='toast')showToast(target.dataset.message||'操作已完成');
   if(action==='close-sheet')closeSheet();
   if(action==='network')showToast(`当前为 ${networkName()} · Chain ID ${runtimeConfig.chainId.slice(0,4)}…${runtimeConfig.chainId.slice(-3)}`);
