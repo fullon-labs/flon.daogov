@@ -1,4 +1,5 @@
 import { Client } from '@fullon/flonjs';
+import {latestCompleteEpoch,summarizeBPProduction} from './production.js';
 
 const wait=milliseconds=>new Promise(resolve=>window.setTimeout(resolve,milliseconds));
 const timeout=(promise,milliseconds,message)=>Promise.race([promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(message)),milliseconds))]);
@@ -369,6 +370,19 @@ export async function loadElection(){
     else if(standbyRank++<30)producer.status='standby';
   }
   return {producers,activeTarget,activeCount:active.size};
+}
+export async function loadNetworkProduction(){
+  const epochRows=await rpcPost('/v1/chain/get_table_rows',{
+    json:true,code:'flon',scope:'flon',table:'epochstats',reverse:true,limit:24,
+  });
+  const epoch=latestCompleteEpoch(epochRows.rows||[]);
+  if(!epoch)return {available:false,reason:'awaiting'};
+  const statsRows=await rpcPost('/v1/chain/get_table_rows',{
+    json:true,code:'flon',scope:String(epoch.epoch_id),table:'bpstats',limit:200,
+  });
+  const summary=summarizeBPProduction(statsRows.rows||[]);
+  if(summary.rate===null)return {available:false,reason:'empty',epochId:Number(epoch.epoch_id)};
+  return {available:true,epochId:Number(epoch.epoch_id),...summary};
 }
 export async function loadGovernance(account=''){
   const governance=config().governance||'dao.gov';
