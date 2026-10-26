@@ -191,8 +191,15 @@ function setMobileVoteTab(tab='directory'){
 }
 mobileVoteMedia.addEventListener?.('change',()=>setMobileVoteTab(mobileVoteTab));
 function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
-function openSheet(html){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden'}
-function closeSheet(){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow=''}
+function syncVisualViewport(){
+  const viewport=window.visualViewport,height=Math.max(1,viewport?.height||window.innerHeight),offset=Math.max(0,viewport?.offsetTop||0),keyboardInset=Math.max(0,window.innerHeight-height-offset);
+  document.documentElement.style.setProperty('--visual-viewport-height',`${height}px`);
+  document.documentElement.style.setProperty('--visual-keyboard-inset',`${keyboardInset}px`);
+  const active=document.activeElement;
+  if(!sheet.hidden&&active&&sheet.contains(active)&&active.matches('input,textarea,select'))window.setTimeout(()=>active.scrollIntoView({block:'center',inline:'nearest',behavior:'smooth'}),60);
+}
+function openSheet(html){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden';syncVisualViewport()}
+function closeSheet(){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;document.body.style.overflow='';document.documentElement.style.setProperty('--visual-keyboard-inset','0px')}
 function walletProviderName(provider){return provider==='iframe'?'HuFu App':provider==='hufu'?'HuFu Wallet':'Anchor Wallet'}
 function renderWallet(){const account=walletSession?.account||'未连接',label=walletSession?walletProviderName(walletSession.provider):'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
 const bpStatusMeta={0:['未评估',''],1:['合格','qualified'],2:['降级',''],3:['警告',''],4:['暂停','suspended'],5:['样本不足',''],6:['网络事件',''],7:['试运行','probation']};
@@ -761,6 +768,10 @@ document.addEventListener('click',async event=>{
 });
 sheetContent.addEventListener('change',event=>{if(event.target?.name==='proposalType')syncProposalType();if(event.target?.name==='targetAction')void renderProposalActionFields(event.target.closest('.proposal-action-row'));if(event.target?.name==='operation'){const max=sheetContent.querySelector('[data-action="stake-max"]'),input=sheetContent.querySelector('[data-stake-form] [name="amount"]');if(max)max.hidden=event.target.value!=='sub';if(input)input.value=''}});
 sheetContent.addEventListener('input',event=>{const row=event.target.closest?.('.proposal-action-row');if(row)scheduleProposalActionSizeCheck(row)});
+sheetContent.addEventListener('focusin',event=>{if(event.target.matches?.('input,textarea,select'))window.setTimeout(()=>event.target.scrollIntoView({block:'center',inline:'nearest',behavior:'smooth'}),120)});
+window.visualViewport?.addEventListener('resize',syncVisualViewport);
+window.visualViewport?.addEventListener('scroll',syncVisualViewport);
+window.addEventListener('orientationchange',()=>window.setTimeout(syncVisualViewport,100));
 overlay.addEventListener('click',closeSheet);
 document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-votes]')){try{const units=decimalUnits(event.target.value||'0');if(units>0n)event.target.value=formatVoteInput(units)}catch{}}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
 document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]'))updateAllocation()});
