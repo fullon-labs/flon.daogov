@@ -504,10 +504,13 @@ export async function transact(session,actions){
     const provider=window.HuFu;if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
     confirmTransactionSnapshot(provider,current,session.chainId);
-    // HuFu's native signer does not consistently synthesize TAPOS for newer
-    // system-contract actions. Prepare the complete transaction against this
-    // DApp's verified RPC, while keeping account selection out of the flow.
-    const transaction=await prepareHuFuTransaction(authorized);
+    // Match the proven numguess HuFu path: testnet must reach transact in the
+    // original tap task with actions only. Awaiting RPC/TAPOS preparation here
+    // loses the native WebView gesture in affected HuFu releases. Mainnet keeps
+    // explicit chain-derived TAPOS to avoid the older clock-skew expiration bug.
+    const transaction=config().network==='mainnet'
+      ? await prepareHuFuTransaction(authorized)
+      : {actions:authorized};
     return timeout(
       Promise.resolve(provider.transact({transaction})),
       hufuTransactionTimeoutMilliseconds,
