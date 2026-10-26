@@ -16,6 +16,7 @@ const hufuExpirationSeconds=120;
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
+let injectedAuthorizationReady=false;
 
 function normalizeAccount(value){
   if(typeof value==='string'){try{return normalizeAccount(JSON.parse(value))}catch{return /^[a-z1-5.]{1,12}$/.test(value)?{account:value,permission:'active',chainId:''}:null}}
@@ -201,12 +202,11 @@ export async function restoreWallet(){
   const stored=load();if(!stored)return null;
   try{
     assertChain(stored.chainId);
-    // The HuFu container can change its transport between releases (or after
-    // reopening a DApp). Prefer the transport exposed by the current page over
-    // the cached provider label, otherwise an old `hufu` session can call the
-    // injected bridge while the page is actually hosted by HuFuClient.
+    // Restore the iframe bridge only for a session that was actually connected
+    // through HuFuClient. Merely being framed is not proof that the parent page
+    // hosts a flonjs Server transport.
     const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
-    if(runtimeClient.isInIframe()){
+    if(stored.provider==='iframe'&&runtimeClient.isInIframe()){
       const info=await timeout(runtimeClient.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
       const account=normalizeAccount(await timeout(runtimeClient.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
       if(!account||account.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
@@ -215,7 +215,14 @@ export async function restoreWallet(){
     if(stored.provider==='hufu'&&isHuFuApp()){
       const current=accountSnapshot(window.HuFu);
       if(current&&current.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
+      // A localStorage session is display state, not proof that this newly
+      // created HuFu WebView has authorized the current origin. Only restore
+      // silently when the injected provider exposes a live account snapshot.
+      // Otherwise autoConnectHuFuWallet establishes authorization once during
+      // page initialization, never from the transaction button.
+      if(!current)return null;
       const chainId=chainIdFrom(current)||chainIdFrom(window.HuFu)||chainIdFrom(hufuChainInfo);if(chainId)assertChain(chainId);
+      injectedAuthorizationReady=true;
       return stored;
     }
     if(stored.provider==='anchor'){
@@ -250,6 +257,7 @@ export async function connectWallet(){
     if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
     await wait(650);
     const chainId=await confirmInjectedChain(provider,account);
+    injectedAuthorizationReady=true;
     return save({...account,chainId,provider:'hufu'});
   }
   if(isHuFuApp())throw new Error('HUFU_PROVIDER_UNAVAILABLE');
@@ -269,8 +277,18 @@ export function autoConnectHuFuWallet(){
       return account?save({...account,chainId:config().chainId,provider:'iframe'}):null;
     }
     const provider=await prepareHuFu();if(!provider)return null;
-    const account=accountSnapshot(provider);if(!account)return null;
+    let account=accountSnapshot(provider);
+    // HuFu may recreate its WebView while localStorage survives. Reauthorize
+    // the current origin during startup so the later transaction click opens
+    // approval directly instead of hanging behind an unauthorised provider.
+    // This is intentionally never called by transact().
+    if(!account&&provider.requestAccountsHuFu){
+      const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
+      account=normalizeAccount(response);
+    }
+    if(!account)return null;
     const chainId=await confirmInjectedChain(provider,account);
+    injectedAuthorizationReady=true;
     return save({...account,chainId,provider:'hufu'});
   })();
   return automaticConnection;
@@ -278,7 +296,7 @@ export function autoConnectHuFuWallet(){
 export async function disconnectWallet(){
   const stored=load();
   if(stored?.provider==='anchor'){try{(await getAnchorLink()).clearSessions(appId())}catch{}}
-  automaticConnection=null;forget();
+  automaticConnection=null;injectedAuthorizationReady=false;forget();
 }
 export async function loadBPAccount(account){
   const [accountInfo,abi,chainInfo]=await Promise.all([
@@ -517,7 +535,7 @@ export async function transact(session,actions){
   // transaction sheet entry point in that environment and must win over the
   // stale cached label.
   const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
-  if(runtimeClient.isInIframe()){
+  if(session.provider==='iframe'&&runtimeClient.isInIframe()){
     return timeout(
       Promise.resolve(runtimeClient.transact(authorized)),
       hufuTransactionTimeoutMilliseconds,
@@ -526,6 +544,7 @@ export async function transact(session,actions){
   }
   if(session.provider==='hufu'){
     const provider=window.HuFu;if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
+    if(!injectedAuthorizationReady)throw new Error('HUFU_REAUTH_REQUIRED');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
     confirmTransactionSnapshot(provider,current,session.chainId);
     // Match the proven numguess HuFu path: testnet must reach transact in the
