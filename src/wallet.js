@@ -1,6 +1,7 @@
 import { Client } from '@fullon/flonjs';
 import {latestCompleteEpoch,summarizeBPProduction} from './production.js';
 import {summarizeNetworkEconomics} from './network-summary.js';
+import {readTablePages} from './table-pages.js';
 
 const wait=milliseconds=>new Promise(resolve=>window.setTimeout(resolve,milliseconds));
 const timeout=(promise,milliseconds,message)=>Promise.race([promise,new Promise((_,reject)=>window.setTimeout(()=>reject(new Error(message)),milliseconds))]);
@@ -429,11 +430,11 @@ export async function loadProducerStake(owner){
 }
 export async function loadElection(){
   const [producerRows,schedule,statusRows,configRows,stakeRows,glonStats]=await Promise.all([
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'producers',limit:200}),
+    readTablePages(rpcPost,{json:true,code:'flon',scope:'flon',table:'producers',limit:200}),
     rpcPost('/v1/chain/get_producer_schedule',{}),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstatus',limit:200}).catch(()=>({rows:[]})),
+    readTablePages(rpcPost,{json:true,code:'flon',scope:'flon',table:'bpstatus',limit:200}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'electconfig',limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakes',limit:200}).catch(()=>({rows:[]})),
+    readTablePages(rpcPost,{json:true,code:'flon',scope:'flon',table:'bpstakes',limit:200}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_currency_stats',{code:'flon.token',symbol:'GLON'}).catch(()=>({})),
   ]);
   const active=new Set((schedule.active?.producers||[]).map(row=>row.producer_name));

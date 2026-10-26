@@ -281,15 +281,21 @@ async function openProducerDetails(owner){
   const location=Number(producer.location||0)>0?String(producer.location):'未设置';
   openSheet(`<h2 id="sheet-title">BP 详情</h2><p class="sheet-subtitle">${accountLabel} · #${index+1}</p><div class="sign-summary"><div><span>节点状态</span><strong>${escapeHtml(producer.status)}</strong></div><div><span>排名</span><strong>#${index+1}</strong></div><div><span>自身质押</span><strong>${escapeHtml(selfStake)}</strong></div><div><span>获得的总投票</span><strong>${escapeHtml(formatVoteAsset(producer.total_votes))}</strong></div><div><span>奖励分享比例</span><strong>${Number(producer.reward_shared_ratio||0)/100}%</strong></div><div><span>未领取出块奖励</span><strong>${escapeHtml(baseUnclaimed)}</strong></div><div><span>GAS 待领取奖励</span><strong>${escapeHtml(gasUnclaimed)}</strong></div><div><span>最后领取时间</span><strong>${escapeHtml(producer.last_claim_time||'—')}</strong></div><div><span>地区代码</span><strong>${escapeHtml(location)}</strong></div><div><span>链上数据源</span><strong>flon::producers / flon::bpstakes</strong></div></div><div class="profile-review"><strong>注册地址</strong>${url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`:`<small>${escapeHtml(producer.url||'—')}</small>`}<strong>出块公钥</strong><small class="full-value">${escapeHtml(producerKey(producer))}</small></div><div class="sheet-actions ${hasClaimable?'':'one'}"><button class="secondary-button" data-action="close-sheet">完成</button>${hasClaimable?`<button class="primary-button" data-action="bp-claim" data-producer="${escapeHtml(producer.owner)}">领取 BP 奖励</button>`:''}</div>`);
 }
-async function refreshElection(){
+let electionRefreshing=false;
+let electionLastRefresh=0;
+async function refreshElection({preserveDraft=false}={}){
+  if(electionRefreshing)return;
+  electionRefreshing=true;
   try{
     const [election,production]=await Promise.all([
       loadElection(),
       loadNetworkProduction().catch(error=>({available:false,reason:'error',error:String(error?.message||error)})),
     ]);
+    // Capture at render time so edits made while the request is in flight survive.
+    const draft=preserveDraft?new Map([...document.querySelectorAll('.select-node')].map(row=>[row.dataset.producer,{checked:row.querySelector('input[type="checkbox"]').checked,value:row.querySelector('[data-node-votes]').value}])):null;
     electionState=election;
     const selectList=document.querySelector('.select-list');
-    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').slice(0,51).map((producer,index)=>`<div class="select-node status-${escapeHtml(producer.status)}" data-producer="${escapeHtml(producer.owner)}" data-status="${escapeHtml(producer.status)}" data-name="${escapeHtml(`${producer.owner} ${producer.url||''}`.toLowerCase())}" data-rank="${index+1}" data-votes="${escapeHtml(producer.total_votes||0)}" data-share="${Number(producer.reward_shared_ratio||0)}"><label class="check-control" aria-label="选择 ${escapeHtml(producer.owner)}"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span></label><span class="rank din">${String(index+1).padStart(2,'0')}</span><span class="node-logo ${producer.status==='active'?'green-logo':producer.status==='standby'?'amber-logo':'gray-logo'}">${escapeHtml(producerInitials(producer.owner))}</span><button class="node-main node-details-trigger" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong>${escapeHtml(producer.owner)}</strong><small>${escapeHtml(producer.url||'No public URL')}</small><span><b>${escapeHtml(producer.status)}</b><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></span></button><button class="node-votes" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong class="din">${escapeHtml(formatVotes(producer.total_votes))}</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></button><label class="node-allocation-field"><span>我的投票</span><span class="node-vote-control"><input class="node-vote-input din" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" data-node-votes disabled aria-label="${escapeHtml(producer.owner)} FLON votes"><b>FLON</b></span></label></div>`).join('');
+    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').map((producer,index)=>`<div class="select-node status-${escapeHtml(producer.status)}" data-producer="${escapeHtml(producer.owner)}" data-status="${escapeHtml(producer.status)}" data-name="${escapeHtml(`${producer.owner} ${producer.url||''}`.toLowerCase())}" data-rank="${index+1}" data-votes="${escapeHtml(producer.total_votes||0)}" data-share="${Number(producer.reward_shared_ratio||0)}"><label class="check-control" aria-label="选择 ${escapeHtml(producer.owner)}"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span></label><span class="rank din">${String(index+1).padStart(2,'0')}</span><span class="node-logo ${producer.status==='active'?'green-logo':producer.status==='standby'?'amber-logo':'gray-logo'}">${escapeHtml(producerInitials(producer.owner))}</span><button class="node-main node-details-trigger" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong>${escapeHtml(producer.owner)}</strong><small>${escapeHtml(producer.url||'No public URL')}</small><span><b>${escapeHtml(producer.status)}</b><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></span></button><button class="node-votes" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong class="din">${escapeHtml(formatVotes(producer.total_votes))}</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></button><label class="node-allocation-field"><span>我的投票</span><span class="node-vote-control"><input class="node-vote-input din" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" data-node-votes disabled aria-label="${escapeHtml(producer.owner)} FLON votes"><b>FLON</b></span></label></div>`).join('');
     const standbyCount=electionState.producers.filter(producer=>producer.status==='standby').length;
     const summary=document.querySelector('.rank-summary');if(summary)summary.querySelector('strong').textContent=`${electionState.activeCount} / ${electionState.activeTarget}`;
     document.querySelectorAll('[data-active-count]').forEach(node=>node.textContent=String(electionState.activeCount));
@@ -305,13 +311,21 @@ async function refreshElection(){
       ?`Epoch ${production.epochId} · 链上统计`
       :(production.reason==='awaiting'||production.reason==='empty'?'等待完整 Epoch 封存':'链上出块统计暂不可用');
     setText('[data-epoch-active]',`${electionState.activeCount} / ${electionState.activeTarget}`);setText('[data-epoch-standby]',String(standbyCount));setText('[data-epoch-candidates]',String(electionState.producers.length));
-    syncVotingSelection();updateAllocation();applyNodeFilters();applyTranslations();
+    syncVotingSelection();
+    if(draft)document.querySelectorAll('.select-node').forEach(row=>{
+      const saved=draft.get(row.dataset.producer);if(!saved)return;
+      const checkbox=row.querySelector('input[type="checkbox"]'),amount=row.querySelector('[data-node-votes]');
+      checkbox.checked=saved.checked;amount.value=saved.value;amount.disabled=!saved.checked;
+    });
+    updateAllocation();applyNodeFilters();applyTranslations();
   }catch(error){
-    console.error('Failed to load election state',error);electionState=null;
+    console.error('Failed to load election state',error);
+    if(preserveDraft&&electionState)return;
+    electionState=null;
     const selectList=document.querySelector('.select-list');
     if(selectList)selectList.innerHTML='<div class="inline-error">无法验证候选 BP，已禁用投票提交。</div>';
     updateAllocation();
-  }
+  }finally{electionRefreshing=false;electionLastRefresh=Date.now()}
 }
 async function refreshVotingAccount(){
   if(walletSession){
@@ -844,6 +858,20 @@ document.querySelectorAll('[data-proposal-filter]').forEach(button=>button.addEv
 applyTranslations();
 renderVotingAccount();
 refreshElection();
+// The sentinel is outside the list, which is replaced when fresh candidates arrive.
+const bpList=document.querySelector('.select-list');
+if(bpList){
+  const sentinel=document.createElement('div');sentinel.style.height='1px';sentinel.setAttribute('aria-hidden','true');bpList.after(sentinel);
+  const refreshAtBottom=()=>{
+    const view=bpList.closest('[data-view]');
+    if(!view||view.hidden||document.hidden||electionRefreshing||Date.now()-electionLastRefresh<15000)return;
+    const rect=sentinel.getBoundingClientRect();
+    if(rect.top>=0&&rect.top<=window.innerHeight+80)refreshElection({preserveDraft:true});
+  };
+  if('IntersectionObserver' in window)new IntersectionObserver(refreshAtBottom,{rootMargin:'0px 0px 80px 0px'}).observe(sentinel);
+  let scrollFrame=0;
+  window.addEventListener('scroll',()=>{if(!scrollFrame)scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;refreshAtBottom()})},{passive:true});
+}
 refreshGovernance();
 async function initializeWallet(){
   let session=await restoreWallet();
