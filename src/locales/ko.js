@@ -209,6 +209,9 @@ export default {
   "Official website": "공식 홈페이지",
   "X account": "X 계정",
   "Country or region": "국가 또는 지역",
+  "Search country or region": "국가 또는 지역 검색",
+  "Select a country or region": "국가 또는 지역 선택",
+  "No matching country or region": "일치하는 국가 또는 지역이 없습니다",
   "Mainland China": "중국 본토",
   "Hong Kong SAR": "홍콩 특별행정구",
   "Japan": "일본",
@@ -547,5 +550,15 @@ export default {
   "Total Network Stake": "전체 네트워크 스테이킹 총량",
   "BP self-stake + voting stake": "BP 자체 스테이킹 + 투표 스테이킹",
   "Total node votes": "노드 총 투표수",
-  "Registered": "등록됨"
+  "Registered": "등록됨",
+  "Redeem BP self-stake": "BP 자체 스테이크 상환", "Redemption amount": "상환 수량",
+  "A bond never used for registration is returned immediately. A committed bond follows the on-chain unlocking period.": "등록에 사용되지 않은 보증금은 즉시 반환됩니다. 등록에 사용된 보증금은 온체인 잠금 해제 기간을 따릅니다.",
+  "Pending refund": "대기 중인 환불", "Available at": "수령 가능 시각", "Available now": "지금 수령 가능", "Unlocking": "잠금 해제 중",
+  "Claim unlocked FLON": "잠금 해제된 FLON 수령", "Cancel redemption and restore stake": "상환 취소 및 스테이크 복원",
+  "BP self-stake redemption broadcast": "BP 자체 스테이크 상환 거래 전송됨", "BP self-stake refund claimed": "BP 자체 스테이크 환불 수령됨",
+  "Redemption cancelled and stake restored": "상환 취소 및 스테이크 복원 완료", "Generation": "세대",
+  "Committed to BP registration": "BP 등록에 사용됨", "Not yet committed to BP registration": "BP 등록에 아직 사용되지 않음",
+  "A new staking generation cannot start while a refund is pending. Claim or cancel the refund first.": "환불이 대기 중이면 새 스테이크 세대를 시작할 수 없습니다. 먼저 환불을 수령하거나 상환을 취소하세요.",
+  "Enter a valid amount no greater than the current self-stake": "현재 자체 스테이크 이하의 유효한 수량을 입력하세요",
+  "BP self-stake is a candidate bond. It neither mints GLON nor counts as DAO governance power.": "BP 자체 스테이크는 후보자 보증금입니다. GLON을 발행하지 않으며 DAO 거버넌스 권한에도 포함되지 않습니다."
 };

@@ -209,6 +209,9 @@ export default {
   "Official website": "Sitio web oficial",
   "X account": "cuenta x",
   "Country or region": "País o región",
+  "Search country or region": "Buscar país o región",
+  "Select a country or region": "Seleccione un país o región",
+  "No matching country or region": "No hay ningún país o región coincidente",
   "Mainland China": "China continental",
   "Hong Kong SAR": "RAE de Hong Kong",
   "Japan": "Japón",
@@ -547,5 +550,15 @@ export default {
   "Total Network Stake": "Stake total de la red",
   "BP self-stake + voting stake": "Stake propio de BP + stake de votación",
   "Total node votes": "Votos totales de nodos",
-  "Registered": "Registrados"
+  "Registered": "Registrados",
+  "Redeem BP self-stake": "Retirar auto-stake de BP", "Redemption amount": "Cantidad a retirar",
+  "A bond never used for registration is returned immediately. A committed bond follows the on-chain unlocking period.": "Una garantía nunca usada para el registro se devuelve de inmediato. Una garantía comprometida sigue el período de desbloqueo on-chain.",
+  "Pending refund": "Reembolso pendiente", "Available at": "Disponible en", "Available now": "Disponible ahora", "Unlocking": "Desbloqueando",
+  "Claim unlocked FLON": "Reclamar FLON desbloqueado", "Cancel redemption and restore stake": "Cancelar retiro y restaurar stake",
+  "BP self-stake redemption broadcast": "Transacción de retiro del auto-stake de BP enviada", "BP self-stake refund claimed": "Reembolso del auto-stake de BP reclamado",
+  "Redemption cancelled and stake restored": "Retiro cancelado y stake restaurado", "Generation": "Generación",
+  "Committed to BP registration": "Comprometido con el registro de BP", "Not yet committed to BP registration": "Aún no comprometido con el registro de BP",
+  "A new staking generation cannot start while a refund is pending. Claim or cancel the refund first.": "No se puede iniciar una nueva generación de stake mientras haya un reembolso pendiente. Reclámalo o cancélalo primero.",
+  "Enter a valid amount no greater than the current self-stake": "Introduce una cantidad válida que no supere el auto-stake actual",
+  "BP self-stake is a candidate bond. It neither mints GLON nor counts as DAO governance power.": "El auto-stake de BP es una garantía de candidatura. No crea GLON ni cuenta como poder de gobernanza DAO."
 };

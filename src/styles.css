@@ -52,7 +52,11 @@
   .sheet .wizard-form{gap:11px}
   .sheet .wizard-form input:not([type="range"]),.sheet .wizard-form select,.sheet .wizard-form textarea{min-height:44px;font-size:16px}
   .sheet .sheet-actions{position:sticky;bottom:-14px;z-index:4;margin:14px -16px -14px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(255,255,255,.72),#fff 18%);border-top:1px solid rgba(225,229,239,.75)}
+  .sheet.is-keyboard-open{scroll-padding-top:18px;scroll-padding-bottom:24px}
+  .sheet.is-keyboard-open .sheet-actions{position:static;margin:14px 0 0;padding:10px 0 calc(6px + env(safe-area-inset-bottom));background:#fff}
 }
+.wizard-form .region-picker input+select{margin-top:7px}
+.bp-refund-card{margin-top:12px;padding:13px;border:1px solid #f0d5a5;border-radius:12px;background:#fffaf0}.bp-refund-card>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:12px}.bp-refund-card strong{font-size:11px}.bp-refund-card b{font-size:12px}.bp-refund-card small{display:block;margin-top:5px;color:#996000;font-size:9px}.bp-refund-card p{margin:8px 0 0;color:var(--muted);font-size:9px;line-height:1.5}.bp-refund-card .sheet-actions{margin-top:11px}
 
 /* Status remains visible independently from the blue vote-selection state. */
 .select-node.status-active{border-color:#bde7dc;background:#fbfffd}.select-node.status-standby{border-color:#f1d8aa;background:#fffdf8}.select-node.status-active .node-main b{color:var(--success)}.select-node.status-standby .node-main b{color:#b36b00}.select-node.status-candidate .node-main b{color:var(--muted)}.select-node.status-active.is-selected,.select-node.status-standby.is-selected{border-color:#83a7ff;background:linear-gradient(90deg,#f8faff,#fff)}
