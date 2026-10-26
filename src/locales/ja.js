@@ -209,6 +209,9 @@ export default {
   "Official website": "公式サイト",
   "X account": "Xアカウント",
   "Country or region": "国または地域",
+  "Search country or region": "国または地域を検索",
+  "Select a country or region": "国または地域を選択",
+  "No matching country or region": "一致する国または地域がありません",
   "Mainland China": "中国本土",
   "Hong Kong SAR": "香港特別行政区",
   "Japan": "日本",
@@ -547,5 +550,15 @@ export default {
   "Total Network Stake": "ネットワーク総ステーク量",
   "BP self-stake + voting stake": "BP自己ステーク + 投票ステーク",
   "Total node votes": "ノード投票総数",
-  "Registered": "登録済み"
+  "Registered": "登録済み",
+  "Redeem BP self-stake": "BP自己ステークを引き出す", "Redemption amount": "引き出し数量",
+  "A bond never used for registration is returned immediately. A committed bond follows the on-chain unlocking period.": "登録に使用されていない保証金は直ちに返却されます。登録済みの保証金はオンチェーンのロック解除期間に従います。",
+  "Pending refund": "返金待ち", "Available at": "受取可能日時", "Available now": "現在受取可能", "Unlocking": "ロック解除中",
+  "Claim unlocked FLON": "解除済みFLONを受け取る", "Cancel redemption and restore stake": "引き出しを取り消してステークを復元",
+  "BP self-stake redemption broadcast": "BP自己ステーク引き出し取引を送信しました", "BP self-stake refund claimed": "BP自己ステーク返金を受け取りました",
+  "Redemption cancelled and stake restored": "引き出しを取り消し、ステークを復元しました", "Generation": "世代",
+  "Committed to BP registration": "BP登録に使用済み", "Not yet committed to BP registration": "BP登録には未使用",
+  "A new staking generation cannot start while a refund is pending. Claim or cancel the refund first.": "返金処理中は新しいステーク世代を開始できません。先に返金を受け取るか引き出しを取り消してください。",
+  "Enter a valid amount no greater than the current self-stake": "現在の自己ステーク以下の有効な数量を入力してください",
+  "BP self-stake is a candidate bond. It neither mints GLON nor counts as DAO governance power.": "BP自己ステークは候補者保証金です。GLONは発行されず、DAOガバナンス権にも算入されません。"
 };

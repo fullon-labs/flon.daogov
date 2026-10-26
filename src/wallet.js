@@ -310,12 +310,16 @@ export async function loadBPAccount(account){
   const recoverySupported=actions.some(item=>item.name==='resumeprod')&&tables.some(item=>item.name==='bpstatus');
   const selfStakeSupported=actions.some(item=>item.name==='stakebp')&&
     tables.some(item=>item.name==='bpstakecfg')&&tables.some(item=>item.name==='bpstakes');
+  const selfStakeRefundSupported=selfStakeSupported&&actions.some(item=>item.name==='unstakebp')&&
+    actions.some(item=>item.name==='claimbpstake')&&tables.some(item=>item.name==='bpstkrefund');
+  const cancelBPRefundSupported=selfStakeRefundSupported&&actions.some(item=>item.name==='cancelbpref');
   const requests=[
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'producers',lower_bound:account,upper_bound:account,limit:1}),
   ];
   if(selfStakeSupported){
     requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakecfg',limit:1}));
     requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakes',lower_bound:account,upper_bound:account,limit:1}));
+    if(selfStakeRefundSupported)requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstkrefund',lower_bound:account,upper_bound:account,limit:1}));
   }
   if(recoverySupported){
     requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstatus',lower_bound:account,upper_bound:account,limit:1}));
@@ -324,10 +328,11 @@ export async function loadBPAccount(account){
   }
   const results=await Promise.all(requests);
   const producerRows=results[0];
-  let cursor=1,selfStakeConfig=null,selfStake=null;
+  let cursor=1,selfStakeConfig=null,selfStake=null,selfStakeRefund=null;
   if(selfStakeSupported){
     selfStakeConfig=results[cursor++]?.rows?.[0]||null;
     selfStake=results[cursor++]?.rows?.find(row=>row.owner===account)||null;
+    if(selfStakeRefundSupported)selfStakeRefund=results[cursor++]?.rows?.find(row=>row.owner===account)||null;
   }
   const statusRows=recoverySupported?results[cursor++]:null;
   const epochRows=recoverySupported?results[cursor++]:null;
@@ -345,7 +350,7 @@ export async function loadBPAccount(account){
     const statsRows=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:String(calculatedEpoch),table:'bpstats',lower_bound:account,upper_bound:account,limit:1});
     currentStats=statsRows.rows?.find(row=>row.producer===account)||null;
   }
-  return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,selfStakeSupported,selfStakeConfig,selfStake,supported:true};
+  return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,selfStakeSupported,selfStakeRefundSupported,cancelBPRefundSupported,selfStakeConfig,selfStake,selfStakeRefund,headTime,supported:true};
 }
 export async function loadProducerRewards(producer){
   if(!/^[a-z1-5.]{1,12}$/.test(String(producer||'')))throw new Error('INVALID_BP_ACCOUNT');

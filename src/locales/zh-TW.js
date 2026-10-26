@@ -209,6 +209,9 @@ export default {
   "Official website": "官方網站",
   "X account": "X帳戶",
   "Country or region": "國家或地區",
+  "Search country or region": "搜尋國家或地區",
+  "Select a country or region": "請選擇國家或地區",
+  "No matching country or region": "找不到相符的國家或地區",
   "Mainland China": "中國大陸",
   "Hong Kong SAR": "中國香港",
   "Japan": "日本",
@@ -589,5 +592,15 @@ export default {
   "Enforce self-stake requirement in scheduling": "是否在排班中強制執行自質押門檻",
   "Minimum BP self-stake": "最低 BP 自質押",
   "Self-stake unlock period (seconds)": "自質押解鎖期（秒）",
-  "Enter the unlock period in seconds; 21 days is 1814400 seconds. The new value only affects unstake requests created after it takes effect; existing pending refunds are unchanged.": "解鎖期以秒為單位；21 天為 1814400 秒。新數值只影響生效後建立的退出申請，既有待退款記錄不會改變。"
+  "Enter the unlock period in seconds; 21 days is 1814400 seconds. The new value only affects unstake requests created after it takes effect; existing pending refunds are unchanged.": "解鎖期以秒為單位；21 天為 1814400 秒。新數值只影響生效後建立的退出申請，既有待退款記錄不會改變。",
+  "Redeem BP self-stake": "贖回 BP 自質押", "Redemption amount": "贖回數量",
+  "A bond never used for registration is returned immediately. A committed bond follows the on-chain unlocking period.": "尚未用於註冊的保證金會立即退回；已投入註冊的保證金依鏈上解鎖期處理。",
+  "Pending refund": "待領取退款", "Available at": "可領取時間", "Available now": "現在可領取", "Unlocking": "等待解鎖",
+  "Claim unlocked FLON": "領取已解鎖 FLON", "Cancel redemption and restore stake": "取消贖回，恢復質押",
+  "BP self-stake redemption broadcast": "BP 自質押贖回交易已廣播", "BP self-stake refund claimed": "BP 自質押退款已領取",
+  "Redemption cancelled and stake restored": "贖回已取消，質押已恢復", "Generation": "生命週期",
+  "Committed to BP registration": "已用於 BP 註冊", "Not yet committed to BP registration": "尚未用於 BP 註冊",
+  "A new staking generation cannot start while a refund is pending. Claim or cancel the refund first.": "有待處理退款時，不能開始新一輪質押。請先領取退款或取消贖回。",
+  "Enter a valid amount no greater than the current self-stake": "請輸入不超過目前自質押的有效數量",
+  "BP self-stake is a candidate bond. It neither mints GLON nor counts as DAO governance power.": "BP 自質押是候選人保證金，不會生成 GLON，也不計入 DAO 治理權。"
 };
