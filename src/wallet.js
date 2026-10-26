@@ -201,6 +201,17 @@ export async function restoreWallet(){
   const stored=load();if(!stored)return null;
   try{
     assertChain(stored.chainId);
+    // The HuFu container can change its transport between releases (or after
+    // reopening a DApp). Prefer the transport exposed by the current page over
+    // the cached provider label, otherwise an old `hufu` session can call the
+    // injected bridge while the page is actually hosted by HuFuClient.
+    const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
+    if(runtimeClient.isInIframe()){
+      const info=await timeout(runtimeClient.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
+      const account=normalizeAccount(await timeout(runtimeClient.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
+      if(!account||account.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
+      return save({...stored,provider:'iframe'});
+    }
     if(stored.provider==='hufu'&&isHuFuApp()){
       const current=accountSnapshot(window.HuFu);
       if(current&&current.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
@@ -500,6 +511,19 @@ export async function loadChainGovernanceParameters(){
 export async function transact(session,actions){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
+  // Detect the live HuFu transport on every signing attempt. A session may
+  // have been saved as `hufu` by an older page load while the current HuFu
+  // WebView exposes the iframe Client transport. Client.transact is the native
+  // transaction sheet entry point in that environment and must win over the
+  // stale cached label.
+  const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
+  if(runtimeClient.isInIframe()){
+    return timeout(
+      Promise.resolve(runtimeClient.transact(authorized)),
+      hufuTransactionTimeoutMilliseconds,
+      'HUFU_IFRAME_TRANSACTION_TIMEOUT',
+    );
+  }
   if(session.provider==='hufu'){
     const provider=window.HuFu;if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
@@ -518,7 +542,7 @@ export async function transact(session,actions){
     );
   }
   const info=await rpcInfo();assertFreshChainTime(info);
-  if(session.provider==='iframe')return window.__DAO_HUFU_CLIENT__.transact(authorized);
+  if(session.provider==='iframe')throw new Error('IFRAME_SESSION_EXPIRED');
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
 }
