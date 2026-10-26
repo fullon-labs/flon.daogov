@@ -35,25 +35,39 @@ test('HuFu testnet reaches the native signer without awaiting RPC TAPOS preparat
   assert.match(branch.slice(networkChoice,nativeSigner),/: \{actions:authorized\}/);
 });
 
-test('the live iframe transport wins over a stale injected-provider session',()=>{
+test('the iframe transport is used only by an iframe wallet session',()=>{
   const start=walletSource.indexOf('export async function transact(session,actions)');
   const hufu=walletSource.indexOf("if(session.provider==='hufu')",start);
   const branch=walletSource.slice(start,hufu);
 
   assert.ok(start>=0&&hufu>start,'transaction dispatch was not found');
-  assert.match(branch,/runtimeClient\.isInIframe\(\)/);
+  assert.match(branch,/session\.provider==='iframe'&&runtimeClient\.isInIframe\(\)/);
   assert.match(branch,/runtimeClient\.transact\(authorized\)/);
   assert.match(branch,/HUFU_IFRAME_TRANSACTION_TIMEOUT/);
 });
 
-test('wallet restore upgrades a stale HuFu provider label to iframe',()=>{
+test('wallet restore does not treat iframe geometry as wallet authorization',()=>{
   const start=walletSource.indexOf('export async function restoreWallet()');
   const end=walletSource.indexOf('export async function connectWallet()',start);
   const branch=walletSource.slice(start,end);
 
   assert.ok(start>=0&&end>start,'wallet restore branch was not found');
-  assert.ok(branch.indexOf('runtimeClient.isInIframe()')<branch.indexOf("stored.provider==='hufu'"));
-  assert.match(branch,/save\(\{\.\.\.stored,provider:'iframe'\}\)/);
+  assert.match(branch,/stored\.provider==='iframe'&&runtimeClient\.isInIframe\(\)/);
+  assert.ok(branch.indexOf("stored.provider==='iframe'&&runtimeClient.isInIframe()")<branch.indexOf("stored.provider==='hufu'"));
+});
+
+test('a cached injected session requires live HuFu authorization',()=>{
+  const restoreStart=walletSource.indexOf('export async function restoreWallet()');
+  const restoreEnd=walletSource.indexOf('export async function connectWallet()',restoreStart);
+  const restore=walletSource.slice(restoreStart,restoreEnd);
+  const autoStart=walletSource.indexOf('export function autoConnectHuFuWallet()');
+  const autoEnd=walletSource.indexOf('export async function disconnectWallet()',autoStart);
+  const auto=walletSource.slice(autoStart,autoEnd);
+
+  assert.match(restore,/if\(!current\)return null/);
+  assert.match(restore,/injectedAuthorizationReady=true/);
+  assert.match(auto,/provider\.requestAccountsHuFu/);
+  assert.match(auto,/injectedAuthorizationReady=true/);
 });
 
 test('HuFu TAPOS uses irreversible block data and chain-derived expiration',()=>{
