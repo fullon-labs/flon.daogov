@@ -30,7 +30,7 @@
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
-    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
+    <symbol id="i-help-doc" viewBox="0 0 24 24"><path d="M4 5.5c2.7-.8 5.3-.3 8 1.5v13c-2.7-1.8-5.3-2.3-8-1.5zM20 5.5c-2.7-.8-5.3-.3-8 1.5v13c2.7-1.8 5.3-2.3 8-1.5z"/><path d="M7 9.5h2.5M7 13h2.5M14.5 9.5H17M14.5 13H17"/></symbol>
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 4.5 6.2 4.5 9S15 17.8 12 21M12 3C9 6.2 7.5 9.2 7.5 12S9 17.8 12 21"/></symbol>
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 16-1 5 5-1L19 9l-4-4zM13 7l4 4"/></symbol>
     <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v6H5V6h6"/></symbol>
@@ -53,15 +53,16 @@
             <button type="button" role="menuitemradio" data-language-option="zh-TW">繁體中文</button>
           </div>
         </div>
-        <button class="icon-button" type="button" aria-label="治理帮助" data-action="help"><svg><use href="#i-info"/></svg></button>
+        <button class="icon-button" type="button" aria-label="治理帮助" data-action="help"><svg><use href="#i-help-doc"/></svg></button>
       </div>
     </header>
 
     <main id="main">
       <section class="view is-active" data-view="overview">
         <div class="content overview-content">
+          <div class="page-heading"><span><small>网络与治理</small><h1>概览</h1></span></div>
           <section class="section network-overview">
-            <div class="section-title"><h2>网络概况</h2><button type="button" data-view-target="nodes">节点排名</button></div>
+            <div class="section-title"><h2>网络概况</h2></div>
             <div class="metric-grid network-metric-grid">
               <article class="bp-composition-card">
                 <small>BP 构成</small>
@@ -72,8 +73,8 @@
                 </div>
                 <div class="bp-production"><span><b class="din" data-production-rate>—</b><em>网络出块率</em></span><small data-production-source>正在读取链上封存 Epoch…</small></div>
               </article>
-              <article><small>BP 总质押</small><strong class="din metric-asset" data-total-bp-stake>— FLON</strong><span>flon::bpstakes</span></article>
-              <article><small>治理总票权</small><strong class="din metric-asset" data-total-governance-power>— GLON</strong><span>GLON supply</span></article>
+              <article><small>BP 自质押总量</small><strong class="din metric-asset" data-total-bp-stake>— FLON</strong><span>flon::bpstakes</span></article>
+              <article><small>全网质押总量</small><strong class="din metric-asset" data-total-network-stake>— FLON</strong><span>BP 自质押 + 投票质押</span></article>
             </div>
           </section>
 

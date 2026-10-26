@@ -9,13 +9,16 @@ test('summarizes BP stake, allocated votes, and GLON supply without floating poi
     {GLON:{supply:'99.00000000 GLON'}},
   ),{
     totalBpStake:'3.50000001 FLON',
+    totalNetworkStake:'102.50000001 FLON',
     totalVotes:'50.00000011 FLON',
     governancePower:'99.00000000 GLON',
   });
 });
 
 test('uses an explicit unavailable value when GLON stats cannot be read',()=>{
-  assert.equal(summarizeNetworkEconomics([],[],{}).governancePower,'— GLON');
+  const summary=summarizeNetworkEconomics([],[],{});
+  assert.equal(summary.governancePower,'— GLON');
+  assert.equal(summary.totalNetworkStake,'— FLON');
 });
 
 test('removes meaningless trailing zeroes while preserving real precision',()=>{

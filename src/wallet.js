@@ -12,6 +12,7 @@ const rewardEpochMilliseconds=21600000;
 const blockTimestampEpochMilliseconds=Date.UTC(2000,0,1);
 const transactionOptions={blocksBehind:3,expireSeconds:300};
 const hufuTransactionTimeoutMilliseconds=45000;
+const hufuExpirationSeconds=120;
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
@@ -53,6 +54,32 @@ async function rpcInfo(){
 function utcMilliseconds(value){
   const text=String(value||'');
   return Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(text)?text:`${text}Z`);
+}
+function blockPrefixFromId(blockId){
+  const normalized=String(blockId||'').trim().toLowerCase();
+  if(!/^[0-9a-f]{64}$/.test(normalized))throw new Error('INVALID_IRREVERSIBLE_BLOCK_ID');
+  const bytes=Uint8Array.from(normalized.match(/../g).map(byte=>Number.parseInt(byte,16)));
+  return new DataView(bytes.buffer).getUint32(8,true);
+}
+function expirationFromChainTime(chainTime){
+  const timestamp=utcMilliseconds(chainTime);
+  if(!Number.isFinite(timestamp))throw new Error('INVALID_HEAD_BLOCK_TIME');
+  return new Date(timestamp+hufuExpirationSeconds*1000).toISOString().slice(0,19);
+}
+async function prepareHuFuTransaction(actions){
+  const info=await rpcInfo();assertFreshChainTime(info);
+  if(!Number.isSafeInteger(info.last_irreversible_block_num)||!info.last_irreversible_block_id)throw new Error('INCOMPLETE_RPC_INFO');
+  return {
+    expiration:expirationFromChainTime(info.head_block_time),
+    ref_block_num:info.last_irreversible_block_num&0xffff,
+    ref_block_prefix:blockPrefixFromId(info.last_irreversible_block_id),
+    max_net_usage_words:0,
+    max_cpu_usage_ms:0,
+    delay_sec:0,
+    context_free_actions:[],
+    actions,
+    transaction_extensions:[],
+  };
 }
 function normalizeRewardPlans(value){
   const rows=Array.isArray(value)?value:(value?[value]:[]);
@@ -474,18 +501,15 @@ export async function transact(session,actions){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
   if(session.provider==='hufu'){
-    // HuFu must receive transact in the original button-click task. Awaiting
-    // RPC or provider discovery first loses the native WebView interaction
-    // context in affected app versions, leaving the returned promise pending
-    // without ever presenting the approval sheet.
     const provider=window.HuFu;if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
-    // Keep the signing gesture free of RPC, provider reads, native switch
-    // calls, and account selection. The domain-scoped session and page RPC
-    // were verified while loading the transaction preview.
     confirmTransactionSnapshot(provider,current,session.chainId);
+    // HuFu's native signer does not consistently synthesize TAPOS for newer
+    // system-contract actions. Prepare the complete transaction against this
+    // DApp's verified RPC, while keeping account selection out of the flow.
+    const transaction=await prepareHuFuTransaction(authorized);
     return timeout(
-      Promise.resolve(provider.transact({transaction:{actions:authorized}})),
+      Promise.resolve(provider.transact({transaction})),
       hufuTransactionTimeoutMilliseconds,
       'HUFU_TRANSACTION_TIMEOUT',
     );

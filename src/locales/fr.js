@@ -16,6 +16,7 @@ export default {
   "Wallet connected": "Portefeuille connecté",
   "Wallet disconnected": "Portefeuille déconnecté",
   "Overview": "Aperçu",
+  "Network & governance": "Réseau et gouvernance",
   "Vote": "Voter",
   "Governance": "Gouvernance",
   "Profile": "Profil",
@@ -536,7 +537,9 @@ export default {
   "Search & sort": "Rechercher et trier",
   "Hide filters": "Masquer les filtres",
   "BP composition": "Composition des BP",
-  "Total BP self-stake": "Auto-stake total des BP",
+  "Total BP Self-Stake": "Total du staking propre des BP",
+  "Total Network Stake": "Staking total du réseau",
+  "BP self-stake + voting stake": "Staking propre des BP + staking de vote",
   "Total node votes": "Total des votes des nœuds",
   "Registered": "Inscrits"
 };
