@@ -18,6 +18,7 @@ export function summarizeNetworkEconomics(producers=[],stakes=[],glonStats={}){
   const supply=glonStats?.GLON?.supply;
   return {
     totalBpStake:formatUnits(totalStakeUnits,'FLON'),
+    totalNetworkStake:typeof supply==='string'?formatUnits(totalStakeUnits+unitsFromAsset(supply),'FLON'):'— FLON',
     totalVotes:formatUnits(totalVoteUnits,'FLON'),
     governancePower:typeof supply==='string'?supply:'— GLON',
   };

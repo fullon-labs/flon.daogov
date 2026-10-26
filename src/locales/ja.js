@@ -16,6 +16,7 @@ export default {
   "Wallet connected": "ウォレットが接続されました",
   "Wallet disconnected": "ウォレットが切断されました",
   "Overview": "概要",
+  "Network & governance": "ネットワークとガバナンス",
   "Vote": "投票する",
   "Governance": "ガバナンス",
   "Profile": "プロフィール",
@@ -536,7 +537,9 @@ export default {
   "Search & sort": "検索と並べ替え",
   "Hide filters": "フィルターを非表示にする",
   "BP composition": "BP構成",
-  "Total BP self-stake": "BP自己ステーク合計",
+  "Total BP Self-Stake": "BP自己ステーク総量",
+  "Total Network Stake": "ネットワーク総ステーク量",
+  "BP self-stake + voting stake": "BP自己ステーク + 投票ステーク",
   "Total node votes": "ノード投票総数",
   "Registered": "登録済み"
 };

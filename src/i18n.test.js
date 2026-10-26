@@ -51,3 +51,30 @@ test('every non-English locale covers all page vocabulary',()=>{
     }
   }
 });
+
+test('Traditional Chinese overview uses native product terminology',()=>{
+  const terms=generatedLocaleTerms['zh-TW'];
+  assert.equal(terms['Overview'],'概覽');
+  assert.equal(terms['Network overview'],'網路概況');
+  assert.equal(terms['Block production'],'網路出塊率');
+  assert.equal(terms['Action required'],'待處理事項');
+  assert.equal(terms['Claim voter rewards'],'領取投票獎勵');
+  assert.equal(terms['Total governance power'],'治理總票權');
+  assert.equal(terms['FullOn Mainnet'],'FullOn 主網');
+});
+
+test('help center copy is localized in every supported non-English locale',()=>{
+  const helpKeys=[
+    'Governance Help Center',
+    'Learn node voting, DAO decisions, epochs, and reward claims',
+    'Proposal lifecycle and Timelock',
+    'Rewards are claimed, not airdropped',
+    'Verify the network, Chain ID, account, contract, action, parameters, and recipient. Help content is not transaction authorization; only the actual transaction shown by the wallet is signed.'
+  ];
+  for(const locale of ['fr','ja','ko','es','zh-TW']){
+    for(const key of helpKeys){
+      assert.equal(typeof generatedLocaleTerms[locale][key],'string',`${locale} is missing help copy: ${key}`);
+      assert.notEqual(generatedLocaleTerms[locale][key],key,`${locale} still renders English help copy: ${key}`);
+    }
+  }
+});

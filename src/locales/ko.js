@@ -16,6 +16,7 @@ export default {
   "Wallet connected": "지갑이 연결됨",
   "Wallet disconnected": "지갑 연결이 끊어졌습니다.",
   "Overview": "개요",
+  "Network & governance": "네트워크 및 거버넌스",
   "Vote": "투표",
   "Governance": "거버넌스",
   "Profile": "프로필",
@@ -536,7 +537,9 @@ export default {
   "Search & sort": "검색 및 정렬",
   "Hide filters": "필터 숨기기",
   "BP composition": "BP 구성",
-  "Total BP self-stake": "BP 자체 스테이킹 합계",
+  "Total BP Self-Stake": "BP 자체 스테이킹 총량",
+  "Total Network Stake": "전체 네트워크 스테이킹 총량",
+  "BP self-stake + voting stake": "BP 자체 스테이킹 + 투표 스테이킹",
   "Total node votes": "노드 총 투표수",
   "Registered": "등록됨"
 };
