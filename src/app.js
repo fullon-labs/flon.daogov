@@ -32,6 +32,9 @@ let profileBPRewards=null;
 let electionState=null;
 let governanceState=null;
 let discussionState={loading:true,items:[],session:null,error:''};
+const governancePageSize=12;
+let visibleDiscussionCount=governancePageSize;
+let visibleProposalCount=governancePageSize;
 const discussions=createDiscussionsClient({baseUrl:runtimeConfig.discussionApiUrl,network:runtimeConfig.network});
 const contractAbiCache=new Map();
 const proposalActionChecks=new WeakMap();
@@ -129,7 +132,7 @@ const translations=new Map([
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['治理内容','Governance content'],['治理提案','Governance proposals'],['发起讨论','Start discussion'],['先讨论和完善社区议题，再形成链上治理提案。','Discuss and refine community topics before creating an on-chain proposal.'],['正在读取社区讨论…','Loading community discussions…'],['讨论服务暂未接入','Discussion service is not connected'],['链上提案仍可正常使用。配置统一社区 API 后，这里将显示 GitHub Discussions。','On-chain proposals remain available. GitHub Discussions will appear here after the unified community API is configured.'],['尚无社区讨论','No community discussions yet'],['条回复','replies'],['查看讨论','View discussion'],['查看提案','View proposal'],['发起社区讨论','Start a community discussion'],['讨论将通过统一 API 发布到 GitHub Discussions，成熟后可进一步创建链上提案。','The discussion is published to GitHub Discussions through the unified API and can later become an on-chain proposal.'],['讨论内容','Discussion'],['至少输入 3 个字符','Enter at least 3 characters'],['发布讨论','Publish discussion'],['社区讨论已发布','Community discussion published'],['标题或讨论内容过短','The title or discussion is too short'],['发布讨论失败，请稍后重试','Could not publish the discussion. Try again later'],['正在读取讨论详情…','Loading discussion details…'],['社区回复','Community replies'],['暂无回复','No replies yet'],['回复讨论','Reply to discussion'],['发布回复','Publish reply'],['回复已发布','Reply published'],['读取讨论详情失败，请稍后重试','Could not load the discussion. Try again later'],['发布回复失败，请稍后重试','Could not publish the reply. Try again later']
-  ,['社区表态仅用于讨论，不代替链上治理投票。','Community sentiment is for discussion only and does not replace on-chain governance voting.']
+  ,['社区表态仅用于讨论，不代替链上治理投票。','Community sentiment is for discussion only and does not replace on-chain governance voting.'],['加载更多','Load more']
 ].forEach(([zh,en])=>translations.set(zh,en));
 const languageLabels={en:'English',fr:'Français',ja:'日本語',ko:'한국어',es:'Español','zh-CN':'简体中文','zh-TW':'繁體中文'};
 const supportedLanguages=new Set(Object.keys(languageLabels));
@@ -372,7 +375,9 @@ function renderGovernance(){
   setText('[data-governance-summary]',configured?`${proposals.length} 个链上提案 · 总治理权 ${formatOverviewAsset(governanceState.global?.total_power||'0.00000000 GLON')}`:'治理参数尚未配置');
   const create=document.querySelector('[data-action="create-proposal"]');if(create)create.disabled=!configured;
   if(!configured){list.innerHTML='<div class="inline-error">dao.gov 已部署，但治理参数尚未配置。配置完成前不能发起提案。</div>';preview.innerHTML='<div class="inline-error">治理参数尚未配置</div>';applyTranslations();return}
-  list.innerHTML=proposals.length?proposals.map(proposalCard).join(''):'<div class="empty-state">尚无链上提案</div>';
+  document.querySelectorAll('[data-proposal-count]').forEach(node=>node.textContent=String(proposals.length));
+  const visible=proposals.slice(0,visibleProposalCount);
+  list.innerHTML=proposals.length?`${visible.map(proposalCard).join('')}${visible.length<proposals.length?`<button class="list-load-more" type="button" data-action="governance-load-more" data-list="proposals">${escapeHtml(translateText('加载更多'))}（${proposals.length-visible.length}）</button>`:''}`:'<div class="empty-state">尚无链上提案</div>';
   preview.innerHTML=proposals.length?proposalCard(proposals[0]):'<div class="empty-state">尚无链上提案</div>';
   if(!discussionState.loading)renderDiscussions();
   applyTranslations();
@@ -397,7 +402,9 @@ function renderDiscussions(){
   if(discussionState.loading){list.innerHTML='<div class="loading-state"><i></i><span>正在读取社区讨论…</span></div>';return}
   if(discussionState.error){list.innerHTML='<div class="discussion-unavailable"><strong>讨论服务暂未接入</strong><p>链上提案仍可正常使用。配置统一社区 API 后，这里将显示 GitHub Discussions。</p></div>';if(create)create.disabled=true;applyTranslations(list);return}
   if(create)create.disabled=false;
-  list.innerHTML=discussionState.items.length?discussionState.items.map(discussionCard).join(''):'<div class="empty-state">尚无社区讨论</div>';
+  document.querySelectorAll('[data-discussion-count]').forEach(node=>node.textContent=String(discussionState.items.length));
+  const visible=discussionState.items.slice(0,visibleDiscussionCount);
+  list.innerHTML=discussionState.items.length?`${visible.map(discussionCard).join('')}${visible.length<discussionState.items.length?`<button class="list-load-more" type="button" data-action="governance-load-more" data-list="discussions">${escapeHtml(translateText('加载更多'))}（${discussionState.items.length-visible.length}）</button>`:''}`:'<div class="empty-state">尚无社区讨论</div>';
   applyTranslations(list);
 }
 async function refreshDiscussions(){
@@ -443,7 +450,7 @@ function governanceExecutableRules(){
 }
 function openProposalDetails(id){
   const proposal=findProposal(id);if(!proposal)return;const policy=proposalPolicy(id),action=governanceActionFor(proposal),forum=safePublicUrl(proposal.discussion_uri),metadata=safePublicUrl(proposal.metadata_uri);
-  openSheet(`<h2 id="sheet-title">${escapeHtml(proposal.title)}</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml((DAO_STATUS_META[Number(proposal.status)]||['未知'])[0])}</p><div class="sign-summary"><div><span>提案人</span><strong>${escapeHtml(proposal.proposer)}</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal.proposal_type)}</strong></div>${policy?`<div><span>风险等级</span><strong>L${Number(policy.risk_level)}</strong></div><div><span>最低全网票权</span><strong>${escapeHtml(policy.min_total_power||'待激活')}</strong></div><div><span>Quorum / 通过率 / 绝对支持</span><strong>${Number(policy.quorum_bps||0)/100}% / ${Number(policy.approval_bps||0)/100}% / ${Number(policy.min_support_bps||0)/100}%</strong></div>`:''}<div><span>附议</span><strong>${Number(proposal.endorsement_count||0)}</strong></div><div><span>赞成</span><strong>${escapeHtml(proposal.for_votes)}</strong></div><div><span>反对</span><strong>${escapeHtml(proposal.against_votes)}</strong></div><div><span>弃权</span><strong>${escapeHtml(proposal.abstain_votes)}</strong></div><div><span>拟议变更</span><strong>${proposal.actions?.length||0}</strong></div></div><p class="proposal-summary">${escapeHtml(proposal.summary)}</p><div class="profile-review">${metadata?`<strong>提案文档</strong><a href="${escapeHtml(metadata)}" target="_blank" rel="noopener noreferrer">${escapeHtml(metadata)}</a>`:''}${forum?`<strong>社区讨论</strong><a href="${escapeHtml(forum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(forum)}</a>`:'<strong>社区讨论</strong><small>尚未关联论坛讨论</small>'}</div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">关闭</button>${action?`<button class="primary-button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${proposal.proposal_id}">${escapeHtml(action.label)}</button>`:''}</div>`);
+  openSheet(`<h2 id="sheet-title">${escapeHtml(proposal.title)}</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml((DAO_STATUS_META[Number(proposal.status)]||['未知'])[0])}</p><div class="sign-summary"><div><span>提案人</span><strong>${escapeHtml(proposal.proposer)}</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal.proposal_type)}</strong></div>${policy?`<div><span>风险等级</span><strong>L${Number(policy.risk_level)}</strong></div><div><span>最低全网票权</span><strong>${escapeHtml(formatOverviewAsset(policy.min_total_power||'待激活'))}</strong></div><div><span>Quorum / 通过率 / 绝对支持</span><strong>${Number(policy.quorum_bps||0)/100}% / ${Number(policy.approval_bps||0)/100}% / ${Number(policy.min_support_bps||0)/100}%</strong></div>`:''}<div><span>附议</span><strong>${Number(proposal.endorsement_count||0)}</strong></div><div><span>赞成</span><strong>${escapeHtml(formatOverviewAsset(proposal.for_votes))}</strong></div><div><span>反对</span><strong>${escapeHtml(formatOverviewAsset(proposal.against_votes))}</strong></div><div><span>弃权</span><strong>${escapeHtml(formatOverviewAsset(proposal.abstain_votes))}</strong></div><div><span>拟议变更</span><strong>${proposal.actions?.length||0}</strong></div></div><p class="proposal-summary">${escapeHtml(proposal.summary)}</p><div class="profile-review">${metadata?`<strong>提案文档</strong><a href="${escapeHtml(metadata)}" target="_blank" rel="noopener noreferrer">${escapeHtml(metadata)}</a>`:''}${forum?`<strong>社区讨论</strong><a href="${escapeHtml(forum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(forum)}</a>`:'<strong>社区讨论</strong><small>尚未关联论坛讨论</small>'}</div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">关闭</button>${action?`<button class="primary-button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${proposal.proposal_id}">${escapeHtml(action.label)}</button>`:''}</div>`);
 }
 function openCreateProposal(prefill={}){
   if(!walletSession){openWalletSheet();return}if(!governanceState?.config){showToast('治理参数尚未配置');return}
@@ -571,10 +578,10 @@ async function openHelpCenter(){
     [zh?'执行宽限期':'Execution grace period',humanDuration(governanceConfig?.execution_grace_seconds,zh),'dao.gov::config']
   ];
   const riskRows=(governanceState?.riskConfigs||[]).filter(row=>row.enabled===true||Number(row.enabled)===1).sort((a,b)=>Number(a.risk_level)-Number(b.risk_level));
-  const riskTable=riskRows.length?`<div class="help-parameter-grid">${riskRows.map(row=>`<span><small>L${Number(row.risk_level)} · ${zh?'最低全网票权':'minimum network power'}</small><strong>${escapeHtml(row.min_total_power)}</strong><code>Q ${Number(row.quorum_bps)/100}% · ${zh?'通过':'approval'} ${Number(row.approval_bps)/100}% · ${zh?'绝对赞成':'absolute support'} ${Number(row.min_support_bps)/100}%</code></span>`).join('')}</div>`:`<p>${zh?'当前合约尚未配置 L1–L4 风险策略。未分类的可执行 action 不应进入投票。':'The contract has no L1-L4 risk policies yet. Unclassified executable actions must not enter voting.'}</p>`;
+  const riskTable=riskRows.length?`<div class="help-parameter-grid">${riskRows.map(row=>`<span><small>L${Number(row.risk_level)} · ${zh?'最低全网票权':'minimum network power'}</small><strong>${escapeHtml(formatOverviewAsset(row.min_total_power))}</strong><code>Q ${Number(row.quorum_bps)/100}% · ${zh?'通过':'approval'} ${Number(row.approval_bps)/100}% · ${zh?'绝对赞成':'absolute support'} ${Number(row.min_support_bps)/100}%</code></span>`).join('')}</div>`:`<p>${zh?'当前合约尚未配置 L1–L4 风险策略。未分类的可执行 action 不应进入投票。':'The contract has no L1-L4 risk policies yet. Unclassified executable actions must not enter voting.'}</p>`;
   const riskByLevel=new Map(riskRows.map(row=>[Number(row.risk_level),row]));
   const actionRows=governanceExecutableRules().sort((a,b)=>`${a.contract}::${a.action}`.localeCompare(`${b.contract}::${b.action}`)).map(rule=>{
-    const key=`${rule.contract}::${rule.action}`,level=Number(rule.riskLevel||0),risk=riskByLevel.get(level),requirements=risk?`${zh?'全网':'Network'} ${risk.min_total_power}<br>${zh?'提案':'Proposer'} ${risk.proposal_threshold}<br>${zh?'附议':'Endorser'} ${risk.endorsement_threshold} × ${Number(risk.required_endorsements)}`:(zh?'未配置':'Not configured');
+    const key=`${rule.contract}::${rule.action}`,level=Number(rule.riskLevel||0),risk=riskByLevel.get(level),requirements=risk?`${zh?'全网':'Network'} ${escapeHtml(formatOverviewAsset(risk.min_total_power))}<br>${zh?'提案':'Proposer'} ${escapeHtml(formatOverviewAsset(risk.proposal_threshold))}<br>${zh?'附议':'Endorser'} ${escapeHtml(formatOverviewAsset(risk.endorsement_threshold))} × ${Number(risk.required_endorsements)}`:(zh?'未配置':'Not configured');
     return `<tr><td><strong>${escapeHtml(governanceActionLabel(key))}</strong><code>${escapeHtml(key)}</code></td><td>${escapeHtml(governanceActionHelpText(key,0))}</td><td><b>L${level||'—'}</b></td><td>${requirements}</td><td>${escapeHtml(governanceActionHelpText(key,1))}</td></tr>`;
   });
   const actionTable=actionRows.length?`<div class="help-action-table-wrap"><table class="help-action-table"><thead><tr><th>Action</th><th>${zh?'目的':'Purpose'}</th><th>Level</th><th>${zh?'GLON 要求':'GLON requirements'}</th><th>${zh?'执行影响':'Execution impact'}</th></tr></thead><tbody>${actionRows.join('')}</tbody></table></div><p class="help-table-note">${zh?'“最低全网”是 activate 时全网治理总票权门槛，并非提案人个人持仓。GLON 只作治理权证明，提案、附议和投票均不会转账或消耗 GLON。':'The network minimum is checked against total governance power at activation, not the proposer balance. GLON proves governance power and is neither transferred nor consumed by proposing, endorsing, or voting.'}</p>`:`<p>${zh?'当前没有同时启用风险等级与执行白名单的 action。':'No action currently has both an enabled risk policy and execution allowlist rule.'}</p>`;
@@ -897,6 +904,10 @@ document.addEventListener('click',async event=>{
     if(item)openCreateProposal({title:item.title,summary:item.excerpt||item.body_text||item.body,discussionUri:item.url||item.html_url,metadataUri:item.url||item.html_url});
   }
   if(action==='create-discussion')openCreateDiscussion();
+  if(action==='governance-load-more'){
+    if(target.dataset.list==='discussions'){visibleDiscussionCount+=governancePageSize;renderDiscussions()}
+    if(target.dataset.list==='proposals'){visibleProposalCount+=governancePageSize;renderGovernance();document.querySelector('[data-proposal-filter].is-active')?.click()}
+  }
   if(action==='discussion-submit')await submitDiscussion(target);
   if(action==='discussion-details')await openDiscussionDetails(target.dataset.discussionIndex);
   if(action==='discussion-reply-submit')await submitDiscussionReply(target);
