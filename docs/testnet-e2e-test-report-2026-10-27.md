@@ -33,6 +33,7 @@
 - PASS：`hellotoworld` 新增投票本金 `4,000 FLON`，自动铸造等额 GLON 并调用 `dao.gov::syncpower`。交易：`2453e830a51df4472001483267791a4344200311a233241e3c9de2b6a0443cff`。
 - PASS：治理总票权由 `6,799` 自动更新为 `10,799 GLON`，无需管理员手工同步。
 - PASS：提交四个 BP 的非等额分配，总额 `9,300 FLON`；`pendingvote.activation_epoch=770`。交易：`e106f441a999cfc6dabd7b75759d35adcfe4770737e8874f80d7feaa067a0eea`。
+- FAIL（Epoch 770 封存后）：`rewardepoch.next_epoch_to_close=771` 且 `epochstats[770].closed=1`，但 `flon::pendingvote` 中 `hellotoworld` 的 `activation_epoch=770` 行仍未删除；`flon::voters` 仍显示旧的 `5300 FLON`，Active producer schedule 仍只有 `bpflowtest11/miner1111111/miner3333333` 三席。虽然 `flon::producers.total_votes` 已出现部分变动且四名 producer 的 `active=1`，但不能认定 pending vote 已被完整消费，需定位 Epoch 结算与 schedule 更新链路。
 - PASS：重复分配被拒绝：`producer vote allocations did not change`。
 - PASS：分配总额不等于锁定 FLON 被拒绝。
 - BLOCKED/等待：账户已有 `0.00000001 FLON` voter refund（2026-10-25 11:44:39 UTC），第二次 `subvote` 按规则被拒绝；需等待 72 小时后完成 refund 正向路径。
@@ -52,19 +53,28 @@
 - PASS：非 `dao.gov` 直接调用 `dao.treasury::reserve` 被拒绝：`missing authority of dao.gov`。
 - PASS：Treasury 入金 `10 FLON`，账本为 liquid/received `10 FLON`、reserved/paid `0`。交易：`549fa3ce996b87395b9b5e4b62ddf10dc1c817f69803582dc7e48dd2fbbbefe4`。
 - PASS：L3 可执行提案 #3 冻结 `dao.treasury::reserve` 的 78-byte action data，金额 `1 FLON`，并由两个独立账户完成附议。
-- 等待：L3 附议期、投票延迟、投票期和 Timelock 必须按链上真实时间经过，之后验证 permissionless execute 与 Treasury 守恒。
+- PASS：提案 #3 在附议期结束后由 `govvoter1111` permissionless activate，交易 `5a7afb3ca0558ab33f160d24b67d83ffc33310a29cab833c950570f04adedc1d`，区块 `21770734`，已不可逆。激活快照为 `10,799 GLON`，L3 quorum `25%`、approval `67%`；投票开始时间为 2026-10-27 13:13:26（北京时间），结束时间为 13:43:26。
+- PASS：投票延迟结束后，`hellotoworld` 使用快照票权投赞成票，交易 `bbd420396025e7776428076af53990c1d5432761fec42eef5d22ce79ef206013`，区块 `21770784`，已不可逆；链上 `for_votes=9,300 GLON`、against/abstain 均为 0。
+- PASS：投票期结束后由 `govvoter1111` permissionless finalize，交易 `25ef28f6c2d378e58c42abc1f3358b595177723f07bc593a526b9f152cd2d31b`，已观察至 LIB `21772096`。
+- PASS：通过后的提案由 `govvoter1111` permissionless queue，交易 `7fde5683d806469668fd8a98bd2823b04a687fac81e79f13773939410cfc22c2`，已观察至 LIB `21772109`；链上状态为 `6`（queued）。
+- PASS：Timelock 时间窗冻结为 `2026-10-27T10:38:12Z` 至 `2026-10-29T10:38:12Z`；执行前 Treasury 为 liquid `10 FLON`、reserved `0`、grants 空。
+- 等待：北京时间 2026-10-27 18:38:12 后执行 permissionless `execute`，并验证 reserve 后 liquid/reserved/grant 守恒。
 
 ## 3. Epoch / 出块率 / 奖励核算
 
 - 已在 Reward Epoch 769 封存前保存 before 快照：`bp-rewards-epoch769-before/`。
-- Epoch 769 自然结束时间约为北京时间 2026-10-27 12:33:39；不得修改 Epoch 时长或手动加速。
-- 等待 Keeper 自然封存后抓取 after 快照，复算三名 Active BP 的 expected、produced、missed、idle_skipped、基础奖励、voter share、forfeited、GAS pool 与 voter reward 三层守恒。
+- PASS：Epoch 769 已由 Keeper 自然封存，`complete_sample=1`、`closed=1`、`active_bp_count=3`、`failed_bp_count=0`、`network_incident=0`。
+- PASS：三名 Active BP 均满足 `expected = produced + missed`，且该 Epoch 都为 100% 出块率：`miner3333333 109/109`、`miner2222222 104/104`、`miner1111111 105/105`；三者均为 `qualified`，warning 为 0。`idle_skipped` 分别为 2291、2296、2295，未计入出块率分母。
+- PASS：voter reward 当前表满足 producer 逐行、global/producer、voter claimed+unclaimed 三层守恒。
+- PASS：Epoch 770 自然封存且样本完整：`active_bp_count=4`、`failed_bp_count=0`、`network_incident=0`。四行均满足 `expected=produced+missed`：`bpflowtest11 91+1=92`、`miner1111111 100+0=100`、`miner2222222 10+0=10`、`miner3333333 101+0=101`；`idle_skipped` 分别为 `2086/2305/207/2299`。其中 `miner2222222 status=5`（样本不足），其余为 warning/qualified 状态且 warning_count 均为 0。
+- WAIT：对应 GAS Epoch 39184 尚未生成可用 settlement，暂不能完成 GAS pool 守恒校验。
+- INVALID BASELINE：before/after 之间发生了 BP claim（账户余额和 claim row 已变化），因此本次 sealed reward reconciliation 的三行 `FAIL` 不能归因于奖励公式；该 before 快照不满足“只跨越一个封存且无 claim”的比较前提。证据：`bp-rewards-epoch769-after/summary.md` 与 `comparison.md`。需要选择无 claim 干扰的后续完整 Epoch 重新做严格增量核算。
 
 ## 4. 尚未完成/时间门控
 
-1. 提案 #3：附议期结束 → activate → 延迟后投票 → finalize → queue → 1 小时 Timelock → 任意账户 execute → Treasury grant 校验。
-2. Reward Epoch 769 与对应 GAS Epoch 的 after 快照和完整奖励核算。
-3. `pendingvote` 在 Epoch 770 消费后的 BP 票数、排名与 schedule 校验。
+1. 提案 #3：已完成 activate、赞成票、finalize 和 queue；等待北京时间 2026-10-27 18:38:12 Timelock 结束后由 `govvoter1111` permissionless execute，并完成 Treasury grant/余额守恒校验。
+2. Reward Epoch 769 的生产统计已通过；GAS settlement 尚未就绪，且 BP claim 干扰了 before/after 奖励增量基线，需在后续完整 Epoch 重做无 claim 干扰的严格奖励核算。
+3. BLOCKED/缺陷：Epoch 770 已封存，但 `pendingvote` 未删除、voter 仍是旧票数、active schedule 仍为三席；需修复或确认额外 materialize 触发条件后重测。
 4. voter refund 72 小时正向领取。
 5. BP unstake 21 天正向领取只可在长期测试窗口完成；本轮已覆盖创建、提前领取拒绝、取消与状态恢复。
 
