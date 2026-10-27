@@ -44,6 +44,19 @@ export function createCommunityServer(options={}){
       if(req.method==='GET'&&path==='/v1/discussions'){
         const data=await repository(),items=data.repository.discussions.nodes.map(item=>({...item,comments:item.comments.totalCount,author:item.author?.login||''}));return json(res,200,{items,mode:'dao-bot'});
       }
+      const detailMatch=path.match(/^\/v1\/discussions\/(\d+)$/);
+      if(req.method==='GET'&&detailMatch){
+        const data=await graph(`query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){discussion(number:$number){id number title bodyText url createdAt updatedAt author{login} comments(first:100){nodes{id bodyText createdAt updatedAt author{login}}}}}}`,{owner:config.owner,repo:config.repo,number:Number(detailMatch[1])});
+        if(!data.repository?.discussion)return json(res,404,{error:'Discussion not found'});return json(res,200,{...data.repository.discussion,author:data.repository.discussion.author?.login||'',comments:data.repository.discussion.comments.nodes.map(comment=>({...comment,author:comment.author?.login||''}))});
+      }
+      const commentMatch=path.match(/^\/v1\/discussions\/(\d+)\/comments$/);
+      if(req.method==='POST'&&commentMatch){
+        if(!originAllowed(req))return json(res,403,{error:'Origin not allowed'});const body=await readBody(req),actor=String(body.actor||'').trim(),commentBody=String(body.body||'').trim();
+        if(!/^[a-z1-5.]{1,12}$/.test(actor))return json(res,422,{error:'A connected FLON account is required'});if(commentBody.length<2||commentBody.length>10000)return json(res,422,{error:'Reply must contain 2 to 10000 characters'});rateLimit(`${req.socket.remoteAddress||'unknown'}:${actor}`);
+        const detail=await graph(`query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){discussion(number:$number){id}}}`,{owner:config.owner,repo:config.repo,number:Number(commentMatch[1])});if(!detail.repository?.discussion)return json(res,404,{error:'Discussion not found'});
+        const submittedBody=`${commentBody}\n\n---\nReplied through FullOn DAO by FLON account \`${actor}\`.`;
+        const result=await graph(`mutation($discussionId:ID!,$body:String!){addDiscussionComment(input:{discussionId:$discussionId,body:$body}){comment{id bodyText createdAt updatedAt author{login}}}}`,{discussionId:detail.repository.discussion.id,body:submittedBody});const comment=result.addDiscussionComment.comment;console.info(JSON.stringify({event:'discussion.replied',actor,discussion:Number(commentMatch[1]),at:new Date(config.now()).toISOString()}));return json(res,201,{...comment,author:comment.author?.login||''});
+      }
       if(req.method==='POST'&&path==='/v1/discussions'){
         if(!originAllowed(req))return json(res,403,{error:'Origin not allowed'});const body=await readBody(req),title=String(body.title||'').trim(),discussionBody=String(body.body||'').trim(),actor=String(body.actor||'').trim();
         if(!/^[a-z1-5.]{1,12}$/.test(actor))return json(res,422,{error:'A connected FLON account is required'});
