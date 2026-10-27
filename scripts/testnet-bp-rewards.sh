@@ -48,6 +48,9 @@ capture_scope() {
   local out="$1" table="$2" scope="$3"
   rows flon "$scope" "$table" > "$out/$table.json"
 }
+balance() {
+  rpc /v1/chain/get_currency_balance "$(jq -cn --arg a "$1" '{code:"flon.token",account:$a,symbol:"FLON"}')"
+}
 
 capture() {
   local info root bp epoch gas_epoch
@@ -57,25 +60,34 @@ capture() {
   BP_ACCOUNTS="${BP_ACCOUNTS:-$(active_bps)}"
   LABEL="${LABEL:-snapshot}"
   root="${SNAPSHOT_DIR:-$REPO_DIR/artifacts/testnet-e2e/bp-rewards-$(date -u +%Y%m%dT%H%M%SZ)-$LABEL}"
-  mkdir -p "$root/prodclaims" "$root/gasclaims"
+  mkdir -p "$root/prodclaims" "$root/gasclaims" "$root/balances"
   jq . <<<"$info" > "$root/get_info.json"
   jq -n --arg captured "$(date -u +%FT%TZ)" --arg rpc "$RPC_URL" \
     --argjson epoch "$epoch" --argjson gas_epoch "$gas_epoch" --arg bps "$BP_ACCOUNTS" \
     '{captured_at:$captured,rpc:$rpc,reward_epoch:$epoch,gas_epoch:$gas_epoch,bp_accounts:($bps|split(",")|map(select(length>0)))}' \
     > "$root/metadata.json"
 
-  for table in global rewardepoch rewardplans epochstats bpstatus producers gasrewcfg gasepochcfg gassettles; do
+  for table in global rewardepoch rewardplans rewardseal epochstats bpstatus producers gasrewcfg gasepochcfg gassettles; do
     rows flon flon "$table" > "$root/$table.json"
   done
   capture_scope "$root" bpstats "$epoch"
+  capture_scope "$root" epochreward "$epoch"
   capture_scope "$root" gasnodestats "$gas_epoch"
+  for table in global producers voters epochstate sealstate; do
+    rows voter.reward voter.reward "$table" > "$root/voter-reward-$table.json"
+  done
+  rows voter.reward "$epoch" epochindex > "$root/voter-reward-epochindex.json"
 
   IFS=',' read -r -a bp_array <<<"$BP_ACCOUNTS"
   for bp in "${bp_array[@]}"; do
     [[ -n "$bp" ]] || continue
     rows flon "$bp" prodclaims > "$root/prodclaims/$bp.json"
     rows flon "$bp" gasclaims > "$root/gasclaims/$bp.json"
+    balance "$bp" > "$root/balances/$bp.json"
   done
+  balance flon > "$root/balances/flon.json"
+  balance voter.reward > "$root/balances/voter.reward.json"
+  balance flon.gas > "$root/balances/flon.gas.json"
 
   summarize "$root" > "$root/summary.md"
   printf '%s\n' "$root"
@@ -164,6 +176,22 @@ EOF
     then "- PASS: active + standby pool equals GAS pool"
     else "- FAIL: GAS pool split is not conserved" end
   '
+  jq -nr --slurpfile gf "$root/voter-reward-global.json" --slurpfile pf "$root/voter-reward-producers.json" --slurpfile vf "$root/voter-reward-voters.json" '
+    def units: split(" ")[0] | tonumber | . * 100000000 | round;
+    ($gf[0]) as $g | ($pf[0]) as $p | ($vf[0]) as $v |
+    ([$p.rows[].total_rewards|units] | add // 0) as $ptotal |
+    ([$p.rows[].allocated_rewards|units] | add // 0) as $pallocated |
+    ([$v.rows[] | ((.claimed_rewards|units)+(.unclaimed_rewards|units))] | add // 0) as $vaccounted |
+    if ([ $p.rows[] | select((.total_rewards|units) != ((.allocating_rewards|units)+(.allocated_rewards|units))) ] | length)==0
+    then "- PASS: each voter-reward producer has total = allocating + allocated"
+    else "- FAIL: voter-reward producer accounting is inconsistent" end,
+    if ($g.rows[0].total_rewards|units)==$ptotal
+    then "- PASS: voter-reward global total equals producer totals"
+    else "- FAIL: voter-reward global/producer totals differ" end,
+    if $pallocated==$vaccounted
+    then "- PASS: voter claimed + unclaimed equals producer allocated rewards"
+    else "- FAIL: voter reward allocation is not conserved" end
+  '
 }
 
 compare() {
@@ -196,6 +224,53 @@ compare() {
     jq -n --slurpfile b "$BEFORE_DIR/global.json" --slurpfile a "$AFTER_DIR/global.json" '
       def row: .[0].rows[0];
       "- total_produced_rewards: \($b|row|.total_produced_rewards) -> \($a|row|.total_produced_rewards)\n- total_unclaimed_rewards: \($b|row|.total_unclaimed_rewards) -> \($a|row|.total_unclaimed_rewards)"' -r
+    echo
+    echo '## Sealed reward epoch reconciliation'
+    echo
+    echo '| BP | Gross | Factor bp | Eligible | Producer expected/actual | Voter share expected/actual | Forfeited | Result |'
+    echo '|---|---:|---:|---:|---:|---:|---:|---|'
+    local epoch closed bp gross ratio expected produced missed status incident factor eligible shared producer actual_claim before_voter after_voter voter_delta result
+    epoch="$(jq -r .reward_epoch "$BEFORE_DIR/metadata.json")"
+    closed="$(jq -r --argjson e "$epoch" '[.rows[] | select(.epoch_id==$e)][0].closed // 0' "$AFTER_DIR/epochstats.json")"
+    incident="$(jq -r --argjson e "$epoch" '[.rows[] | select(.epoch_id==$e)][0].network_incident // 0' "$AFTER_DIR/epochstats.json")"
+    if [[ "$closed" != 1 ]]; then
+      echo '| — | — | — | — | — | — | — | INFO: after snapshot epoch is not sealed |'
+    elif [[ "$(jq '.rows|length' "$BEFORE_DIR/epochreward.json")" -eq 0 ]]; then
+      echo '| — | — | — | — | — | — | — | INFO: before snapshot has no unsealed epochreward rows |'
+    else while IFS=$'\t' read -r bp gross ratio; do
+      [[ -n "$bp" ]] || continue
+      read -r expected produced missed status < <(jq -r --arg p "$bp" '.rows[] | select(.producer==$p) | [.expected_blocks,.produced_blocks,.missed_blocks,.status] | @tsv' "$AFTER_DIR/bpstats.json")
+      if [[ "$incident" == 1 || "$expected" -lt 12 || "$status" == 5 || "$status" == 6 ]]; then factor=10000
+      elif (( produced * 100 < expected * 95 )); then factor=0
+      elif (( produced * 100 >= expected * 99 )); then factor=10000
+      else factor=$((produced * 10000 / expected)); fi
+      eligible=$((gross * factor / 10000))
+      shared=$((eligible * ratio / 10000))
+      producer=$((eligible - shared))
+      actual_claim="$(jq -r --argjson e "$epoch" '[.rows[] | select(.epoch_id==$e)][0].quantity // "0.00000000 FLON" | split(" ")[0] | tonumber*100000000 | round' "$AFTER_DIR/prodclaims/$bp.json")"
+      before_voter="$(jq -r --arg p "$bp" '[.rows[] | select(.owner==$p)][0].total_rewards // "0.00000000 FLON" | split(" ")[0] | tonumber*100000000 | round' "$BEFORE_DIR/voter-reward-producers.json")"
+      after_voter="$(jq -r --arg p "$bp" '[.rows[] | select(.owner==$p)][0].total_rewards // "0.00000000 FLON" | split(" ")[0] | tonumber*100000000 | round' "$AFTER_DIR/voter-reward-producers.json")"
+      voter_delta=$((after_voter - before_voter))
+      result=PASS; [[ "$actual_claim" -eq "$producer" && "$voter_delta" -eq "$shared" ]] || result=FAIL
+      printf '| %s | %s | %s | %s | %s / %s | %s / %s | %s | %s |\n' \
+        "$bp" "$gross" "$factor" "$eligible" "$producer" "$actual_claim" "$shared" "$voter_delta" "$((gross-eligible))" "$result"
+    done < <(jq -r '.rows[] | [.producer, (.rewards|split(" ")[0]|tonumber*100000000|round), .reward_shared_ratio] | @tsv' "$BEFORE_DIR/epochreward.json")
+    fi
+    echo
+    echo 'Amounts in the reconciliation table are FLON smallest units (10^-8). The voter delta assertion requires the snapshots to span exactly this one sealed reward epoch.'
+    echo
+    echo '## Account balance and claim-row deltas'
+    echo
+    echo '| Account | FLON before | FLON after | prodclaims before/after | gasclaims before/after |'
+    echo '|---|---:|---:|---:|---:|'
+    while IFS= read -r bp; do
+      [[ -n "$bp" ]] || continue
+      printf '| %s | %s | %s | %s / %s | %s / %s |\n' "$bp" \
+        "$(jq -r '.[0] // "0.00000000 FLON"' "$BEFORE_DIR/balances/$bp.json")" \
+        "$(jq -r '.[0] // "0.00000000 FLON"' "$AFTER_DIR/balances/$bp.json")" \
+        "$(jq '.rows|length' "$BEFORE_DIR/prodclaims/$bp.json")" "$(jq '.rows|length' "$AFTER_DIR/prodclaims/$bp.json")" \
+        "$(jq '.rows|length' "$BEFORE_DIR/gasclaims/$bp.json")" "$(jq '.rows|length' "$AFTER_DIR/gasclaims/$bp.json")"
+    done < <(jq -r '.bp_accounts[]' "$BEFORE_DIR/metadata.json")
     echo
     echo '## After snapshot assertions'
     summarize "$AFTER_DIR" | sed -n '/## Assertions/,$p'
