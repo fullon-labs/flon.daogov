@@ -29,16 +29,14 @@ services:
       GITHUB_OWNER: fullon-labs
       GITHUB_REPO: flon.daogov
       GITHUB_DISCUSSION_CATEGORY: General
-      GITHUB_OAUTH_CALLBACK_URL: https://daogov.flon.network/community-api/v1/auth/github/callback
-      SESSION_COOKIE_DOMAIN: .flon.network
       ALLOWED_ORIGINS: https://daogov.flon.network,https://daogov-t.flon.network
-      GITHUB_CLIENT_ID_FILE: /run/secrets/github_oauth_client_id
-      GITHUB_CLIENT_SECRET_FILE: /run/secrets/github_oauth_client_secret
-      SESSION_SECRET_FILE: /run/secrets/community_session_secret
+      GITHUB_APP_ID_FILE: /run/secrets/github_app_id
+      GITHUB_APP_INSTALLATION_ID_FILE: /run/secrets/github_app_installation_id
+      GITHUB_APP_PRIVATE_KEY_FILE: /run/secrets/github_app_private_key
     secrets:
-      - github_oauth_client_id
-      - github_oauth_client_secret
-      - community_session_secret
+      - github_app_id
+      - github_app_installation_id
+      - github_app_private_key
     ports:
       - "127.0.0.1:20103:8789"
 
@@ -76,9 +74,9 @@ services:
 secrets:
   testnet_keeper_key:
     file: /data/flon-daogov/secrets/testnet-epoch-keeper.key
-  github_oauth_client_id:
-    file: /data/flon-daogov/secrets/github-oauth-client-id
-  github_oauth_client_secret:
-    file: /data/flon-daogov/secrets/github-oauth-client-secret
-  community_session_secret:
-    file: /data/flon-daogov/secrets/community-session-secret
+  github_app_id:
+    file: /data/flon-daogov/secrets/github-app-id
+  github_app_installation_id:
+    file: /data/flon-daogov/secrets/github-app-installation-id
+  github_app_private_key:
+    file: /data/flon-daogov/secrets/github-app-private-key.pem

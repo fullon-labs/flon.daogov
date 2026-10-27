@@ -2,19 +2,21 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createCommunityServer} from './server.mjs';
 
-const options={clientId:'id',clientSecret:'secret',sessionSecret:'session-secret',cookieDomain:'',allowedOrigins:['https://daogov.flon.network'],fetchImpl:async()=>{throw new Error('unexpected fetch')}};
+function response(body,status=200){return{ok:status>=200&&status<300,status,json:async()=>body}}
+const repository={id:'R_1',discussionCategories:{nodes:[{id:'C_1',name:'General'}]},discussions:{nodes:[]}};
+const options={botToken:'bot-token',allowedOrigins:['https://daogov.flon.network'],fetchImpl:async(url,request)=>{const input=JSON.parse(request.body||'{}');if(input.query?.includes('createDiscussion'))return response({data:{createDiscussion:{discussion:{id:'D_1',number:1,title:input.variables.title,bodyText:input.variables.body,url:'https://github.com/fullon-labs/flon.daogov/discussions/1',comments:{totalCount:0},author:{login:'fullon-dao-bot'}}}}});return response({data:{repository}})}};
 async function withServer(run){const server=createCommunityServer(options);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));try{await run(`http://127.0.0.1:${server.address().port}`)}finally{await new Promise(resolve=>server.close(resolve))}}
 
-test('health and anonymous session do not expose credentials',()=>withServer(async base=>{
-  const health=await fetch(`${base}/community-api/healthz`).then(r=>r.json());assert.deepEqual(health,{ok:true});
-  const session=await fetch(`${base}/community-api/v1/session`).then(r=>r.json());assert.deepEqual(session,{authenticated:false});
-  const discussions=await fetch(`${base}/community-api/v1/discussions`).then(r=>r.json());assert.deepEqual(discussions,{items:[],authenticated:false});
+test('bot mode is ready without per-user GitHub authentication',()=>withServer(async base=>{
+  const health=await fetch(`${base}/community-api/healthz`).then(response=>response.json());assert.deepEqual(health,{ok:true,mode:'dao-bot'});
+  const session=await fetch(`${base}/community-api/v1/session`).then(response=>response.json());assert.deepEqual(session,{authenticated:true,mode:'dao-bot'});
+  const discussions=await fetch(`${base}/community-api/v1/discussions`).then(response=>response.json());assert.deepEqual(discussions,{items:[],mode:'dao-bot'});
 }));
 
-test('OAuth start only accepts configured return origins',()=>withServer(async base=>{
-  const response=await fetch(`${base}/community-api/v1/auth/github?return_to=https%3A%2F%2Fevil.example%2Fpwn`,{redirect:'manual'});const target=new URL(response.headers.get('location'));assert.equal(target.origin,'https://github.com');assert.equal(target.pathname,'/login/oauth/authorize');assert.equal(target.searchParams.get('client_id'),'id');assert.ok(target.searchParams.get('state'));
+test('DAO bot publishes a discussion with the connected FLON account attribution',()=>withServer(async base=>{
+  const response=await fetch(`${base}/community-api/v1/discussions`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({actor:'hellotoworld',title:'Example topic',body:'A sufficiently long discussion body.'})});assert.equal(response.status,201);const item=await response.json();assert.match(item.bodyText,/FLON account `hellotoworld`/);
 }));
 
-test('discussion creation requires an authenticated session',()=>withServer(async base=>{
-  const response=await fetch(`${base}/community-api/v1/discussions`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({title:'Example',body:'A sufficiently long discussion body.'})});assert.equal(response.status,401);
+test('discussion creation rejects missing or invalid FLON account attribution',()=>withServer(async base=>{
+  const response=await fetch(`${base}/community-api/v1/discussions`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({title:'Example',body:'A sufficiently long discussion body.'})});assert.equal(response.status,422);
 }));

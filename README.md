@@ -16,7 +16,7 @@ FullOn Network DAO治理 H5 DApp，可在 HuFu 内置浏览器中打开，也支
 - 支持信号提案创建、附议、快照投票，以及 permissionless `activate`、`finalize`、`queue`、`execute`、`expire`
 - 支持从链上执行白名单选择一个或多个 action，根据目标合约 ABI 自动生成类型化参数输入框，由当前网络 RPC 序列化并在创建时冻结
 - 提案正文保存 URI 与 SHA-256，社区讨论通过链上 `discussion_uri` 接入论坛
-- GitHub Discussions 通过同源 `/community-api` 接入；OAuth token 仅保存在服务端，讨论可一键预填为链上提案
+- GitHub Discussions 通过同源 `/community-api` 和仓库级 DAO Bot 接入；用户无需 GitHub 登录，讨论可一键预填为链上提案
 - HuFu 钱包连接、交易解释、签名请求和状态追踪
 - PC / 手机响应式布局与浏览器语言自动识别（英文、法文、日文、韩文、西班牙文、简体中文、繁体中文；专业链上术语在缺少本地化时回退英文）
 - 内置双语治理帮助中心，并提供 [`docs/governance-help.md`](docs/governance-help.md) 作为完整用户操作说明
