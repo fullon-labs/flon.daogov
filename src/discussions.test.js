@@ -21,6 +21,9 @@ test('governance view provides desktop columns and mobile discussion/proposal ta
   const [html,css]=await Promise.all([readFile(new URL('../index.html',import.meta.url),'utf8'),readFile(new URL('./styles.css',import.meta.url),'utf8')]);
   assert.match(html,/data-governance-panel="discussions"[\s\S]*data-governance-panel="proposals"/);
   assert.match(html,/data-governance-tab="discussions"[\s\S]*data-governance-tab="proposals"/);
+  assert.match(html,/id="governance-discussions"[\s\S]*id="governance-proposals"/);
+  assert.match(html,/id="governance-proposals"[\s\S]*data-action="create-proposal"/);
+  assert.match(css,/\.governance-columns\{grid-template-columns:minmax\(0,2fr\) minmax\(0,3fr\)/);
   assert.match(css,/@media\(min-width:900px\)\{\.governance-mobile-tabs\{display:none\}/);
   assert.match(css,/@media\(max-width:899px\)\{\.governance-column\.is-mobile-hidden\{display:none\}/);
 });
