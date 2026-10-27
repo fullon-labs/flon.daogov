@@ -46,7 +46,10 @@ export function createCommunityServer(options={}){
       }
       if(req.method==='POST'&&path==='/v1/discussions'){
         if(!originAllowed(req))return json(res,403,{error:'Origin not allowed'});const body=await readBody(req),title=String(body.title||'').trim(),discussionBody=String(body.body||'').trim(),actor=String(body.actor||'').trim();
-        if(!/^[a-z1-5.]{1,12}$/.test(actor))return json(res,422,{error:'A connected FLON account is required'});if(title.length<3||title.length>120||discussionBody.length<10||discussionBody.length>10000)return json(res,422,{error:'Invalid discussion title or body'});rateLimit(`${req.socket.remoteAddress||'unknown'}:${actor}`);
+        if(!/^[a-z1-5.]{1,12}$/.test(actor))return json(res,422,{error:'A connected FLON account is required'});
+        if(title.length<3||title.length>120)return json(res,422,{error:'Discussion title must contain 3 to 120 characters'});
+        if(discussionBody.length<3||discussionBody.length>10000)return json(res,422,{error:'Discussion body must contain 3 to 10000 characters'});
+        rateLimit(`${req.socket.remoteAddress||'unknown'}:${actor}`);
         const data=await repository(),category=data.repository.discussionCategories.nodes.find(item=>item.name.toLowerCase()===config.category.toLowerCase());if(!category)throw new Error(`GitHub discussion category not found: ${config.category}`);
         const submittedBody=`${discussionBody}\n\n---\nSubmitted through FullOn DAO by FLON account \`${actor}\`.`;
         const result=await graph(`mutation($repositoryId:ID!,$categoryId:ID!,$title:String!,$body:String!){createDiscussion(input:{repositoryId:$repositoryId,categoryId:$categoryId,title:$title,body:$body}){discussion{id number title bodyText url createdAt updatedAt author{login} comments{totalCount}}}}`,{repositoryId:data.repository.id,categoryId:category.id,title,body:submittedBody});const item=result.createDiscussion.discussion;console.info(JSON.stringify({event:'discussion.created',actor,discussion:item.number,at:new Date(config.now()).toISOString()}));return json(res,201,{...item,comments:item.comments.totalCount,author:item.author?.login||''});
