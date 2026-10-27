@@ -804,7 +804,7 @@ async function confirmClaimRewards(){
 }
 async function submitClaimRewards(target){
   if(!walletSession)return;target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
-  try{const result=await transact(walletSession,[{account:'voter.reward',name:'claimrewards',data:{voter:walletSession.account}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">奖励领取交易已广播</h2><p>${escapeHtml(walletSession.account)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'确认签名':'Confirm signature';showToast(String(error?.message||error))}
+  try{const result=await transact(walletSession,[{account:'voter.reward',name:'claimrewards',data:{caller:walletSession.account,voter:walletSession.account,max_steps:30}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">奖励领取交易已广播</h2><p>${escapeHtml(walletSession.account)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'确认签名':'Confirm signature';showToast(walletErrorMessage(error))}
 }
 async function openBPClaimSheet(producer=''){
   if(!walletSession){openWalletSheet();return}
