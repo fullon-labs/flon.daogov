@@ -72,3 +72,5 @@ scripts/testnet-e2e.sh bp-stake --env /tmp/flon-testnet-e2e.env --broadcast
 
 脚本按阶段运行，不会伪造时间或自动跨越等待期。证据写入 `artifacts/testnet-e2e/<UTC run id>/`。详细步骤见 [测试用例](./testnet-e2e-test-cases.md)。
 
+节点出块率、区块基础奖励、GAS Active/Standby 奖励、BP/Voter 领取和 Epoch 前后快照，见 [BP Performance & Rewards 独立用例](./testnet-bp-performance-rewards-cases.md)。
+
