@@ -145,7 +145,6 @@ async function captureHuFuChainInfo(bridge){
   window.onChainInfo=value=>{previousInfo?.(value);finish(value)};
   const timer=window.setTimeout(()=>finish(),5000);
   try{
-    if(bridge.HuFuSwitchChain)Promise.resolve(bridge.HuFuSwitchChain('FLON')).then(value=>{if(value!==undefined)hufuChainInfo=value}).catch(()=>{});
     if(bridge.HuFuGetChain)Promise.resolve(bridge.HuFuGetChain()).then(finish).catch(()=>finish());
     await ready;
   }finally{window.clearTimeout(timer);window.onChainReady=previousReady;window.onChainInfo=previousInfo}
@@ -216,12 +215,11 @@ export async function restoreWallet(){
     if(stored.provider==='hufu'&&isHuFuApp()){
       const current=accountSnapshot(window.HuFu);
       if(current&&current.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
-      // A localStorage session is display state, not proof that this newly
-      // created HuFu WebView has authorized the current origin. Only restore
-      // silently when the injected provider exposes a live account snapshot.
-      // Otherwise autoConnectHuFuWallet establishes authorization once during
-      // page initialization, never from the transaction button.
-      if(!current)return null;
+      // HuFu's only public account getter is interactive in several releases.
+      // A domain/network-scoped session is therefore restored without calling
+      // requestAccountsHuFu(). When the provider exposes a passive snapshot we
+      // still reject account changes; otherwise the transaction actor and the
+      // wallet signature enforce ownership of the cached account.
       const chainId=chainIdFrom(current)||chainIdFrom(window.HuFu)||chainIdFrom(hufuChainInfo);if(chainId)assertChain(chainId);
       injectedAuthorizationReady=true;
       return stored;
@@ -278,15 +276,10 @@ export function autoConnectHuFuWallet(){
       return account?save({...account,chainId:config().chainId,provider:'iframe'}):null;
     }
     const provider=await prepareHuFu();if(!provider)return null;
-    let account=accountSnapshot(provider);
-    // HuFu may recreate its WebView while localStorage survives. Reauthorize
-    // the current origin during startup so the later transaction click opens
-    // approval directly instead of hanging behind an unauthorised provider.
-    // This is intentionally never called by transact().
-    if(!account&&provider.requestAccountsHuFu){
-      const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
-      account=normalizeAccount(response);
-    }
+    const account=accountSnapshot(provider);
+    // Page load must never open HuFu's interactive account picker. A passive
+    // injected snapshot can connect silently; otherwise the user may choose
+    // Connect wallet explicitly once and the resulting session is cached.
     if(!account)return null;
     const chainId=await confirmInjectedChain(provider,account);
     injectedAuthorizationReady=true;

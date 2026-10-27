@@ -56,7 +56,7 @@ test('wallet restore does not treat iframe geometry as wallet authorization',()=
   assert.ok(branch.indexOf("stored.provider==='iframe'&&runtimeClient.isInIframe()")<branch.indexOf("stored.provider==='hufu'"));
 });
 
-test('a cached injected session requires live HuFu authorization',()=>{
+test('a cached injected session restores silently without account selection',()=>{
   const restoreStart=walletSource.indexOf('export async function restoreWallet()');
   const restoreEnd=walletSource.indexOf('export async function connectWallet()',restoreStart);
   const restore=walletSource.slice(restoreStart,restoreEnd);
@@ -64,10 +64,20 @@ test('a cached injected session requires live HuFu authorization',()=>{
   const autoEnd=walletSource.indexOf('export async function disconnectWallet()',autoStart);
   const auto=walletSource.slice(autoStart,autoEnd);
 
-  assert.match(restore,/if\(!current\)return null/);
+  assert.doesNotMatch(restore,/if\(!current\)return null/);
   assert.match(restore,/injectedAuthorizationReady=true/);
-  assert.match(auto,/provider\.requestAccountsHuFu/);
+  assert.doesNotMatch(auto,/requestAccountsHuFu/);
   assert.match(auto,/injectedAuthorizationReady=true/);
+});
+
+test('HuFu chain inspection never switches the wallet network on page load',()=>{
+  const start=walletSource.indexOf('async function captureHuFuChainInfo');
+  const end=walletSource.indexOf('async function prepareHuFu()',start);
+  const branch=walletSource.slice(start,end);
+
+  assert.ok(start>=0&&end>start,'HuFu chain inspection branch was not found');
+  assert.match(branch,/HuFuGetChain/);
+  assert.doesNotMatch(branch,/HuFuSwitchChain/);
 });
 
 test('HuFu TAPOS uses irreversible block data and chain-derived expiration',()=>{
