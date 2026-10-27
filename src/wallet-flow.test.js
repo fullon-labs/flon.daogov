@@ -53,6 +53,7 @@ test('an iframe-authenticated HuFu session prefers the full-transaction bridge',
   const legacyIframe=branch.indexOf("session.provider==='iframe'&&runtimeClient.isInIframe()");
 
   assert.ok(injected>=0&&legacyIframe>injected,'full-transaction HuFu bridge must precede the legacy iframe fallback');
+  assert.match(branch,/window\.HuFu\|\|\(isHuFuApp\(\)\?await prepareHuFu\(\):null\)/);
   assert.match(branch,/const transaction=await prepareHuFuTransaction\(authorized\)/);
   assert.match(branch,/provider\.transact\(\{transaction\}\)/);
 });
