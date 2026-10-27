@@ -402,12 +402,12 @@ async function refreshDiscussions(){
 }
 function openCreateDiscussion(){
   if(discussionState.error){showToast('讨论服务暂未接入');return}
-  if(!discussionState.session?.authenticated){window.location.assign(discussions.signInUrl());return}
+  if(!walletSession){openWalletSheet();return}
   openSheet(`<h2 id="sheet-title">发起社区讨论</h2><p class="sheet-subtitle">讨论将通过统一 API 发布到 GitHub Discussions，成熟后可进一步创建链上提案。</p><form class="wizard-form" data-discussion-form><label><span>标题</span><input name="title" maxlength="120" required></label><label><span>讨论内容</span><textarea name="body" maxlength="10000" rows="10" required></textarea></label></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="discussion-submit">发布讨论</button></div>`);
 }
 async function submitDiscussion(target){
   const form=sheetContent.querySelector('[data-discussion-form]');if(!form?.reportValidity())return;const data=new FormData(form);target.disabled=true;
-  try{const item=await discussions.create({title:String(data.get('title')||''),body:String(data.get('body')||'')});closeSheet();showToast('社区讨论已发布');await refreshDiscussions();const url=safePublicUrl(item.url||item.html_url);if(url)window.open(url,'_blank','noopener,noreferrer')}catch(error){target.disabled=false;showToast(String(error?.message||error))}
+  try{const item=await discussions.create({title:String(data.get('title')||''),body:String(data.get('body')||''),actor:walletSession?.account});closeSheet();showToast('社区讨论已发布');await refreshDiscussions();const url=safePublicUrl(item.url||item.html_url);if(url)window.open(url,'_blank','noopener,noreferrer')}catch(error){target.disabled=false;showToast(String(error?.message||error))}
 }
 function findProposal(id){return governanceState?.proposals?.find(item=>Number(item.proposal_id)===Number(id))||null}
 function proposalPolicy(id){return governanceState?.policySnapshots?.find(item=>Number(item.proposal_id)===Number(id))||null}
