@@ -30,6 +30,50 @@
 | producer total_votes | | |
 | Active schedule | | |
 
+## BP Performance
+
+| BP | Expected | Produced | Missed | Idle skipped | Rate | Status | Warning/Suspension |
+|---|---:|---:|---:|---:|---:|---|---|
+| | | | | | | | |
+
+| Epoch 字段 | Before | After |
+|---|---|---|
+| complete_sample / closed | | |
+| network_incident | | |
+| rewardseal phase/stage | | |
+
+## 区块基础奖励对账（最小单位）
+
+| BP | Gross | Factor bp | Eligible | BP expected/actual | Voter share expected/actual | Forfeited | Pass/Fail |
+|---|---:|---:|---:|---:|---:|---:|---|
+| | | | | | | | |
+
+## GAS 奖励对账
+
+| GAS Epoch | Pool | Active pool/allocated | Standby pool/allocated | Node sum | Funded/Finalized | Pass/Fail |
+|---:|---:|---:|---:|---:|---|---|
+| | | | | | | |
+
+| BP | Role | Expected/Produced/Missed | Eligible/Score | Allocated | Claim before/after |
+|---|---|---|---|---:|---|
+| | | | | | |
+
+## Voter reward 守恒
+
+| 断言 | Expected | Actual | Pass/Fail |
+|---|---:|---:|---|
+| producer total = allocating + allocated | | | |
+| global total = producer totals | | | |
+| producer allocated = voter claimed + unclaimed | | | |
+
+## Claim 验证
+
+| 类型 | 触发账户 | 受益账户 | max_steps | 余额变化 | Claim rows 变化 | 重复领取结果 |
+|---|---|---|---:|---:|---|---|
+| BP base | | | | | | |
+| BP GAS | | | | | | |
+| Voter | | | | | | |
+
 ## 资产守恒
 
 | 资产/账户 | 开始 | 结束 | 预期变化 | 实际变化 |

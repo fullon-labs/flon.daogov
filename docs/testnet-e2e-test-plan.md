@@ -40,25 +40,108 @@ BP block signing key 不得用作账户 owner/active key。建议使用可丢弃
 1. **T0 预检**：链 ID、RPC、ABI、本地钱包、账户权限、余额、配置、白名单、风险策略和 treasury。
 2. **T1 BP 准入**：低于门槛失败 → 自质押 → 注册 → 表校验。
 3. **T2 投票竞选**：增加本金 → 自定义分配 → 等自然 Epoch → 排名、Active/Standby、schedule 校验。
-4. **T3 奖励退出**：claim rewards、unregister、unstake、取消退款、再次 unstake、到期领取。
-5. **T4 Voter 撤票**：减少本金、销毁 GLON、重新分配、到期退款。
-6. **T5 信号提案**：提案、论坛、附议、激活、快照、投票、结算、取消。
-7. **T6 可执行提案**：ABI 编码、白名单/风险、action 冻结、queue、Timelock、permissionless execute、expire。
-8. **T7 Treasury**：入金、reserve、pay、release、closegrant 与账务守恒。
-9. **T8 回归**：LIB、余额、表状态、重复调用、错误分支与 DApp 展示。
+4. **T3 BP Performance before**：在目标 Reward/GAS Epoch 封存前保存完整出块、奖励、claim、余额和 voter reward 快照。
+5. **T4 自然封存与奖励对账**：不加速 Epoch，等待 Keeper 自然封存；保存 after 快照并完成区块奖励、BP/voter 分成、GAS 池及节点分配核算。
+6. **T5 奖励领取与退出**：分别验证 BP 本人、Keeper/第三方、分批 `max_steps`、重复领取；再执行 unregister、unstake、取消退款、重新 unstake 和到期领取。
+7. **T6 Voter 撤票**：减少本金、销毁 GLON、重新分配、到期退款，并验证 voter reward 跨 Epoch 归属。
+8. **T7 信号提案**：提案、论坛、附议、激活、快照、投票、结算、取消。
+9. **T8 可执行提案**：ABI 编码、白名单/风险、action 冻结、queue、Timelock、permissionless execute、expire。
+10. **T9 Treasury**：入金、reserve、pay、release、closegrant 与账务守恒。
+11. **T10 回归**：LIB、余额、表状态、重复调用、错误分支与 DApp 展示。
 
-## 5. 通过标准与证据
+## 5. BP Performance & Rewards 完整核算
+
+### 5.1 出块率与状态
+
+Reward Epoch 的有效出块率定义为：
+
+```text
+production_rate = produced_blocks / expected_blocks
+expected_blocks = produced_blocks + missed_blocks
+```
+
+`idle_skipped_blocks` 是未分配给该 BP 的空闲 slot，必须单独展示，不得计入 `missed_blocks` 或出块率分母。每个 Epoch 同时验证：
+
+- `epochstats.complete_sample`、`closed`、`network_incident`。
+- `bpstats.expected/produced/missed/idle_skipped`。
+- longest/trailing missed streak。
+- `bpstatus` 的 qualified、degraded、warning、suspended、insufficient sample、network incident、probation。
+- warning count、suspension count、cooldown 和恢复后的 schedule。
+
+### 5.2 区块基础奖励
+
+每个 BP 按最小单位复算：
+
+```text
+gross                = 该 Epoch 实际出块产生的基础奖励
+performance_factor   = 合约根据完整样本、网络事故和出块率计算的 basis points
+eligible             = floor(gross × performance_factor / 10000)
+voter_share          = floor(eligible × reward_shared_ratio / 10000)
+producer_reward      = eligible - voter_share
+forfeited            = gross - eligible
+```
+
+核对关系：
+
+- `producer_reward` 必须等于该 BP、该 Epoch 的 `prodclaims.quantity`。
+- `voter_share` 必须等于 `voter.reward::producers.total_rewards` 的对应增量。
+- `producer_reward + voter_share + forfeited = gross`。
+- `global.total_produced_rewards`、`global.total_unclaimed_rewards` 与各 BP 行、claim 和转账变化一致。
+- missed slot 不产生基础奖励；基础奖励只归实际合格出块 BP，不存在 Active 固定基础份额。
+- 跨 315,360,000 奖励区块减半边界时，检查固定 5 亿 FLON 总预算、整数精度和累计发行上限。
+
+### 5.3 Voter reward 守恒
+
+逐层校验：
+
+```text
+每个 producer: total_rewards = allocating_rewards + allocated_rewards
+global.total_rewards = sum(producer.total_rewards)
+sum(producer.allocated_rewards)
+  = sum(voter.claimed_rewards + voter.unclaimed_rewards)
+```
+
+投票变更只从约定的下一 Reward Epoch 生效，不得追溯领取历史奖励。撤票前产生但尚未领取的奖励必须保留。
+
+### 5.4 GAS Active/Standby 奖励
+
+独立于区块基础奖励校验：
+
+- `gasepochcfg` 必须冻结当期 epoch slots、Active 门槛、pool 和 share 参数。
+- Active score、eligible、allocated 必须与实际出块绩效一致。
+- Standby 只有有效 `standbyproof` 达到规则要求才进入 Standby 分配；重复或错误证明不得增加计数。
+- `active_pool + standby_pool = pool`。
+- `sum(gasnodestats.allocated) = active_allocated + standby_allocated`。
+- settlement 的 funded、finalized、phase、incident hold 和参与节点数一致。
+- `gasclaims` 只能消费一次；领取前后 `flon.gas`、BP 余额和 claim rows 守恒。
+
+### 5.5 Claim 行为
+
+分别验证：
+
+- BP 本人触发和 Keeper/任意第三方代触发，收益始终进入指定 BP/voter。
+- `max_steps` 较小时允许分批继续，不得跳过或重复 Epoch。
+- 无奖励、重复领取、重放交易不会重复付款。
+- claim 前后同时记录账户余额、`unclaimed_rewards`、`prodclaims`、`gasclaims`、voter claimed/unclaimed。
+- Keeper 下线时，用户自行触发仍可完成领取。
+
+## 6. 通过标准与证据
 
 每个写交易保存 action/actor、transaction ID、包含区块、LIB 时间、执行前后快照和精确错误。满足以下条件才算通过：
 
 - 交易达到 LIB；仅返回 submitted 不算完成。
 - FLON/GLON、BP stake/refund、treasury liquid/reserved/paid 守恒。
 - Epoch 边界前后 `pendingvote/votedeltas/voteallocs/producers` 一致。
+- 完整 Reward Epoch 满足 `expected = produced + missed`，`idle_skipped` 不污染 missed 和出块率。
+- 每个 BP 的 gross、绩效系数、自留、voter share、forfeited 和 `prodclaims` 精确到 `10^-8 FLON`。
+- GAS pool、Active/Standby 子池、节点 allocated 及 claims 精确守恒。
+- voter reward 的 global、producer、voter 三层账目精确守恒。
+- 若 before/after 跨越多个 Epoch、有其他 claim/转账干扰，结果标记 Blocked 并重新选择单 Epoch 窗口，不得推断通过。
 - DAO power/policy 在激活时冻结，之后 add/sub vote 不追溯改变该提案权重。
 - action bytes、风险等级和权限冻结；执行结果严格等于冻结内容。
 - 负向用例断言具体合约错误，不只判断非零退出码。
 
-## 6. 使用测试脚本
+## 7. 使用测试脚本
 
 ```bash
 cd /Users/ray/work/flon/flon.daogov
@@ -73,4 +156,33 @@ scripts/testnet-e2e.sh bp-stake --env /tmp/flon-testnet-e2e.env --broadcast
 脚本按阶段运行，不会伪造时间或自动跨越等待期。证据写入 `artifacts/testnet-e2e/<UTC run id>/`。详细步骤见 [测试用例](./testnet-e2e-test-cases.md)。
 
 节点出块率、区块基础奖励、GAS Active/Standby 奖励、BP/Voter 领取和 Epoch 前后快照，见 [BP Performance & Rewards 独立用例](./testnet-bp-performance-rewards-cases.md)。
+
+目标 Epoch 封存前后分别执行只读快照，并始终显式复用相同 Epoch ID：
+
+```bash
+EPOCH_ID=768 GAS_EPOCH_ID=39184 \
+  scripts/testnet-bp-rewards.sh capture --label before
+
+# 等待链上自然封存及 Keeper 结算，不修改 Epoch 参数。
+
+EPOCH_ID=768 GAS_EPOCH_ID=39184 \
+  scripts/testnet-bp-rewards.sh capture --label after
+
+BEFORE_DIR=/absolute/path/to/before \
+AFTER_DIR=/absolute/path/to/after \
+  scripts/testnet-bp-rewards.sh compare
+```
+
+`comparison.md` 必须包含逐 BP 基础奖励拆分、voter share 实际增量、claim rows、余额变化，以及 Reward/GAS/voter 三类守恒断言。开放 Epoch 只能报告等待封存，不能提前判定奖励核算失败。
+
+## 8. 完成定义
+
+只有以下全部满足，才能宣布测试链完整流程通过：
+
+1. BP 自质押、注册、投票、竞选、schedule、退出和退款均达到 LIB。
+2. 至少一个完整 Reward Epoch 和一个已 finalized/funded GAS Epoch 对账通过。
+3. BP block reward、GAS reward、voter reward 至少各完成一次合法 claim，并验证重复领取被阻止。
+4. 信号提案至少覆盖 succeeded 和 defeated；可执行提案完成 endorse、vote、queue、Timelock、permissionless execute。
+5. Treasury 至少完成一次 reserve → pay，以及一次 reserve → release/close 路径。
+6. 所有负向用例保存精确合约错误；没有主网交易、私钥泄露、Epoch 参数加速或共享测试网危险配置修改。
 
