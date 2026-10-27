@@ -5,7 +5,7 @@ import fs from 'node:fs';
 const walletSource=fs.readFileSync(new URL('./wallet.js',import.meta.url),'utf8');
 
 test('an existing HuFu session does not reopen account selection',()=>{
-  const start=walletSource.indexOf("if(session.provider==='hufu')");
+  const start=walletSource.indexOf("if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact)");
   const end=walletSource.indexOf("if(session.provider==='iframe')",start);
   const hufuTransactionBranch=walletSource.slice(start,end);
 
@@ -24,7 +24,7 @@ test('an existing HuFu session does not reopen account selection',()=>{
 });
 
 test('HuFu testnet uses chain-derived TAPOS before opening the native signer',()=>{
-  const start=walletSource.indexOf("if(session.provider==='hufu')");
+  const start=walletSource.indexOf("if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact)");
   const end=walletSource.indexOf("if(session.provider==='iframe')",start);
   const branch=walletSource.slice(start,end);
   const preparation=branch.indexOf('await prepareHuFuTransaction(authorized)');
@@ -36,13 +36,25 @@ test('HuFu testnet uses chain-derived TAPOS before opening the native signer',()
 
 test('the iframe transport is used only by an iframe wallet session',()=>{
   const start=walletSource.indexOf('export async function transact(session,actions)');
-  const hufu=walletSource.indexOf("if(session.provider==='hufu')",start);
-  const branch=walletSource.slice(start,hufu);
+  const end=walletSource.indexOf("if(session.provider==='hufu')throw",start);
+  const branch=walletSource.slice(start,end);
 
-  assert.ok(start>=0&&hufu>start,'transaction dispatch was not found');
+  assert.ok(start>=0&&end>start,'transaction dispatch was not found');
   assert.match(branch,/session\.provider==='iframe'&&runtimeClient\.isInIframe\(\)/);
   assert.match(branch,/runtimeClient\.transact\(authorized\)/);
   assert.match(branch,/HUFU_IFRAME_TRANSACTION_TIMEOUT/);
+});
+
+test('an iframe-authenticated HuFu session prefers the full-transaction bridge',()=>{
+  const start=walletSource.indexOf('export async function transact(session,actions)');
+  const end=walletSource.indexOf("if(session.provider==='hufu')throw",start);
+  const branch=walletSource.slice(start,end);
+  const injected=branch.indexOf("session.provider==='hufu'||session.provider==='iframe'");
+  const legacyIframe=branch.indexOf("session.provider==='iframe'&&runtimeClient.isInIframe()");
+
+  assert.ok(injected>=0&&legacyIframe>injected,'full-transaction HuFu bridge must precede the legacy iframe fallback');
+  assert.match(branch,/const transaction=await prepareHuFuTransaction\(authorized\)/);
+  assert.match(branch,/provider\.transact\(\{transaction\}\)/);
 });
 
 test('wallet restore does not treat iframe geometry as wallet authorization',()=>{
