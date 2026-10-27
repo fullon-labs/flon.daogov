@@ -7,8 +7,18 @@ test('lists discussions through the unified API with cookie credentials',async()
   let request;
   const client=createDiscussionsClient({baseUrl:'https://community.example/api/',network:'testnet',fetchImpl:async(url,options)=>{request={url,options};return{ok:true,json:async()=>({items:[{id:'D_1'}]})}}});
   assert.deepEqual(await client.list(),[{id:'D_1'}]);
-  assert.equal(request.url,'https://community.example/api/v1/discussions?network=testnet');
+  assert.equal(request.url,'https://community.example/api/v1/discussions?network=testnet&actor=');
   assert.equal(request.options.credentials,'include');
+});
+
+test('writes wallet community votes and emoji through the unified API',async()=>{
+  const requests=[];
+  const client=createDiscussionsClient({baseUrl:'https://community.example/api',network:'testnet',fetchImpl:async(url,options)=>{requests.push({url,options});return{ok:true,json:async()=>({community:{}})}}});
+  await client.vote(7,{actor:'hellotoworld',vote:'up'});
+  await client.react(7,{actor:'hellotoworld',emoji:'ROCKET',active:true,commentId:'DC_1'});
+  assert.equal(requests[0].url,'https://community.example/api/v1/discussions/7/vote');
+  assert.deepEqual(JSON.parse(requests[0].options.body),{network:'testnet',actor:'hellotoworld',vote:'up'});
+  assert.equal(requests[1].url,'https://community.example/api/v1/discussions/7/comments/DC_1/reactions/ROCKET');
 });
 
 test('does not call the network when the API is not configured',async()=>{

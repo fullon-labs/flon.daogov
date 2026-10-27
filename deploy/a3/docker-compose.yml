@@ -33,6 +33,9 @@ services:
       GITHUB_APP_ID_FILE: /run/secrets/github_app_id
       GITHUB_APP_INSTALLATION_ID_FILE: /run/secrets/github_app_installation_id
       GITHUB_APP_PRIVATE_KEY_FILE: /run/secrets/github_app_private_key
+      COMMUNITY_DATA_FILE: /data/community-state.json
+    volumes:
+      - /data/flon-daogov/community:/data
     secrets:
       - github_app_id
       - github_app_installation_id
