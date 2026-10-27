@@ -6,7 +6,7 @@ async function request(base,path,{fetchImpl=fetch,method='GET',body}={}){
     method,credentials:'include',headers:{Accept:'application/json',...(body?{'Content-Type':'application/json'}:{})},
     ...(body?{body:JSON.stringify(body)}:{})
   });
-  if(!response.ok){const detail=await response.text().catch(()=> '');throw new Error(`DISCUSSIONS_API_${response.status}${detail?`: ${detail.slice(0,160)}`:''}`)}
+  if(!response.ok){const payload=await response.json().catch(()=>null);throw new Error(payload?.error||`DISCUSSIONS_API_${response.status}`)}
   return response.json();
 }
 

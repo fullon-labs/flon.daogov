@@ -20,3 +20,7 @@ test('DAO bot publishes a discussion with the connected FLON account attribution
 test('discussion creation rejects missing or invalid FLON account attribution',()=>withServer(async base=>{
   const response=await fetch(`${base}/community-api/v1/discussions`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({title:'Example',body:'A sufficiently long discussion body.'})});assert.equal(response.status,422);
 }));
+
+test('short but complete CJK discussion content is accepted',()=>withServer(async base=>{
+  const response=await fetch(`${base}/community-api/v1/discussions`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({actor:'hellotoworld',title:'降低单块收益',body:'增发太大了'})});assert.equal(response.status,201);
+}));
