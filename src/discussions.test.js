@@ -35,5 +35,9 @@ test('governance view provides desktop columns and mobile discussion/proposal ta
   assert.match(html,/id="governance-proposals"[\s\S]*data-action="create-proposal"/);
   assert.match(css,/\.governance-columns\{grid-template-columns:minmax\(0,2fr\) minmax\(0,3fr\)/);
   assert.match(css,/@media\(min-width:900px\)\{\.governance-mobile-tabs\{display:none\}/);
-  assert.match(css,/@media\(max-width:899px\)\{\.governance-column\.is-mobile-hidden\{display:none\}/);
+  assert.match(css,/@media\(max-width:899px\)\{/);
+  assert.match(css,/\.governance-column\.is-mobile-hidden\{display:none\}/);
+  assert.match(css,/\.discussion-list,\.proposal-column \.proposal-list\{display:flex;flex:1 1 auto;min-height:0;overflow-y:auto/);
+  assert.match(html,/data-governance-tab="discussions"[^>]*>[\s\S]*data-discussion-count/);
+  assert.match(html,/data-governance-tab="proposals"[^>]*>[\s\S]*data-proposal-count/);
 });

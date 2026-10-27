@@ -14,10 +14,18 @@ const discussionDetailTerms={
   'zh-TW':{'View proposal':'查看提案','Loading discussion details…':'正在讀取討論詳情…','Community replies':'社區回覆','No replies yet':'暫無回覆','Reply to discussion':'回覆討論','Publish reply':'發布回覆','Reply published':'回覆已發布','Could not load the discussion. Try again later':'讀取討論詳情失敗，請稍後重試','Could not publish the reply. Try again later':'發布回覆失敗，請稍後重試'}
 };
 
+const governanceListTerms={
+  fr:{'Community sentiment is for discussion only and does not replace on-chain governance voting.':'Les réactions communautaires servent uniquement à la discussion et ne remplacent pas le vote de gouvernance on-chain.','Load more':'Charger plus'},
+  ja:{'Community sentiment is for discussion only and does not replace on-chain governance voting.':'コミュニティの反応は議論専用であり、オンチェーンのガバナンス投票に代わるものではありません。','Load more':'さらに読み込む'},
+  ko:{'Community sentiment is for discussion only and does not replace on-chain governance voting.':'커뮤니티 반응은 토론용이며 온체인 거버넌스 투표를 대체하지 않습니다.','Load more':'더 보기'},
+  es:{'Community sentiment is for discussion only and does not replace on-chain governance voting.':'Las reacciones de la comunidad son solo para debatir y no sustituyen la votación de gobernanza on-chain.','Load more':'Cargar más'},
+  'zh-TW':{'Community sentiment is for discussion only and does not replace on-chain governance voting.':'社區表態僅用於討論，不代替鏈上治理投票。','Load more':'載入更多'}
+};
+
 export const generatedLocaleTerms={
-  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr},
-  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja},
-  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko},
-  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es},
-  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW']}
+  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr},
+  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja},
+  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko},
+  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es},
+  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW']}
 };
