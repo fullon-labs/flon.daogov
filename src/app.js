@@ -145,11 +145,6 @@ Object.assign(localeTerms.ja,{'Vote changes':'投票の変更','Before':'変更�
 Object.assign(localeTerms.ko,{'Vote changes':'투표 변경','Before':'변경 전','After':'변경 후','Added':'추가','Changed':'변경','Removed':'삭제'});
 Object.assign(localeTerms.es,{'Vote changes':'Cambios de voto','Before':'Antes','After':'Después','Added':'Añadido','Changed':'Modificado','Removed':'Eliminado'});
 Object.assign(localeTerms['zh-TW'],{'Vote changes':'投票變更','Before':'變更前','After':'變更後','Added':'新增','Changed':'修改','Removed':'移除'});
-Object.assign(localeTerms.fr,{'Enter at least 3 characters':'Saisissez au moins 3 caractères','The title or discussion is too short':'Le titre ou la discussion est trop court','Could not publish the discussion. Try again later':'Impossible de publier la discussion. Réessayez plus tard'});
-Object.assign(localeTerms.ja,{'Enter at least 3 characters':'3文字以上入力してください','The title or discussion is too short':'タイトルまたはディスカッションが短すぎます','Could not publish the discussion. Try again later':'ディスカッションを公開できませんでした。後でもう一度お試しください'});
-Object.assign(localeTerms.ko,{'Enter at least 3 characters':'3자 이상 입력하세요','The title or discussion is too short':'제목 또는 토론 내용이 너무 짧습니다','Could not publish the discussion. Try again later':'토론을 게시하지 못했습니다. 잠시 후 다시 시도하세요'});
-Object.assign(localeTerms.es,{'Enter at least 3 characters':'Introduce al menos 3 caracteres','The title or discussion is too short':'El título o la discusión es demasiado corto','Could not publish the discussion. Try again later':'No se pudo publicar la discusión. Inténtalo de nuevo más tarde'});
-Object.assign(localeTerms['zh-TW'],{'Enter at least 3 characters':'至少輸入 3 個字元','The title or discussion is too short':'標題或討論內容過短','Could not publish the discussion. Try again later':'無法發布討論，請稍後再試'});
 const sourceText=new WeakMap();
 const sourceAttrs=new WeakMap();
 function normalizeLanguage(value){const locale=String(value||'').replace('_','-'),lower=locale.toLowerCase();if(lower==='zh-tw'||lower==='zh-hk'||lower==='zh-hant')return'zh-TW';if(lower.startsWith('zh'))return'zh-CN';const base=lower.split('-')[0];return supportedLanguages.has(base)?base:'en'}
