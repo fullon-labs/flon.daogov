@@ -534,21 +534,15 @@ export async function transact(session,actions){
   // transaction sheet entry point in that environment and must win over the
   // stale cached label.
   const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
-  if(session.provider==='iframe'&&runtimeClient.isInIframe()){
-    return timeout(
-      Promise.resolve(runtimeClient.transact(authorized)),
-      hufuTransactionTimeoutMilliseconds,
-      'HUFU_IFRAME_TRANSACTION_TIMEOUT',
-    );
-  }
-  if(session.provider==='hufu'){
-    const provider=window.HuFu;if(!provider?.transact)throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
-    if(!injectedAuthorizationReady)throw new Error('HUFU_REAUTH_REQUIRED');
+  const provider=window.HuFu;
+  if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact){
+    if(session.provider==='hufu'&&!injectedAuthorizationReady)throw new Error('HUFU_REAUTH_REQUIRED');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
     confirmTransactionSnapshot(provider,current,session.chainId);
-    // Always derive TAPOS and expiration from this DApp's verified RPC. Letting
-    // HuFu construct the testnet envelope from device time can produce a
-    // transaction that is already expired when it reaches the chain.
+    // HuFuClient's legacy iframe protocol accepts actions only, so HuFu builds
+    // a short-lived transaction envelope that can expire while its approval
+    // sheet is open. The injected bridge accepts a complete transaction; use
+    // it for both injected and iframe-authenticated sessions whenever present.
     const transaction=await prepareHuFuTransaction(authorized);
     return timeout(
       Promise.resolve(provider.transact({transaction})),
@@ -556,6 +550,14 @@ export async function transact(session,actions){
       'HUFU_TRANSACTION_TIMEOUT',
     );
   }
+  if(session.provider==='iframe'&&runtimeClient.isInIframe()){
+    return timeout(
+      Promise.resolve(runtimeClient.transact(authorized)),
+      hufuTransactionTimeoutMilliseconds,
+      'HUFU_IFRAME_TRANSACTION_TIMEOUT',
+    );
+  }
+  if(session.provider==='hufu')throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
   const info=await rpcInfo();assertFreshChainTime(info);
   if(session.provider==='iframe')throw new Error('IFRAME_SESSION_EXPIRED');
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
