@@ -30,6 +30,12 @@
 | BP-14 | 到期领取 | FLON 到账、refund 删除、重复领取拒绝 |
 | BP-15 | `resumeprod` | 条件满足时恢复；不满足时精确拒绝 |
 | BP-16 | 第三方 `claimrewards` | permissionless 触发，款项只到正确受益方 |
+| BP-17 | Candidate 票数进入 Standby 阈值 | 排名、Standby 状态与候选池顺序一致，不进入 active schedule |
+| BP-18 | Standby 票数超过末位 Active | 下一自然 Epoch 按 quorum/席位规则切换，旧 BP 退出 schedule，新 BP 进入 |
+| BP-19 | 入选后连续两个 Epoch | schedule、节点日志、`bpstats` 三方一致，确实轮流出块 |
+| BP-20 | 票数回落退出席位 | 下一自然 Epoch 降级为 Standby/Candidate，之后不再获得 Active slot |
+| BP-21 | 注册资料更新 | signing key、URL、location、share 只更新指定字段且不改变自质押/票数 |
+| BP-22 | 相同排名/边界票数 | 排序确定且跨节点一致，不出现非确定性 schedule |
 
 ```bash
 scripts/testnet-e2e.sh bp-stake --env /tmp/flon-testnet-e2e.env --broadcast
@@ -56,6 +62,13 @@ scripts/testnet-e2e.sh bp-claim-refund --env /tmp/flon-testnet-e2e.env --broadca
 | VOTE-11 | 第二笔未结退款 | 再次 subvote 拒绝 |
 | VOTE-12 | 72 小时前 `voterefund` | 拒绝 |
 | VOTE-13 | 到期赎回 | FLON 返回 owner，退款记录删除 |
+| VOTE-14 | 三 BP 改为四 BP 非等额分配 | 只保存一份最新 pending 状态；旧 allocation 在边界前保持有效 |
+| VOTE-15 | 四 BP 改回三 BP | 被移除 BP 的增量精确扣除，其余 BP 按新值更新 |
+| VOTE-16 | Epoch 前多次修改 | 只应用最终版本，不叠加中间版本，不重复加票或减票 |
+| VOTE-17 | 分配后增加本金 | 必须重新提交总额等于新 locked stake 的完整 allocation |
+| VOTE-18 | 部分撤票后重分配 | GLON/DAO power、locked stake、allocation 总额同步降低且历史奖励不追溯 |
+| VOTE-19 | Epoch 边界原子性 | pending 消费、voter/allocations/producer totals 同批生效，不暴露半更新状态 |
+| VOTE-20 | 连续两 Epoch 稳定性 | 无新投票时不重复消费，不再次改变 producer totals |
 
 ```bash
 scripts/testnet-e2e.sh vote-add --env /tmp/flon-testnet-e2e.env --broadcast

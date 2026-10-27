@@ -21,9 +21,9 @@
 | 默认 quorum / 通过门槛 | 10% / 50% |
 | Timelock / 执行宽限期 | 5 分钟 / 24 小时 |
 | action 限制 | 最多 10 个；单个 4096 bytes；合计 16384 bytes |
-| 治理总票权 | `6,799 GLON` |
+| 治理总票权 | `10,799 GLON` |
 
-执行提案还要应用 L1–L4 风险策略，混合 actions 取最高风险。L3/L4 当前最低总票权为 10,000/50,000 GLON；在当前 6,799 GLON 下被拒绝是预期策略结果。
+执行提案还要应用 L1–L4 风险策略，混合 actions 取最高风险。L3/L4 当前最低总票权为 10,000/50,000 GLON；当前 `10,799 GLON` 已满足 L3 总票权门槛，但仍不足以激活 L4 提案。
 
 ## 3. 测试角色
 
@@ -48,6 +48,19 @@ BP block signing key 不得用作账户 owner/active key。建议使用可丢弃
 9. **T8 可执行提案**：ABI 编码、白名单/风险、action 冻结、queue、Timelock、permissionless execute、expire。
 10. **T9 Treasury**：入金、reserve、pay、release、closegrant 与账务守恒。
 11. **T10 回归**：LIB、余额、表状态、重复调用、错误分支与 DApp 展示。
+
+### 4.1 BP 竞选专项发布门禁
+
+BP 竞选必须连续覆盖至少两个自然 Reward Epoch，不能只验证单笔 action 成功：
+
+1. 保存 `producers/voters/voteallocs/pendingvote/electconfig`、active schedule、链头和 LIB 基线。
+2. 对同一 voter 连续执行“新增本金 → 三个 BP 非等额分配 → 修改为四个 BP → 撤去一个 BP → 部分撤回本金”，每轮分配都必须按账户名排序并等于当轮锁定本金。
+3. 每笔 `votealloc` 只创建下一 Epoch 的待生效状态；边界前旧票数和 schedule 不得提前变化。
+4. 自然封存后，待生效行必须被消费；逐 BP 验证 `new_total_votes = old_total_votes - old_allocation + new_allocation`，并核对 voter、allocation、排名、Active/Standby 和 schedule。
+5. 对入选 Active 的每个 BP，从节点日志、active schedule、`bpstats` 三处交叉验证实际出块；不得仅根据 `producers.is_active` 推断正在出块。
+6. 再跨一个完整 Epoch 验证变更稳定，避免只在封存瞬间读取过渡状态。
+
+任何 `pendingvote` 到期未消费、票数增量不精确、schedule 与席位规则不一致，或 `expected != produced + missed`，均为主网发布阻断。
 
 ## 5. BP Performance & Rewards 完整核算
 
