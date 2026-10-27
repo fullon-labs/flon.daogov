@@ -17,22 +17,21 @@ test('an existing HuFu session does not reopen account selection',()=>{
   assert.doesNotMatch(hufuTransactionBranch,/provider\.(?:request|getInfo|getChainId|getChainID)\(/);
   assert.doesNotMatch(hufuTransactionBranch,/waitForHuFuProvider/);
   assert.doesNotMatch(hufuTransactionBranch,/await wait\(/);
-  assert.match(hufuTransactionBranch,/config\(\)\.network==='mainnet'/);
-  assert.match(hufuTransactionBranch,/\? await prepareHuFuTransaction\(authorized\)/);
-  assert.match(hufuTransactionBranch,/: \{actions:authorized\}/);
+  assert.doesNotMatch(hufuTransactionBranch,/config\(\)\.network==='mainnet'/);
+  assert.match(hufuTransactionBranch,/const transaction=await prepareHuFuTransaction\(authorized\)/);
   assert.match(hufuTransactionBranch,/provider\.transact\(\{transaction\}\)/);
   assert.match(hufuTransactionBranch,/HUFU_TRANSACTION_TIMEOUT/);
 });
 
-test('HuFu testnet reaches the native signer without awaiting RPC TAPOS preparation',()=>{
+test('HuFu testnet uses chain-derived TAPOS before opening the native signer',()=>{
   const start=walletSource.indexOf("if(session.provider==='hufu')");
   const end=walletSource.indexOf("if(session.provider==='iframe')",start);
   const branch=walletSource.slice(start,end);
-  const networkChoice=branch.indexOf("config().network==='mainnet'");
+  const preparation=branch.indexOf('await prepareHuFuTransaction(authorized)');
   const nativeSigner=branch.indexOf('provider.transact({transaction})');
 
-  assert.ok(networkChoice>=0&&nativeSigner>networkChoice,'HuFu network-specific transaction path was not found');
-  assert.match(branch.slice(networkChoice,nativeSigner),/: \{actions:authorized\}/);
+  assert.ok(preparation>=0&&nativeSigner>preparation,'HuFu chain-derived TAPOS path was not found');
+  assert.doesNotMatch(branch,/\{actions:authorized\}/);
 });
 
 test('the iframe transport is used only by an iframe wallet session',()=>{
@@ -90,4 +89,5 @@ test('HuFu TAPOS uses irreversible block data and chain-derived expiration',()=>
   assert.match(preparation,/last_irreversible_block_id/);
   assert.match(preparation,/ref_block_prefix:blockPrefixFromId/);
   assert.match(preparation,/expiration:expirationFromChainTime/);
+  assert.match(walletSource,/const hufuExpirationSeconds=300/);
 });
