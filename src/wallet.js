@@ -13,7 +13,7 @@ const rewardEpochMilliseconds=21600000;
 const blockTimestampEpochMilliseconds=Date.UTC(2000,0,1);
 const transactionOptions={blocksBehind:3,expireSeconds:300};
 const hufuTransactionTimeoutMilliseconds=45000;
-const hufuExpirationSeconds=120;
+const hufuExpirationSeconds=300;
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
@@ -546,13 +546,10 @@ export async function transact(session,actions){
     if(!injectedAuthorizationReady)throw new Error('HUFU_REAUTH_REQUIRED');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
     confirmTransactionSnapshot(provider,current,session.chainId);
-    // Match the proven numguess HuFu path: testnet must reach transact in the
-    // original tap task with actions only. Awaiting RPC/TAPOS preparation here
-    // loses the native WebView gesture in affected HuFu releases. Mainnet keeps
-    // explicit chain-derived TAPOS to avoid the older clock-skew expiration bug.
-    const transaction=config().network==='mainnet'
-      ? await prepareHuFuTransaction(authorized)
-      : {actions:authorized};
+    // Always derive TAPOS and expiration from this DApp's verified RPC. Letting
+    // HuFu construct the testnet envelope from device time can produce a
+    // transaction that is already expired when it reaches the chain.
+    const transaction=await prepareHuFuTransaction(authorized);
     return timeout(
       Promise.resolve(provider.transact({transaction})),
       hufuTransactionTimeoutMilliseconds,
