@@ -534,7 +534,11 @@ export async function transact(session,actions){
   // transaction sheet entry point in that environment and must win over the
   // stale cached label.
   const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
-  const provider=window.HuFu;
+  // HuFu injects the full-transaction bridge asynchronously. In an iframe
+  // session it is common for HuFuClient to be ready several seconds before
+  // window.HuFu; taking an immediate snapshot here incorrectly selects the
+  // legacy actions-only path and recreates a 30-second transaction envelope.
+  const provider=window.HuFu||(isHuFuApp()?await prepareHuFu():null);
   if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact){
     if(session.provider==='hufu'&&!injectedAuthorizationReady)throw new Error('HUFU_REAUTH_REQUIRED');
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
