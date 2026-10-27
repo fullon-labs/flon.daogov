@@ -529,10 +529,11 @@ function formatCountdown(milliseconds){
   return [hours,minutes,remaining].map(value=>String(value).padStart(2,'0')).join(':');
 }
 function updateEpochCountdown(){
-  const label=document.querySelector('[data-vote-epoch-label]'),value=document.querySelector('[data-vote-epoch-countdown]');
-  if(!label||!value)return;
+  const title=document.querySelector('[data-vote-epoch-title]'),label=document.querySelector('[data-vote-epoch-label]'),value=document.querySelector('[data-vote-epoch-countdown]');
+  if(!title||!label||!value)return;
   const timing=epochCountdownAnchor;
-  if(!timing){label.textContent=currentLanguage==='zh-CN'?'Epoch 时间不可用':'Epoch timing unavailable';value.textContent='--:--:--';return}
+  if(!timing){title.textContent=translateText('下一 Epoch 生效');label.textContent=currentLanguage==='zh-CN'?'Epoch 时间不可用':'Epoch timing unavailable';value.textContent='--:--:--';return}
+  title.textContent=currentLanguage==='zh-CN'?`Epoch ${timing.targetEpoch} 生效`:`${translateText('下一 Epoch 生效')} · ${timing.targetEpoch}`;
   const estimatedChainNow=timing.chainHeadMs+(Date.now()-timing.observedAt);
   const remaining=timing.boundaryMs-estimatedChainNow;
   if(remaining<=0&&timing.hasPendingVote){label.textContent=`Epoch ${timing.targetEpoch} · ${currentLanguage==='zh-CN'?'等待 Epoch 结算':'Awaiting epoch settlement'}`;value.textContent='';return}
