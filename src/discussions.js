@@ -16,6 +16,8 @@ export function createDiscussionsClient({baseUrl,fetchImpl=fetch,network='testne
     configured:Boolean(base),
     async session(){return request(base,'/v1/session',{fetchImpl})},
     async list(){const result=await request(base,`/v1/discussions?network=${encodeURIComponent(network)}`,{fetchImpl});return Array.isArray(result)?result:(result.items||[])},
+    async detail(number){return request(base,`/v1/discussions/${Number(number)}`,{fetchImpl})},
+    async reply(number,{body,actor}){return request(base,`/v1/discussions/${Number(number)}/comments`,{fetchImpl,method:'POST',body:{network,body,actor}})},
     async create({title,body,actor,proposalId=null}){return request(base,'/v1/discussions',{fetchImpl,method:'POST',body:{network,title,body,actor,proposal_id:proposalId}})}
   };
 }
