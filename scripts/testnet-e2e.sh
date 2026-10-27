@@ -5,6 +5,7 @@ readonly TESTNET_CHAIN_ID="18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 RPC_URL="${RPC_URL:-https://t4.flon.network}"
+PUSH_RPC_URL="${PUSH_RPC_URL:-$RPC_URL}"
 EXPECTED_CHAIN_ID="${EXPECTED_CHAIN_ID:-$TESTNET_CHAIN_ID}"
 FUWAL_CONTAINER="${FUWAL_CONTAINER:-fuwal}"
 WALLET_URL="${WALLET_URL:-unix:///tmp/fuwal.sock}"
@@ -33,7 +34,7 @@ rpc() {
     --retry 2 --retry-delay 1 "$RPC_URL$1" \
     -H 'content-type: application/json' --data "$2"
 }
-cli() { docker exec "$FUWAL_CONTAINER" fucli --wallet-url "$WALLET_URL" --no-auto-wallet -u "$RPC_URL" "$@"; }
+cli() { docker exec "$FUWAL_CONTAINER" fucli --wallet-url "$WALLET_URL" --no-auto-wallet -u "$PUSH_RPC_URL" "$@"; }
 rows() {
   rpc /v1/chain/get_table_rows "$(jq -cn --arg c "$1" --arg s "$2" --arg t "$3" \
     '{json:true,code:$c,scope:$s,table:$t,limit:1000}')"
@@ -70,6 +71,11 @@ push() {
   result="$(cli push action "$contract" "$action" "$data" -p "$auth" -j 2>&1)" || {
     printf '%s\n' "$result" | tee "$EVIDENCE_DIR/$file-error.txt" >&2; return 1;
   }
+  if ! jq -e '(.processed.except == null) and (.processed.error_code == null)' <<<"$result" >/dev/null 2>&1; then
+    printf '%s\n' "$result" | tee "$EVIDENCE_DIR/$file-error.json" >&2
+    log "Chain rejected $contract::$action"
+    return 1
+  fi
   printf '%s\n' "$result" | tee "$EVIDENCE_DIR/$file.json"
   jq -r '.transaction_id // empty' <<<"$result" | tee -a "$EVIDENCE_DIR/transactions.txt"
 }
@@ -203,7 +209,15 @@ case "$COMMAND" in
     ;;
   treasury-deposit)
     guard_testnet; need PROPOSER_ACCOUNT; need TREASURY_DEPOSIT_AMOUNT; write_guard
-    cli transfer "$PROPOSER_ACCOUNT" dao.treasury "$TREASURY_DEPOSIT_AMOUNT" "testnet E2E treasury deposit" -p "$PROPOSER_ACCOUNT@${PROPOSER_PERMISSION:-active}" -j | tee "$EVIDENCE_DIR/treasury-deposit.json"
+    result="$(cli transfer "$PROPOSER_ACCOUNT" dao.treasury "$TREASURY_DEPOSIT_AMOUNT" "testnet E2E treasury deposit" -p "$PROPOSER_ACCOUNT@${PROPOSER_PERMISSION:-active}" -j 2>&1)" || {
+      printf '%s\n' "$result" | tee "$EVIDENCE_DIR/treasury-deposit-error.txt" >&2; exit 1;
+    }
+    if ! jq -e '(.processed.except == null) and (.processed.error_code == null)' <<<"$result" >/dev/null 2>&1; then
+      printf '%s\n' "$result" | tee "$EVIDENCE_DIR/treasury-deposit-error.json" >&2
+      die "chain rejected treasury deposit"
+    fi
+    printf '%s\n' "$result" | tee "$EVIDENCE_DIR/treasury-deposit.json"
+    jq -r '.transaction_id // empty' <<<"$result" | tee -a "$EVIDENCE_DIR/transactions.txt"
     ;;
   *) die "unknown command: $COMMAND" ;;
 esac
