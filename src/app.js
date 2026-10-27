@@ -6,6 +6,7 @@ import {formatVoteInput,voteAllocationChanges} from './vote-diff.js';
 import {generatedLocaleTerms} from './locales/index.js';
 import {formatOverviewAsset} from './network-summary.js';
 import {iso3166Regions,regionByNumeric,regionDisplayName} from './countries.js';
+import {createDiscussionsClient} from './discussions.js';
 
 const views=[...document.querySelectorAll('.view')];
 const nav=[...document.querySelectorAll('.bottom-nav [data-view-target]')];
@@ -18,6 +19,7 @@ const runtimeConfig=Object.freeze({
   networkName:'FullOn 测试网',
   chainId:'18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f',
   rpcUrl:'/rpc',
+  discussionApiUrl:'/community-api',
   voteRefundDelaySeconds:3*24*60*60,
   ...(window.__DAO_GOV_CONFIG__||{})
 });
@@ -29,12 +31,16 @@ let votingState=null;
 let profileBPRewards=null;
 let electionState=null;
 let governanceState=null;
+let discussionState={loading:true,items:[],session:null,error:''};
+const discussions=createDiscussionsClient({baseUrl:runtimeConfig.discussionApiUrl,network:runtimeConfig.network});
 const contractAbiCache=new Map();
 const proposalActionChecks=new WeakMap();
 let pendingVoteAllocations=null;
 let epochCountdownTimer=null;
 let refundCountdownTimer=null;
 let epochCountdownAnchor=null;
+let epochBoundaryRefreshAt=0;
+let epochBoundaryRefreshPromise=null;
 let candidateStep=1;
 let sheetViewportBaseline=window.innerHeight;
 let candidateChainState={loading:false,registered:false,producer:null,error:''};
@@ -121,6 +127,9 @@ const translations=new Map([
 [
   ['BP 自质押与解锁期设置','BP self-stake and unlock settings'],['是否在排班中强制执行自质押门槛','Enforce self-stake requirement in scheduling'],['最低 BP 自质押','Minimum BP self-stake'],['自质押解锁期（秒）','Self-stake unlock period (seconds)']
 ].forEach(([zh,en])=>translations.set(zh,en));
+[
+  ['治理内容','Governance content'],['治理提案','Governance proposals'],['发起讨论','Start discussion'],['先讨论和完善社区议题，再形成链上治理提案。','Discuss and refine community topics before creating an on-chain proposal.'],['正在读取社区讨论…','Loading community discussions…'],['讨论服务暂未接入','Discussion service is not connected'],['链上提案仍可正常使用。配置统一社区 API 后，这里将显示 GitHub Discussions。','On-chain proposals remain available. GitHub Discussions will appear here after the unified community API is configured.'],['尚无社区讨论','No community discussions yet'],['条回复','replies'],['查看讨论','View discussion'],['发起社区讨论','Start a community discussion'],['讨论将通过统一 API 发布到 GitHub Discussions，成熟后可进一步创建链上提案。','The discussion is published to GitHub Discussions through the unified API and can later become an on-chain proposal.'],['讨论内容','Discussion'],['发布讨论','Publish discussion'],['社区讨论已发布','Community discussion published']
+].forEach(([zh,en])=>translations.set(zh,en));
 const languageLabels={en:'English',fr:'Français',ja:'日本語',ko:'한국어',es:'Español','zh-CN':'简体中文','zh-TW':'繁體中文'};
 const supportedLanguages=new Set(Object.keys(languageLabels));
 const localeTerms={
@@ -178,7 +187,7 @@ function showView(name){
   window.scrollTo({top:0,behavior:'smooth'});
   if(name==='nodes')setMobileVoteTab('directory');
   if(name==='mine')refreshBPRecovery();
-  if(name==='dao')refreshGovernance();
+  if(name==='dao')Promise.all([refreshGovernance(),refreshDiscussions()]);
 }
 function navigateBack(){
   if(window.history.length>1){window.history.back();return}
@@ -364,10 +373,41 @@ function renderGovernance(){
   if(!configured){list.innerHTML='<div class="inline-error">dao.gov 已部署，但治理参数尚未配置。配置完成前不能发起提案。</div>';preview.innerHTML='<div class="inline-error">治理参数尚未配置</div>';applyTranslations();return}
   list.innerHTML=proposals.length?proposals.map(proposalCard).join(''):'<div class="empty-state">尚无链上提案</div>';
   preview.innerHTML=proposals.length?proposalCard(proposals[0]):'<div class="empty-state">尚无链上提案</div>';
+  if(!discussionState.loading)renderDiscussions();
   applyTranslations();
 }
 async function refreshGovernance(){
   try{governanceState=await loadGovernance(walletSession?.account||'');renderGovernance()}catch(error){console.error('Failed to load DAO governance',error);governanceState=null;setGovernanceAttention(false);const list=document.querySelector('.proposal-list');if(list)list.innerHTML=`<div class="inline-error">链上治理数据读取失败：${escapeHtml(String(error?.message||error))}</div>`}
+}
+function discussionCard(item,index){
+  const url=safePublicUrl(item.url||item.html_url),comments=Number(item.comments_count??item.comments??0),author=item.author?.login||item.author||'GitHub user',updated=item.updated_at||item.created_at||'';
+  const linked=(governanceState?.proposals||[]).find(proposal=>safePublicUrl(proposal.discussion_uri)===url);
+  return `<article class="discussion-item"><div class="discussion-meta"><span>${escapeHtml(author)}</span>${updated?`<time>${escapeHtml(String(updated).slice(0,10))}</time>`:''}</div><h3>${escapeHtml(item.title||'Untitled discussion')}</h3><p>${escapeHtml(item.excerpt||item.body_text||item.body||'')}</p><footer><span>${comments} 条回复</span><span class="discussion-actions">${url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">查看讨论 ↗</a>`:''}${linked?`<button type="button" data-action="dao-details" data-proposal-id="${Number(linked.proposal_id)}">查看</button>`:`<button type="button" data-action="discussion-propose" data-discussion-index="${index}">发起提案</button>`}</span></footer></article>`;
+}
+function renderDiscussions(){
+  const list=document.querySelector('.discussion-list'),create=document.querySelector('[data-action="create-discussion"]');if(!list)return;
+  if(discussionState.loading){list.innerHTML='<div class="loading-state"><i></i><span>正在读取社区讨论…</span></div>';return}
+  if(discussionState.error){list.innerHTML='<div class="discussion-unavailable"><strong>讨论服务暂未接入</strong><p>链上提案仍可正常使用。配置统一社区 API 后，这里将显示 GitHub Discussions。</p></div>';if(create)create.disabled=true;applyTranslations(list);return}
+  if(create)create.disabled=false;
+  list.innerHTML=discussionState.items.length?discussionState.items.map(discussionCard).join(''):'<div class="empty-state">尚无社区讨论</div>';
+  applyTranslations(list);
+}
+async function refreshDiscussions(){
+  discussionState={...discussionState,loading:true,error:''};renderDiscussions();
+  try{
+    const [items,session]=await Promise.all([discussions.list(),discussions.session().catch(()=>null)]);
+    discussionState={loading:false,items,session,error:''};
+  }catch(error){console.error('Failed to load GitHub discussions',error);discussionState={loading:false,items:[],session:null,error:String(error?.message||error)}}
+  renderDiscussions();
+}
+function openCreateDiscussion(){
+  if(discussionState.error){showToast('讨论服务暂未接入');return}
+  if(!discussionState.session?.authenticated){window.location.assign(discussions.signInUrl());return}
+  openSheet(`<h2 id="sheet-title">发起社区讨论</h2><p class="sheet-subtitle">讨论将通过统一 API 发布到 GitHub Discussions，成熟后可进一步创建链上提案。</p><form class="wizard-form" data-discussion-form><label><span>标题</span><input name="title" maxlength="120" required></label><label><span>讨论内容</span><textarea name="body" maxlength="10000" rows="10" required></textarea></label></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="discussion-submit">发布讨论</button></div>`);
+}
+async function submitDiscussion(target){
+  const form=sheetContent.querySelector('[data-discussion-form]');if(!form?.reportValidity())return;const data=new FormData(form);target.disabled=true;
+  try{const item=await discussions.create({title:String(data.get('title')||''),body:String(data.get('body')||'')});closeSheet();showToast('社区讨论已发布');await refreshDiscussions();const url=safePublicUrl(item.url||item.html_url);if(url)window.open(url,'_blank','noopener,noreferrer')}catch(error){target.disabled=false;showToast(String(error?.message||error))}
 }
 function findProposal(id){return governanceState?.proposals?.find(item=>Number(item.proposal_id)===Number(id))||null}
 function proposalPolicy(id){return governanceState?.policySnapshots?.find(item=>Number(item.proposal_id)===Number(id))||null}
@@ -381,10 +421,11 @@ function openProposalDetails(id){
   const proposal=findProposal(id);if(!proposal)return;const policy=proposalPolicy(id),action=governanceActionFor(proposal),forum=safePublicUrl(proposal.discussion_uri),metadata=safePublicUrl(proposal.metadata_uri);
   openSheet(`<h2 id="sheet-title">${escapeHtml(proposal.title)}</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml((DAO_STATUS_META[Number(proposal.status)]||['未知'])[0])}</p><div class="sign-summary"><div><span>提案人</span><strong>${escapeHtml(proposal.proposer)}</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal.proposal_type)}</strong></div>${policy?`<div><span>风险等级</span><strong>L${Number(policy.risk_level)}</strong></div><div><span>最低全网票权</span><strong>${escapeHtml(policy.min_total_power||'待激活')}</strong></div><div><span>Quorum / 通过率 / 绝对支持</span><strong>${Number(policy.quorum_bps||0)/100}% / ${Number(policy.approval_bps||0)/100}% / ${Number(policy.min_support_bps||0)/100}%</strong></div>`:''}<div><span>附议</span><strong>${Number(proposal.endorsement_count||0)}</strong></div><div><span>赞成</span><strong>${escapeHtml(proposal.for_votes)}</strong></div><div><span>反对</span><strong>${escapeHtml(proposal.against_votes)}</strong></div><div><span>弃权</span><strong>${escapeHtml(proposal.abstain_votes)}</strong></div><div><span>拟议变更</span><strong>${proposal.actions?.length||0}</strong></div></div><p class="proposal-summary">${escapeHtml(proposal.summary)}</p><div class="profile-review">${metadata?`<strong>提案文档</strong><a href="${escapeHtml(metadata)}" target="_blank" rel="noopener noreferrer">${escapeHtml(metadata)}</a>`:''}${forum?`<strong>社区讨论</strong><a href="${escapeHtml(forum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(forum)}</a>`:'<strong>社区讨论</strong><small>尚未关联论坛讨论</small>'}</div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">关闭</button>${action?`<button class="primary-button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${proposal.proposal_id}">${escapeHtml(action.label)}</button>`:''}</div>`);
 }
-function openCreateProposal(){
+function openCreateProposal(prefill={}){
   if(!walletSession){openWalletSheet();return}if(!governanceState?.config){showToast('治理参数尚未配置');return}
   const rules=governanceExecutableRules(),executable=rules.length>0;
-  openSheet(`<h2 id="sheet-title">发起治理提案</h2><p class="sheet-subtitle">信号提案表达社区意见；可执行提案通过后只执行创建时锁定的白名单 action。</p><form class="wizard-form" data-proposal-form><fieldset class="proposal-type-picker"><legend>提案类型</legend><label><input type="radio" name="proposalType" value="signal" checked><span><strong>文本 / 信号提案</strong><small>表达社区意见，不执行链上 action</small></span><i aria-hidden="true"></i></label><label class="${executable?'':'is-disabled'}"><input type="radio" name="proposalType" value="parameter" ${executable?'':'disabled'}><span><strong>可执行参数提案</strong><small>${executable?'通过后执行提交时锁定的白名单 action':'白名单为空，暂不可用'}</small></span><i aria-hidden="true"></i></label></fieldset><label><span>标题</span><input name="title" maxlength="128" required></label><label><span>摘要</span><textarea name="summary" maxlength="1024" rows="5" required></textarea></label><label><span>提案文档 URI</span><input name="metadataUri" type="url" maxlength="512" placeholder="https://…" required></label><label><span>社区讨论 URI</span><input name="discussionUri" type="url" maxlength="512" placeholder="https://forum…"></label><section class="proposal-actions-editor" data-proposal-actions hidden><header><strong>拟议变更</strong><button type="button" data-action="dao-add-proposal-action">+ 添加 action</button></header><div data-proposal-action-list></div><p class="field-note">配置类操作会自动填入链上当前值，请只修改希望变更的字段。提交提案后，操作与参数将被锁定，投票期间不能替换。</p></section><p class="field-note">提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。</p></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-sign">检查并签名</button></div>`);
+  const title=escapeHtml(String(prefill.title||'').slice(0,128)),summary=escapeHtml(String(prefill.summary||'').slice(0,1024)),discussionUri=escapeHtml(safePublicUrl(prefill.discussionUri)||''),metadataUri=escapeHtml(safePublicUrl(prefill.metadataUri)||discussionUri);
+  openSheet(`<h2 id="sheet-title">发起治理提案</h2><p class="sheet-subtitle">信号提案表达社区意见；可执行提案通过后只执行创建时锁定的白名单 action。</p><form class="wizard-form" data-proposal-form><fieldset class="proposal-type-picker"><legend>提案类型</legend><label><input type="radio" name="proposalType" value="signal" checked><span><strong>文本 / 信号提案</strong><small>表达社区意见，不执行链上 action</small></span><i aria-hidden="true"></i></label><label class="${executable?'':'is-disabled'}"><input type="radio" name="proposalType" value="parameter" ${executable?'':'disabled'}><span><strong>可执行参数提案</strong><small>${executable?'通过后执行提交时锁定的白名单 action':'白名单为空，暂不可用'}</small></span><i aria-hidden="true"></i></label></fieldset><label><span>标题</span><input name="title" maxlength="128" value="${title}" required></label><label><span>摘要</span><textarea name="summary" maxlength="1024" rows="5" required>${summary}</textarea></label><label><span>提案文档 URI</span><input name="metadataUri" type="url" maxlength="512" value="${metadataUri}" placeholder="https://…" required></label><label><span>社区讨论 URI</span><input name="discussionUri" type="url" maxlength="512" value="${discussionUri}" placeholder="https://forum…"></label><section class="proposal-actions-editor" data-proposal-actions hidden><header><strong>拟议变更</strong><button type="button" data-action="dao-add-proposal-action">+ 添加 action</button></header><div data-proposal-action-list></div><p class="field-note">配置类操作会自动填入链上当前值，请只修改希望变更的字段。提交提案后，操作与参数将被锁定，投票期间不能替换。</p></section><p class="field-note">提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。</p></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-sign">检查并签名</button></div>`);
 }
 const governanceActionLabels={
   'dao.gov::setallow':['管理执行白名单','Manage execution allowlist'],
@@ -528,6 +569,18 @@ function formatCountdown(milliseconds){
   const hours=Math.floor(seconds/3600),minutes=Math.floor((seconds%3600)/60),remaining=seconds%60;
   return [hours,minutes,remaining].map(value=>String(value).padStart(2,'0')).join(':');
 }
+function refreshAfterEpochBoundary(){
+  const now=Date.now();
+  if(epochBoundaryRefreshPromise||now-epochBoundaryRefreshAt<5000)return;
+  epochBoundaryRefreshAt=now;
+  let draft=null;
+  try{draft=votingState?draftVoteAllocations():null}catch{draft=null}
+  epochBoundaryRefreshPromise=new Promise(resolve=>window.setTimeout(resolve,1200))
+    .then(()=>refreshVotingAccount())
+    .then(()=>{if(draft)restoreVoteAllocations(draft)})
+    .catch(error=>console.error('Failed to refresh voting state at epoch boundary',error))
+    .finally(()=>{epochBoundaryRefreshPromise=null});
+}
 function updateEpochCountdown(){
   const title=document.querySelector('[data-vote-epoch-title]'),label=document.querySelector('[data-vote-epoch-label]'),value=document.querySelector('[data-vote-epoch-countdown]');
   if(!title||!label||!value)return;
@@ -536,7 +589,12 @@ function updateEpochCountdown(){
   title.textContent=currentLanguage==='zh-CN'?`Epoch ${timing.targetEpoch} 生效`:`${translateText('下一 Epoch 生效')} · ${timing.targetEpoch}`;
   const estimatedChainNow=timing.chainHeadMs+(Date.now()-timing.observedAt);
   const remaining=timing.boundaryMs-estimatedChainNow;
-  if(remaining<=0&&timing.hasPendingVote){label.textContent=`Epoch ${timing.targetEpoch} · ${currentLanguage==='zh-CN'?'等待 Epoch 结算':'Awaiting epoch settlement'}`;value.textContent='';return}
+  if(remaining<=0){
+    label.textContent=timing.hasPendingVote?`Epoch ${timing.targetEpoch} · ${currentLanguage==='zh-CN'?'等待 Epoch 结算':'Awaiting epoch settlement'}`:(currentLanguage==='zh-CN'?'正在同步下一 Epoch…':'Syncing the next epoch…');
+    value.textContent='';
+    refreshAfterEpochBoundary();
+    return;
+  }
   label.textContent=timing.hasPendingVote?`${currentLanguage==='zh-CN'?'距离 Epoch 生效':'Until epoch activation'} ${timing.targetEpoch}`:`${currentLanguage==='zh-CN'?'距离下一 Epoch':'Until next epoch'} ${timing.targetEpoch}`;
   value.textContent=formatCountdown(remaining);
 }
@@ -790,6 +848,12 @@ document.addEventListener('click',async event=>{
   if(action==='vote-sign')await submitVote(target);
   if(action==='governance-unavailable')openSheet(`<h2 id="sheet-title">DAO治理尚未启用</h2><p class="sheet-subtitle">当前站点未配置可验证的治理合约 ABI 与部署地址</p><p class="sign-warning">提案、附议、正式投票、Timelock 和执行按钮已保持只读，不会请求钱包签名，也不会广播模拟交易。</p><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);
   if(action==='create-proposal')openCreateProposal();
+  if(action==='discussion-propose'){
+    const item=discussionState.items[Number(target.dataset.discussionIndex)];
+    if(item)openCreateProposal({title:item.title,summary:item.excerpt||item.body_text||item.body,discussionUri:item.url||item.html_url,metadataUri:item.url||item.html_url});
+  }
+  if(action==='create-discussion')openCreateDiscussion();
+  if(action==='discussion-submit')await submitDiscussion(target);
   if(action==='dao-add-proposal-action'){
     const list=sheetContent.querySelector('[data-proposal-action-list]'),maximum=Number(governanceState?.config?.max_actions||0);
     if(list&&list.children.length<maximum){list.insertAdjacentHTML('beforeend',proposalActionRow());void renderProposalActionFields(list.lastElementChild)}else showToast(`单个提案最多 ${maximum} 个 action`);
@@ -855,6 +919,9 @@ document.querySelectorAll('[data-node-filter]').forEach(button=>button.addEventL
 document.querySelector('[data-node-selected-only]')?.addEventListener('click',event=>{event.currentTarget.classList.toggle('is-active');applyNodeFilters()});
 document.querySelector('[data-node-search]').addEventListener('input',applyNodeFilters);
 document.querySelectorAll('[data-proposal-filter]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-proposal-filter]').forEach(b=>b.classList.toggle('is-active',b===button));document.querySelectorAll('.proposal-item').forEach(card=>card.hidden=button.dataset.proposalFilter!=='all'&&card.dataset.status!==button.dataset.proposalFilter)}));
+function setGovernanceTab(name){document.querySelectorAll('[data-governance-tab]').forEach(button=>{const active=button.dataset.governanceTab===name;button.classList.toggle('is-active',active);button.setAttribute('aria-selected',String(active))});document.querySelectorAll('[data-governance-panel]').forEach(panel=>panel.classList.toggle('is-mobile-hidden',panel.dataset.governancePanel!==name))}
+document.querySelectorAll('[data-governance-tab]').forEach(button=>button.addEventListener('click',()=>setGovernanceTab(button.dataset.governanceTab)));
+setGovernanceTab('discussions');
 
 applyTranslations();
 renderVotingAccount();
@@ -874,6 +941,7 @@ if(bpList){
   window.addEventListener('scroll',()=>{if(!scrollFrame)scrollFrame=requestAnimationFrame(()=>{scrollFrame=0;refreshAtBottom()})},{passive:true});
 }
 refreshGovernance();
+refreshDiscussions();
 async function initializeWallet(){
   let session=await restoreWallet();
   if(!session&&isHuFuApp())session=await autoConnectHuFuWallet();
@@ -886,4 +954,4 @@ initializeWallet().catch(error=>{
   renderWallet();
   if(isHuFuApp())showToast(walletErrorMessage(error));
 });
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')Promise.all([refreshVotingAccount(),refreshGovernance()]).catch(error=>console.error('Failed to refresh chain state',error))});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')Promise.all([refreshVotingAccount(),refreshGovernance(),refreshDiscussions()]).catch(error=>console.error('Failed to refresh state',error))});

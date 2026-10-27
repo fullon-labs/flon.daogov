@@ -137,8 +137,19 @@
         <div class="content">
           <div class="page-heading"><span><small>社区决策</small><h1>DAO治理</h1></span><button class="primary-small" type="button" data-action="create-proposal"><svg><use href="#i-edit"/></svg>发起提案</button></div>
           <div class="governance-stats"><span><strong class="din" data-dao-endorsement>—</strong><small>附议中</small></span><span><strong class="din" data-dao-voting>—</strong><small>投票中</small></span><span><strong class="din" data-dao-execution>—</strong><small>待执行</small></span></div>
-          <div class="tabs dao-tabs"><button class="is-active" data-proposal-filter="all">全部</button><button data-proposal-filter="endorsement">附议中</button><button data-proposal-filter="voting">投票中</button><button data-proposal-filter="execution">待执行</button></div>
-          <div class="proposal-list"><div class="loading-state"><i></i><span>正在读取链上提案…</span></div></div>
+          <div class="governance-mobile-tabs" role="tablist" aria-label="治理内容"><button class="is-active" type="button" role="tab" aria-selected="true" data-governance-tab="discussions">社区讨论</button><button type="button" role="tab" aria-selected="false" data-governance-tab="proposals">治理提案</button></div>
+          <div class="governance-columns">
+            <section class="governance-column discussion-column" data-governance-panel="discussions">
+              <header class="governance-column-head"><span><small>GitHub Discussions</small><h2>社区讨论</h2></span><button class="secondary-small" type="button" data-action="create-discussion">发起讨论</button></header>
+              <p class="column-intro">先讨论和完善社区议题，再形成链上治理提案。</p>
+              <div class="discussion-list"><div class="loading-state"><i></i><span>正在读取社区讨论…</span></div></div>
+            </section>
+            <section class="governance-column proposal-column" data-governance-panel="proposals">
+              <header class="governance-column-head"><span><small>On-chain</small><h2>治理提案</h2></span></header>
+              <div class="tabs dao-tabs"><button class="is-active" data-proposal-filter="all">全部</button><button data-proposal-filter="endorsement">附议中</button><button data-proposal-filter="voting">投票中</button><button data-proposal-filter="execution">待执行</button></div>
+              <div class="proposal-list"><div class="loading-state"><i></i><span>正在读取链上提案…</span></div></div>
+            </section>
+          </div>
         </div>
       </section>
 
