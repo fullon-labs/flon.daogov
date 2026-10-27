@@ -7,6 +7,7 @@ services:
       - "127.0.0.1:20101:80"
     volumes:
       - ./config.mainnet.js:/usr/share/nginx/html/config.js:ro
+      - ./community-api.conf:/etc/nginx/daogov/community-api.conf:ro
 
   daogov-testnet:
     image: local/flon-daogov:${IMAGE_TAG:-latest}
@@ -17,6 +18,29 @@ services:
     volumes:
       - ./config.testnet.js:/usr/share/nginx/html/config.js:ro
       - ./api.testnet.conf:/etc/nginx/daogov/api.conf:ro
+      - ./community-api.conf:/etc/nginx/daogov/community-api.conf:ro
+
+  community-api:
+    image: local/flon-daogov-community-api:${IMAGE_TAG:-latest}
+    container_name: flon-daogov-community-api
+    restart: unless-stopped
+    environment:
+      PORT: "8789"
+      GITHUB_OWNER: fullon-labs
+      GITHUB_REPO: flon.daogov
+      GITHUB_DISCUSSION_CATEGORY: General
+      GITHUB_OAUTH_CALLBACK_URL: https://daogov.flon.network/community-api/v1/auth/github/callback
+      SESSION_COOKIE_DOMAIN: .flon.network
+      ALLOWED_ORIGINS: https://daogov.flon.network,https://daogov-t.flon.network
+      GITHUB_CLIENT_ID_FILE: /run/secrets/github_oauth_client_id
+      GITHUB_CLIENT_SECRET_FILE: /run/secrets/github_oauth_client_secret
+      SESSION_SECRET_FILE: /run/secrets/community_session_secret
+    secrets:
+      - github_oauth_client_id
+      - github_oauth_client_secret
+      - community_session_secret
+    ports:
+      - "127.0.0.1:20103:8789"
 
   daogov-keeper-mainnet:
     image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.2.0}
@@ -52,3 +76,9 @@ services:
 secrets:
   testnet_keeper_key:
     file: /data/flon-daogov/secrets/testnet-epoch-keeper.key
+  github_oauth_client_id:
+    file: /data/flon-daogov/secrets/github-oauth-client-id
+  github_oauth_client_secret:
+    file: /data/flon-daogov/secrets/github-oauth-client-secret
+  community_session_secret:
+    file: /data/flon-daogov/secrets/community-session-secret

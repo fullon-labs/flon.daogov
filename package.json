@@ -9,7 +9,9 @@
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "keeper:build": "tsc -p keeper/tsconfig.json",
     "keeper:start": "node keeper/dist/index.js",
-    "keeper:test": "npm run keeper:build && node --test keeper/dist/*.test.js"
+    "keeper:test": "npm run keeper:build && node --test keeper/dist/*.test.js",
+    "community:start": "node community-api/server.mjs",
+    "community:test": "node --test community-api/*.test.mjs"
   },
   "dependencies": {
     "@fullon/anchor-link": "^1.0.3",
