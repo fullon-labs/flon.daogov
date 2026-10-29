@@ -1,4 +1,5 @@
-import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadChainGovernanceParameters,loadContractAbi,loadElection,loadEpochTiming,loadGovernance,loadGovernanceActionDefaults,loadNetworkProduction,loadProducerRewards,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
+import {producerStatusUrl,renderProducerPerformance} from './producer-status.js';
+import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadChainGovernanceParameters,loadContractAbi,loadElection,loadEpochTiming,loadGovernance,loadGovernanceActionDefaults,loadNetworkProduction,loadProducerRewards,loadProducerPerformance,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
 
 import {accountExplorerUrl} from './explorer.js';
 import {DAO_STATUS_META,abiFieldValue,actionAbiFields,effectiveProposalPhase,enabledAllowlist,governanceAction,proposalCounts,validateFrozenActions} from './governance.js';
@@ -164,6 +165,7 @@ function networkName(){
 }
 function renderNetworkNames(){document.querySelectorAll('[data-network-name]').forEach(node=>node.textContent=networkName())}
 
+[['Epoch 表现','Epoch performance'],['完整节点状态','Full node status'],['实出 / 应出','produced / expected'],['统计不一致','Inconsistent statistics'],['最近 30 个 Epoch 出块率','Production rate for the last 30 epochs'],['已观测出块率','Observed production rate'],['未知 / 无应出块','Unknown / no expected blocks'],['无观测数据','No observations'],['已封存','Closed'],['未封存','Open'],['Idle skipped 不计入出块率','Idle skipped is excluded from the production rate']].forEach(([zh,en])=>translations.set(zh,en));
 function translateText(value){if(currentLanguage==='zh-CN')return value;let output=value;[...translations.entries()].sort((a,b)=>b[0].length-a[0].length).forEach(([zh,en])=>{output=output.split(zh).join(en)});const terms=localeTerms[currentLanguage];if(terms)Object.entries(terms).sort((a,b)=>b[0].length-a[0].length).forEach(([en,localized])=>{output=output.split(en).join(localized)});return output}
 function applyTranslations(root=document){
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
@@ -286,6 +288,7 @@ function safePublicUrl(value){try{const url=new URL(String(value||''));return ['
 async function openProducerDetails(owner){
   const index=electionState?.producers.findIndex(item=>item.owner===owner)??-1,producer=index>=0?electionState.producers[index]:null;if(!producer)return;
   const url=safePublicUrl(producer.url);
+  const statusUrl=producerStatusUrl(runtimeConfig.network,producer.owner);
   const accountUrl=accountExplorerUrl(runtimeConfig.network,producer.owner);
   const accountLabel=accountUrl?`<a href="${escapeHtml(accountUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--brand);text-decoration:underline;text-underline-offset:3px">${escapeHtml(producer.owner)}</a>`:escapeHtml(producer.owner);
   const [rewardResult,stakeResult]=await Promise.allSettled([loadProducerRewards(producer.owner),loadProducerStake(producer.owner)]);
@@ -295,7 +298,16 @@ async function openProducerDetails(owner){
   const gasUnclaimed=rewards?.gasUnclaimed||'0.00000000 FLON';
   const hasClaimable=Boolean(rewards?.hasClaimable);
   const location=Number(producer.location||0)>0?String(producer.location):'未设置';
-  openSheet(`<h2 id="sheet-title">BP 详情</h2><p class="sheet-subtitle">${accountLabel} · #${index+1}</p><div class="sign-summary"><div><span>节点状态</span><strong>${escapeHtml(producer.status)}</strong></div><div><span>排名</span><strong>#${index+1}</strong></div><div><span>自身质押</span><strong>${escapeHtml(selfStake)}</strong></div><div><span>获得的总投票</span><strong>${escapeHtml(formatVoteAsset(producer.total_votes))}</strong></div><div><span>奖励分享比例</span><strong>${Number(producer.reward_shared_ratio||0)/100}%</strong></div><div><span>未领取出块奖励</span><strong>${escapeHtml(baseUnclaimed)}</strong></div><div><span>GAS 待领取奖励</span><strong>${escapeHtml(gasUnclaimed)}</strong></div><div><span>最后领取时间</span><strong>${escapeHtml(producer.last_claim_time||'—')}</strong></div><div><span>地区代码</span><strong>${escapeHtml(location)}</strong></div><div><span>链上数据源</span><strong>flon::producers / flon::bpstakes</strong></div></div><div class="profile-review"><strong>注册地址</strong>${url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`:`<small>${escapeHtml(producer.url||'—')}</small>`}<strong>出块公钥</strong><small class="full-value">${escapeHtml(producerKey(producer))}</small></div><div class="sheet-actions ${hasClaimable?'':'one'}"><button class="secondary-button" data-action="close-sheet">完成</button>${hasClaimable?`<button class="primary-button" data-action="bp-claim" data-producer="${escapeHtml(producer.owner)}">领取 BP 奖励</button>`:''}</div>`);
+  openSheet(`<h2 id="sheet-title">BP 详情</h2><p class="sheet-subtitle">${accountLabel} · #${index+1}</p><section class="bp-epoch-card" data-producer-performance="${escapeHtml(owner)}"><header><strong>Epoch 表现</strong>${statusUrl?`<a href="${escapeHtml(statusUrl)}" target="_blank" rel="noopener noreferrer">完整节点状态 ↗</a>`:''}</header><p class="field-note">正在读取链上状态…</p></section><div class="sign-summary"><div><span>节点状态</span><strong>${escapeHtml(producer.status)}</strong></div><div><span>排名</span><strong>#${index+1}</strong></div><div><span>自身质押</span><strong>${escapeHtml(selfStake)}</strong></div><div><span>获得的总投票</span><strong>${escapeHtml(formatVoteAsset(producer.total_votes))}</strong></div><div><span>奖励分享比例</span><strong>${Number(producer.reward_shared_ratio||0)/100}%</strong></div><div><span>未领取出块奖励</span><strong>${escapeHtml(baseUnclaimed)}</strong></div><div><span>GAS 待领取奖励</span><strong>${escapeHtml(gasUnclaimed)}</strong></div><div><span>最后领取时间</span><strong>${escapeHtml(producer.last_claim_time||'—')}</strong></div><div><span>地区代码</span><strong>${escapeHtml(location)}</strong></div><div><span>链上数据源</span><strong>flon::producers / flon::bpstakes</strong></div></div><div class="profile-review"><strong>注册地址</strong>${url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`:`<small>${escapeHtml(producer.url||'—')}</small>`}<strong>状态页</strong>${statusUrl?`<a href="${escapeHtml(statusUrl)}" target="_blank" rel="noopener noreferrer">完整节点状态 ↗</a>`:'—'}<strong>出块公钥</strong><small class="full-value">${escapeHtml(producerKey(producer))}</small></div><div class="sheet-actions ${hasClaimable?'':'one'}"><button class="secondary-button" data-action="close-sheet">完成</button>${hasClaimable?`<button class="primary-button" data-action="bp-claim" data-producer="${escapeHtml(producer.owner)}">领取 BP 奖励</button>`:''}</div>`);
+  const performanceCard=sheetContent.querySelector('[data-producer-performance]');
+  loadProducerPerformance(owner).then(performance=>{
+    if(!performanceCard?.isConnected||sheet.hidden)return;
+    performanceCard.innerHTML=renderProducerPerformance(performance,{url:statusUrl,translate:translateText});
+  }).catch(()=>{
+    if(!performanceCard?.isConnected||sheet.hidden)return;
+    performanceCard.innerHTML=`<header><strong>${escapeHtml(translateText('Epoch 表现'))}</strong>${statusUrl?`<a href="${escapeHtml(statusUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(translateText('完整节点状态'))} ↗</a>`:''}</header><p class="field-note">${escapeHtml(translateText('链上出块统计暂不可用'))}</p>`;
+  });
+
 }
 let electionRefreshing=false;
 let electionLastRefresh=0;
