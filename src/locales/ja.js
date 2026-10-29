@@ -566,4 +566,9 @@ export default {
   "The current account does not belong to this network": "現在のアカウントはこのネットワークに属していません",
   "Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.": "HuFu で FullOn テストネットのアカウントに切り替え、ウォレットを再接続してください。",
   "Reconnect wallet": "ウォレットを再接続",
+  "Confirm proposal transaction": "提案トランザクションを確認",
+  "The transaction has been checked. The next step opens the HuFu signer directly.": "トランザクションの確認が完了しました。次のステップで HuFu 署名画面を直接開きます。",
+  "Account": "アカウント", "Execution actions": "実行アクション", "Argument size": "引数サイズ",
+  "Verify the account, contract, action, and arguments again in HuFu.": "HuFu でアカウント、コントラクト、アクション、引数を再確認してください。",
+  "Cancel": "キャンセル", "Sign in HuFu": "HuFu で署名",
 };

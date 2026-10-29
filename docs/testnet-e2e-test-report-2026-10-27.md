@@ -92,6 +92,47 @@
 - 测试网 DApp 在 app-host 构建并仅重建 `flon-daogov-testnet`。全量前端测试初次运行发现两条新增文案未覆盖全部语言，已补齐后 39 项全通过，再构建 `local/flon-daogov:power-20261029-r2`。公网 `https://daogov-t.flon.network/` 返回 HTTP 200，引用最终 JS `assets/index-akjyXKBN.js`，公开 JS 无 GLON 文案，`config.js` 链 ID 正确；测试网容器 healthy，主网 DApp 容器仍为 `local/flon-daogov:0c0f72c`。
 - 测试网 Keeper 容器在本轮只读检查时为 `unhealthy`：健康检查返回 HTTP 503，日志连续出现 BP claim 广播后 3 分钟确认超时。链上 LIB 本轮约需 5–6 分钟追上交易区块，可能使 Keeper 将最终成功的交易判为超时；需单独核对 Keeper 确认逻辑及奖励结算，未重启或改动 Keeper。
 
+### 2026-10-29 Epoch 815 自然封存复测
+
+- PASS：测试链 ID 再次核对通过；采集时 head/LIB 为 `21784738/21784709`。`rewardepoch.next_epoch_to_close=816`，Epoch 815 `closed=1`、`complete_sample=1`、`active_bp_count=21`。
+- PASS：`hellotoworld` 的 `pendingvote` 已清理；`voters.votes=930000000001`（即 `9300.00000001 FLON` 本金单位），所投 21 名 BP 与 Active schedule 的 21 名完全一致，21 名 BP 的 `total_votes` 均为 `44285714285`。完整链上快照见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/epoch815-pendingvote-and-schedule-20261029.json`。此前 pendingvote 不消费的发布阻断项已通过新版合约复测解除。
+- WAIT：Epoch 815 的 BP 生产率、奖励 GAS 结算和 voter share 守恒尚须独立核算；本次排班和票数复测不等于奖励核算通过。
+
+### 2026-10-29 Epoch 816 与 GAS Epoch 39191 只读核算
+
+- PASS：测试链 ID 再次核对通过；采集时 head/LIB 为 `21785078/21785039`。`rewardepoch.next_epoch_to_close=817`，Epoch 816 已自然封存，`closed=1`、`complete_sample=1`、`active_bp_count=21`、`failed_bp_count=0`、`network_incident=0`。
+- PASS：Epoch 816 的 21 名 Active BP 全部满足 `expected_blocks = produced_blocks + missed_blocks`，均为零漏块且 `status=qualified`；`idle_skipped_blocks` 独立记录，未进入出块率分母。完整快照见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/epoch816-rewards-after-20261029T0402Z/`。
+- PASS：GAS Epoch 39191 已 `finalized=1`、`funded=1`。25 个 eligible 节点分配合计 `0.00142233 FLON`，精确等于 `active_allocated 0.00137645 + standby_allocated 0.00004588 FLON`，也等于 settlement pool；节点统计同样全部满足 `expected = produced + missed`。
+- PASS：当前 voter reward 三层守恒：逐 producer 均满足 `total = allocating + allocated`；global total 与 producer total 均为 `7573.18087944 FLON`；producer allocated 与 voter claimed+unclaimed 均为 `5247.06352568 FLON`。
+- WAIT：Epoch 816 的 `epochreward` 表已无行，且本轮没有封存前、无 claim 干扰的 before 快照，因此只能确认封存后的生产统计、GAS 分配和当前 voter reward 守恒，不能据此证明该 Epoch 的 BP 基础奖励增量完整守恒。仍需选择后续 Epoch 在封存前后建立同一基线复测。
+- INFO：Keeper 健康接口仍为 `healthy=false`，最近错误仍是 BP claim 等待确认超时；其最近成功时间晚于前一轮检查，说明并非完全停止，但 3 分钟确认窗口与测试网 LIB 延迟仍需修复。本轮未重启或部署 Keeper。
+
+### 2026-10-29 Epoch 817 封存前后核算
+
+- PASS：测试链 ID 核对通过；Epoch 817 已自然封存，`rewardepoch.next_epoch_to_close=818`，且 `closed=1`、`complete_sample=1`、`active_bp_count=21`、`failed_bp_count=0`、`network_incident=0`。
+- PASS：21 名 BP 全部满足 `expected_blocks = produced_blocks + missed_blocks`，本 Epoch 总漏块为 0。封存前后证据分别保存在 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/epoch817-rewards-before-20261029T0412Z/` 与 `epoch817-rewards-after-20261029T0506Z/`。
+- PASS：封存后仍可见 20 名 BP 的 Epoch 817 `prodclaims`，合计 `232.27422629 FLON`；`archimedes` 的同期余额增加 `11.09842719 FLON` 且 claim 行已被消费，合计可重建本 Epoch 21 名 BP 基础奖励为 `243.37265348 FLON`。本轮 21 席的 voter reward producer/global 表均无增量，与其链上 reward share 配置一致。
+- PASS（claim-aware 严格门禁）：已采用 `after prodclaims - before prodclaims + 窗口内不可逆基础奖励付款` 重建 Epoch 817。所有 `last_claim_time` 变化账户均有对应 trace，且三个区块均位于快照窗口 `(21785136, 21785410]`、状态为 `irreversible`，交易为 `executed`：`copernicus` 交易 `c412e99b125e1709bedb468b82676851c20264985d3abb35ae07851d0b8bf855`、`curie` 交易 `0aae771b6592863a7f052216b68b8553bc51eb7c507c3affc07f7124fb94af64`、`archimedes` 交易 `c0685c2c12f6f0107abede854a62a559843f28b94db309adb78a7e5916ea8344`。
+- PASS：trace 解码分别确认基础奖励付款 `15.85489600/68.96879755/11.09842719 FLON` 均进入对应 BP；`curie` 同笔另有 `0.00006590 FLON` GAS 奖励。三个账户的实际余额增量分别与各自 trace 总付款完全一致，无未解释转账。最终重建 Epoch 817 的 21 BP 基础奖励总额为 `243.37265348 FLON`，逐 BP 应计均非负。
+- PASS：严格核算器 `scripts/reconcile-bp-claims.mjs` 已接入 `scripts/testnet-bp-rewards.sh compare`；缺失 `archimedes` trace 和篡改收款人两个负向测试均被拒绝。核算结果见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/epoch817-claim-aware-reconciliation.json`（SHA-256 `d29250db7c4093c046c19cf3d1ce3249751cca55611dfb778db869dae604717f`），原始不可逆 trace 与解码摘要见 `epoch817-claim-traces-20261029/`。
+- INFO：此前“必须无 claim 才能核算”的限制由本轮可重建门禁取代，Keeper 自动 claim 不再导致假失败。Keeper 的 3 分钟确认超时健康问题仍是独立运维缺陷，不影响上述已经由不可逆区块 trace 证明的账务结果。
+
+### 2026-10-29 BP Status Page 链上字段与 DApp 发布
+
+- PASS：按固定流程在本机进入 `flonv` 后执行容器内 `ut`，`flontest` 钱包成功解锁；未读取、记录或输出钱包密码及私钥。写操作前再次核对 chain ID 为 `18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f`。
+- PASS：`flon.system` 升级交易 `70601bd0e22755881eaef362dfe3d07dfa1554785dadc2d28fac5562fc67b7c1` 在区块 `21785034` 执行成功，并由 LIB `21785034` 确认不可逆。部署 WASM SHA-256 为 `88bf9110d6fa2e138434e0d11ca484c006be961c066a7ab2480b29cbeab340cf`。
+- PASS：链上 ABI 的 `regproducer` 与 `producer_info` 均新增尾部可选字段 `status_url:string$`，旧客户端与旧表行保持可解码。升级前后 `producers` 均为 26 行；owner、票数、签名公钥、active、官网 URL、location、producer authority、分成比例及 revision 等核心字段逐行一致。ABI 与表快照见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/flon-system-status-url-get-abi-20261029.json` 和 `flon-system-status-url-producers-after-20261029.json`。
+- PASS：仅测试网 DApp 服务切换为 `local/flon-daogov:status-url-20261029-r1`，镜像 ID `sha256:0ec513389458b0642976dd38ec72b16fba8dd18bfef1fefecbe900fc90129394`；主网容器 ID 与镜像 `local/flon-daogov:0c0f72c` 保持不变。
+- PASS：公网 `https://daogov-t.flon.network/` 返回 HTTP 200，引用 `/assets/index-CGLA0pgo.js`。公网与容器内 JS SHA-256 均为 `0d1e824c85cde67b26669b393b76564591b2d1bc4c03491c44756f038ffd6149`；bundle 含 `status_url` 交易/展示逻辑且 `GLON` 出现次数为 0，公开 `config.js` 的测试网 chain ID 正确。
+
+### 2026-10-29 BP 注销与 30 分钟全额 unstake
+
+- PASS：写操作前确认测试链 ID 为 `18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f`，`flontest` 钱包已解锁；未读取或输出私钥。操作前 `hellotoworld` 为 active BP，自质押 `500000.00000000 FLON`，无待领取退款，链上 `unstake_delay_sec=1800`。
+- PASS：`hellotoworld@active` 执行 `flon::unregprod`，交易 `73d9c56c59e2ae00c5ef8d2b46375ba54da6902c3b22cbfe203d0ccf737bd1c9`。随后链上 `is_active=0`、producer key 清空；状态验证锚点 head `21786094` 已由 LIB `21786095` 覆盖。
+- PASS：注销不可逆后执行 `flon::unstakebp` 全额退出 `500000.00000000 FLON`，交易 `19f6ffedec59ac36df96f4f981ce4fe778ffc27eaf915e49f74f90d8903d97a7`。链上 `bpstakes.staked=0`，生成同额 `bpstkrefund`，`available_at=2026-10-29T07:57:34`（北京时间 15:57:34）；状态验证锚点 head `21786127` 已由 LIB `21786127` 覆盖。
+- PASS：30 分钟门槛后执行 `flon::claimbpstake`，交易 `2607752514ec1beb98b894b67c89085c4fac3e39467c6d06a21fab3310224367`。trace 显示 `flon.stake` 向 `hellotoworld` 精确转账 `500000.00000000 FLON`；账户余额由 `490654.34407317` 增至 `990654.34205427 FLON`，净增与本金扣除交易 GAS 一致。退款行已删除，状态验证锚点 head `21786319` 已由 LIB `21786319` 覆盖。
+- PASS：重复调用 `claimbpstake` 被 `BP self-stake refund not found` 拒绝，失败交易 ID `b0dab06da7a23f180ec88c2636b60419c0f794fbce253ca0833b61f462359334`。BP 注销、全额 unstake、30 分钟门槛、到账、退款行删除和重复领取拒绝闭环完成。证据摘要见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/bp-full-unstake-hellotoworld-20261029/summary.md`。
+
 ### 2026-10-28 18:00 UTC 只读复查
 
 - 测试链 ID 核对通过；head/LIB 为 `21782084/21782054`。快照见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/live-check-20261028T1800Z/`。
@@ -100,9 +141,9 @@
 
 1. 提案 #3：execute 和 Treasury grant/预留核对已通过，交易已不可逆。
 2. Reward Epoch 769 的生产统计已通过；GAS settlement 尚未就绪，且 BP claim 干扰了 before/after 奖励增量基线，需在后续完整 Epoch 重做无 claim 干扰的严格奖励核算。
-3. BLOCKED/待复测：旧的三席与 `5300 FLON` 观察已被后续 21 席排班、`9300 FLON` 覆盖；新的 `flon.system` 已部署，旧待生效行已清理。本轮新增投票在 Epoch 815 生效前保留 `pendingvote` 属于预期；必须在自然封存后验证其被消费、voter 票数及 21 席 schedule 一致，才能解除该门禁。
+3. PASS：新版 `flon.system` 下 Epoch 815 自然封存后，新增投票的 `pendingvote` 被消费，精确票数与 21 席 Active schedule 均核对通过。旧 pendingvote 发布阻断项解除。
 4. voter refund 72 小时正向领取与重复领取拒绝已通过，正向交易已不可逆。
-5. BP unstake 21 天正向领取只可在长期测试窗口完成；本轮已覆盖创建、提前领取拒绝、取消与状态恢复。
+5. PASS：BP unstake 延迟为 30 分钟；注销 BP、全额 `500000 FLON` unstake、门槛后领取到账、退款行删除及重复领取拒绝均已完成，正向交易已不可逆。
 
 ## 5. 发布门禁
 
