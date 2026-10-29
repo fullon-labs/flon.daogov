@@ -232,7 +232,7 @@ export default {
   "Registration transaction": "登録トランザクション",
   "Verify the contract parameters before requesting a HuFu signature.": "HuFu 署名をリクエストする前に、契約パラメータを確認してください。",
   "On successful registration, flon.system also registers the producer with voter.reward.": "登録が成功すると、flon.system はプロデューサーを voter.reward に登録します。",
-  "X, status page, P2P, and API endpoints are not stored by the current regproducer table and require a metadata service.": "X、ステータス ページ、P2P、および API エンドポイントは、現在の regProducer テーブルによって保存されないため、メタデータ サービスが必要です。",
+  "The status page is stored in the on-chain BP registration; X, P2P, and API endpoints still require a metadata service.": "ステータスページはオンチェーンの BP 登録情報に保存されます。X、P2P、API エンドポイントには引き続きメタデータサービスが必要です。",
   "Requesting wallet signature…": "ウォレットの署名をリクエストしています…",
   "Registration transaction broadcast": "登録トランザクションブロードキャスト",
   "Update BP profile": "BP プロフィールを更新",

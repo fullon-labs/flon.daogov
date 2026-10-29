@@ -1,0 +1,104 @@
+{
+  "title": "FULLON Status",
+  "publicOrigin": "https://status.flon.network",
+  "defaultBp": "mainnet-bp-1",
+  "intervalSeconds": 30,
+  "bps": [
+    {
+      "network": "mainnet",
+      "chainId": "",
+      "producer": "",
+      "rpc": "",
+      "referenceRpc": "",
+      "intervalSeconds": 30,
+      "lagThresholdSeconds": 36,
+      "location": "",
+      "contact": "",
+      "services": [
+        {
+          "id": "rpc",
+          "name": "Chain RPC",
+          "type": "rpc",
+          "url": ""
+        },
+        {
+          "id": "p2p",
+          "name": "P2P Network",
+          "type": "tcp",
+          "host": "",
+          "port": 0
+        },
+        {
+          "id": "history",
+          "name": "History API",
+          "type": "http",
+          "url": ""
+        },
+        {
+          "id": "website",
+          "name": "Website",
+          "type": "http",
+          "url": ""
+        },
+        {
+          "id": "snapshot",
+          "name": "Snapshots",
+          "type": "http",
+          "url": ""
+        }
+      ],
+      "incidents": [],
+      "maintenance": [],
+      "id": "mainnet-bp-1",
+      "label": "Mainnet BP 1 · 待配置"
+    },
+    {
+      "network": "mainnet",
+      "chainId": "",
+      "producer": "",
+      "rpc": "",
+      "referenceRpc": "",
+      "intervalSeconds": 30,
+      "lagThresholdSeconds": 36,
+      "location": "",
+      "contact": "",
+      "services": [
+        {
+          "id": "rpc",
+          "name": "Chain RPC",
+          "type": "rpc",
+          "url": ""
+        },
+        {
+          "id": "p2p",
+          "name": "P2P Network",
+          "type": "tcp",
+          "host": "",
+          "port": 0
+        },
+        {
+          "id": "history",
+          "name": "History API",
+          "type": "http",
+          "url": ""
+        },
+        {
+          "id": "website",
+          "name": "Website",
+          "type": "http",
+          "url": ""
+        },
+        {
+          "id": "snapshot",
+          "name": "Snapshots",
+          "type": "http",
+          "url": ""
+        }
+      ],
+      "incidents": [],
+      "maintenance": [],
+      "id": "mainnet-bp-2",
+      "label": "Mainnet BP 2 · 待配置"
+    }
+  ]
+}

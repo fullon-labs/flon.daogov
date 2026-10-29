@@ -232,7 +232,7 @@ export default {
   "Registration transaction": "등록 거래",
   "Verify the contract parameters before requesting a HuFu signature.": "HuFu 서명을 요청하기 전에 계약 매개변수를 확인하세요.",
   "On successful registration, flon.system also registers the producer with voter.reward.": "성공적으로 등록되면 flon.system은 생산자를 voter.reward에 등록합니다.",
-  "X, status page, P2P, and API endpoints are not stored by the current regproducer table and require a metadata service.": "X, 상태 페이지, P2P 및 API 엔드포인트는 현재 regproducer 테이블에 저장되지 않으며 메타데이터 서비스가 필요합니다.",
+  "The status page is stored in the on-chain BP registration; X, P2P, and API endpoints still require a metadata service.": "상태 페이지는 온체인 BP 등록 정보에 저장되며 X, P2P 및 API 엔드포인트는 여전히 메타데이터 서비스가 필요합니다.",
   "Requesting wallet signature…": "지갑 서명을 요청하는 중…",
   "Registration transaction broadcast": "등록거래 방송",
   "Update BP profile": "BP 프로필 업데이트",
