@@ -8,9 +8,11 @@ const proposal=(status,overrides={})=>({proposal_id:7,status,endorsement_end:'20
 test('derives permissionless lifecycle steps from chain time',()=>{
   assert.equal(effectiveProposalPhase(proposal(0),now),'activation');
   assert.equal(effectiveProposalPhase(proposal(2),now),'finalization');
+  assert.equal(effectiveProposalPhase(proposal(4),now),'closed');
   assert.equal(effectiveProposalPhase(proposal(4,{actions:[{}]}),now),'queue');
-  assert.equal(effectiveProposalPhase(proposal(6),now),'execution');
-  assert.equal(effectiveProposalPhase(proposal(6,{execute_before:'2026-10-25T03:59:59'}),now),'expiry');
+  assert.equal(effectiveProposalPhase(proposal(6),now),'closed');
+  assert.equal(effectiveProposalPhase(proposal(6,{actions:[{}]}),now),'execution');
+  assert.equal(effectiveProposalPhase(proposal(6,{actions:[{}],execute_before:'2026-10-25T03:59:59'}),now),'expiry');
 });
 
 test('does not offer duplicate endorsement or vote actions',()=>{
@@ -22,11 +24,16 @@ test('does not offer duplicate endorsement or vote actions',()=>{
   assert.equal(governanceAction(voting,{voted:true,now}),null);
 });
 
+test('does not offer queue or execute for signal proposals without frozen actions',()=>{
+  assert.equal(governanceAction(proposal(4),{now}),null);
+  assert.equal(governanceAction(proposal(6),{now}),null);
+});
+
 test('counts actionable proposal phases',()=>{
   assert.deepEqual(proposalCounts([
     proposal(0,{endorsement_end:'2026-10-25T05:00:00'}),
     proposal(2,{vote_end:'2026-10-25T05:00:00'}),
-    proposal(6),
+    proposal(6,{actions:[{}]}),
   ],now),{endorsement:1,voting:1,execution:1});
 });
 
