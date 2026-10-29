@@ -12,15 +12,15 @@ function formatUnits(value,symbol){
   return `${whole}.${fraction} ${symbol}`;
 }
 
-export function summarizeNetworkEconomics(producers=[],stakes=[],glonStats={}){
+export function summarizeNetworkEconomics(producers=[],stakes=[],governanceGlobal=null){
   const totalVoteUnits=producers.reduce((total,row)=>total+BigInt(row?.total_votes||0),0n);
   const totalStakeUnits=stakes.reduce((total,row)=>total+unitsFromAsset(row?.staked),0n);
-  const supply=glonStats?.GLON?.supply;
+  const governancePower=governanceGlobal?.total_power;
   return {
     totalBpStake:formatUnits(totalStakeUnits,'FLON'),
-    totalNetworkStake:typeof supply==='string'?formatUnits(totalStakeUnits+unitsFromAsset(supply),'FLON'):'— FLON',
+    totalNetworkStake:typeof governancePower==='string'?formatUnits(totalStakeUnits+unitsFromAsset(governancePower),'FLON'):'— FLON',
     totalVotes:formatUnits(totalVoteUnits,'FLON'),
-    governancePower:typeof supply==='string'?supply:'— GLON',
+    governancePower:typeof governancePower==='string'?governancePower:'— POWER',
   };
 }
 

@@ -7,7 +7,7 @@ FullOn Network DAO治理 H5 DApp，可在 HuFu 内置浏览器中打开，也支
 ## 功能范围
 
 - BP 候选人注册、Active / Standby / Candidate 链上排名
-- 不可转让 GLON 治理权及待生效节点分配展示
+- 合约内部治理权及待生效节点分配展示
 - 最多选择 30 个 BP，为每个 BP 指定 FLON 票数并批量广播 `flon::votealloc`；分配合计不得超过已锁定投票本金
 - 投票人奖励查询并广播 `voter.reward::claimrewards`
 - BP 本人或第三方代 BP 查询并广播 `flon::claimrewards(caller, producer, max_steps)`；奖励始终直接支付给 BP
@@ -23,7 +23,7 @@ FullOn Network DAO治理 H5 DApp，可在 HuFu 内置浏览器中打开，也支
 
 当前版本已经把节点排名、钱包账户票权、节点选择、投票人待领奖励、BP 注册和 BP 恢复接到链上 RPC；对应确认页会展示实际 action，并由钱包签名广播。RPC 返回失败时界面显示错误，不回退到伪造数据。
 
-DAO 提案/附议/投票/Timelock/执行使用 `dao.gov`，预算预留与付款使用 `dao.treasury`。前端先校验链上 ABI 和 `config`；治理参数未配置时保持只读，不广播模拟交易。创建提案会先通过 `syncpower` 读取账户实际 GLON，再提交提案。附议同样先同步当前治理权；正式投票严格使用提案激活时的链上快照。历史在线率、论坛评论和全文检索仍需要索引服务或论坛 API。
+DAO 提案/附议/投票/Timelock/执行使用 `dao.gov`，预算预留与付款使用 `dao.treasury`。治理权由 `flon.system` 在投票本金增减时直接写入 `dao.gov::powers`，无需用户手工同步。前端先校验链上 ABI 和 `config`；治理参数未配置时保持只读，不广播模拟交易。正式投票严格使用提案激活时的链上快照。历史在线率、论坛评论和全文检索仍需要索引服务或论坛 API。
 
 ## 开发
 
