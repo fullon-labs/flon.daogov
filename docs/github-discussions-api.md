@@ -17,16 +17,16 @@ Creation endpoints enforce same-origin checks, per-account/IP rate limits, repos
 
 Production should expose this service behind the DApp origin (for example `/community-api`) to avoid third-party-cookie and CORS failures inside HuFu.
 
-The community state file is stored outside the image at `/path/to/private/community-data/community-state.json`. Back it up with the other DAO service state. The current UI sends the connected wallet account as `actor`; this is sufficient for non-authoritative community sentiment but is not cryptographic proof of wallet ownership. Before these signals are used for moderation, reputation, rewards, or any other privileged decision, add a wallet challenge/signature session at the unified API. They must never be treated as governance authorization.
+The community state file is stored outside the image at the operator-configured persistent data directory. Back it up with the other DAO service state. The current UI sends the connected wallet account as `actor`; this is sufficient for non-authoritative community sentiment but is not cryptographic proof of wallet ownership. Before these signals are used for moderation, reputation, rewards, or any other privileged decision, add a wallet challenge/signature session at the unified API. They must never be treated as governance authorization.
 
 ## Runtime configuration
 
-The production service is implemented in `community-api/server.mjs` and deployed as the `community-api` service in `deploy/app-host/docker-compose.yml`. It reads credentials from Docker secrets; OAuth credentials must never be placed in the frontend config or image.
+The production service is implemented in `community-api/server.mjs` and deployed as the `community-api` service in `deploy/app/docker-compose.yml.template`. It reads credentials from Docker secrets; OAuth credentials must never be placed in the frontend config or image.
 
-Required secret files on app-host:
+Required operator-supplied secret file settings in the private deployment environment:
 
-- `/path/to/private/app-id`
-- `/path/to/private/installation-id`
-- `/path/to/private/app-key.pem`
+- `DEPLOY_GITHUB_APP_ID_FILE`
+- `DEPLOY_GITHUB_INSTALLATION_ID_FILE`
+- `DEPLOY_GITHUB_PRIVATE_KEY_FILE`
 
 Install the GitHub App only on `fullon-labs/flon.daogov` with repository metadata read access and Discussions read/write access. The API signs a short-lived App JWT, exchanges it for a one-hour installation token, caches that token in memory, and refreshes it automatically. Users connect their FLON wallet, not GitHub.

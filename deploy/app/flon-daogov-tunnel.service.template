@@ -1,0 +1,22 @@
+[Unit]
+Description=FLON DAO Governance reverse tunnels to the configured edge
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=${DEPLOY_SERVICE_USER}
+ExecStart=/usr/bin/ssh -NT \
+  -i ${DEPLOY_TUNNEL_KEY_FILE} \
+  -p ${DEPLOY_TUNNEL_SSH_PORT} \
+  -o ExitOnForwardFailure=yes \
+  -o ServerAliveInterval=30 \
+  -o ServerAliveCountMax=3 \
+  -o StrictHostKeyChecking=yes \
+  -R 127.0.0.1:${DEPLOY_EDGE_MAINNET_PORT}:127.0.0.1:${DEPLOY_APP_MAINNET_PORT} \
+  -R 127.0.0.1:${DEPLOY_EDGE_TESTNET_PORT}:127.0.0.1:${DEPLOY_APP_TESTNET_PORT} \
+  ${DEPLOY_TUNNEL_DESTINATION}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
