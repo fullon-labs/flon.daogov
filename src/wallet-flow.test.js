@@ -3,6 +3,20 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const walletSource=fs.readFileSync(new URL('./wallet.js',import.meta.url),'utf8');
+const appSource=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
+
+test('BP registration persists the status page on chain',()=>{
+  const start=appSource.indexOf('async function submitCandidate');
+  const end=appSource.indexOf('async function openBPStakeSheet',start);
+  const submission=appSource.slice(start,end);
+
+  assert.ok(start>=0&&end>start,'BP candidate submission was not found');
+  assert.match(submission,/name:'regproducer'/);
+  assert.match(appSource,/DEFAULT_BP_STATUS_URL='https:\/\/status\.flon\.network'/);
+  assert.match(appSource,/statusUrl:DEFAULT_BP_STATUS_URL/);
+  assert.match(submission,/status_url:candidateDraft\.statusUrl/);
+  assert.match(appSource,/candidateDraft\.statusUrl=state\.producer\.status_url/);
+});
 
 test('an existing HuFu session does not reopen account selection',()=>{
   const start=walletSource.indexOf("if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact)");
