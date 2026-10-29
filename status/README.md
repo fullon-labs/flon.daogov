@@ -87,3 +87,5 @@ npm start
 选择器按网络和 Active / Standby 分组，显示两类数量；浏览器中也每 30 秒更新名单。自动发现列表和详情均通过原有 `/api/bps.json`、`/api/status.json?bp=<network>-<account>` 提供；API 不返回网络发现 RPC 地址。历史 Epoch 数据由每个网络共享批量查询，避免按 BP 重复扫描。
 
 页面顶部提供 Mainnet / Testnet 切换，BP 列表及数量只显示所选网络，切回时恢复该网络上次选择的 BP。直达链接携带 `network` 和 `bp` 参数，支持浏览器前进/后退。没有配置发现来源的网络显示空状态，不沿用另一网络的链数据。示例：`/?network=testnet&bp=testnet-einstein`。
+
+DAO Gov 的 BP 详情中提供紧凑版 Epoch 卡片（最新链上 Epoch、实出/应出、漏块、idle skipped、最近 30 期趋势），数据通过 DAO Gov 当前网络的同源 RPC 直接读取并校验 Chain ID。详情中的状态站入口统一生成 `https://status.flon.network/?network=<mainnet|testnet>&bp=<network>-<account>`，不依赖 BP 自行填写的状态页地址。卡片查询失败不阻塞详情中的其他信息，不将缺失统计或零应出块显示为 100%。

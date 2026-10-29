@@ -1,3 +1,4 @@
+import {loadProducerEpochs} from './producer-status.js';
 import { Client } from '@fullon/flonjs';
 import {latestCompleteEpoch,summarizeBPProduction} from './production.js';
 import {summarizeNetworkEconomics} from './network-summary.js';
@@ -568,4 +569,14 @@ export async function transact(session,actions){
   if(session.provider==='iframe')throw new Error('IFRAME_SESSION_EXPIRED');
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
+}
+
+const producerPerformanceCache=new Map();
+export async function loadProducerPerformance(account){
+  const key=`${config().chainId}:${rpcUrl()}:${account}`,now=Date.now();
+  const cached=producerPerformanceCache.get(key);
+  if(cached&&now-cached.at<30000)return cached.promise;
+  const promise=(async()=>{await rpcInfo();return loadProducerEpochs(rpcPost,account)})();
+  producerPerformanceCache.set(key,{at:now,promise});
+  try{return await promise}catch(error){producerPerformanceCache.delete(key);throw error}
 }
