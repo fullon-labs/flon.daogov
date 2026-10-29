@@ -5,7 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import {openStore} from './store.mjs';
 import {verifyAdmission,targetKey,retentionKey,TEMPORARY_MS} from './admission.mjs';
-const bp={id:'trial',producer:'einstein',network:'testnet',chainId:'a'.repeat(64),rpc:'http://example.invalid:8888',rpcScope:'bp'};
+const bp={id:'trial',producer:'einstein',network:'testnet',chainId:'a'.repeat(64),rpc:'http://192.0.2.1:8888',rpcScope:'bp',services:[{id:'p2p',type:'tcp',host:'192.0.2.1',port:9876}]};
 test('account and self-declared BP scope do not grant long-term admission',async()=>{assert.equal((await verifyAdmission(bp,{})).verified,false)});
 test('long-term admission needs matching private endpoint evidence and trusted registered BP',async()=>{
  const now=Date.now(),policy={networks:{testnet:{chainId:bp.chainId,rpc:'https://trusted.invalid'}},attestations:[{target_key:targetKey(bp),verified_at:new Date(now-1).toISOString(),valid_until:new Date(now+60000).toISOString(),evidence:'Independent operator verification'}]};
@@ -22,9 +22,9 @@ test('30 minute deadline survives restart and aliases; expired configs and sampl
  try{store=await openStore(dir);store.save(bp);const first=store.admission(bp);const end=Date.parse(first.expires_at);assert.equal(store.admission(bp,end-1).expired,false);assert.equal(store.admission(bp,end).expired,true);
  store.verify(bp,{verified:false,reason:'still_unverified'},end-10);assert.equal(store.admission(bp).expires_at,first.expires_at);
  store.close();store=await openStore(dir);assert.equal(store.admission(bp).expires_at,first.expires_at);
- const alias={...bp,id:'different',producer:'newton',referenceRpc:'http://new-reference.invalid'};assert.equal(retentionKey(alias),retentionKey(bp));store.save(alias);assert.equal(store.admission(alias).expires_at,first.expires_at);
+ const alias={...bp,id:'different',producer:'newton',rpcScope:'reference',referenceRpc:'http://new-reference.invalid'};assert.equal(retentionKey(alias),retentionKey(bp));store.save(alias);assert.equal(store.admission(alias).expires_at,first.expires_at);
  store.append(bp.id,[{at:Date.now(),id:'rpc',status:'operational'}]);store.purge(bp);assert.equal(store.history(bp.id).length,0);assert.ok(!store.configs().some(c=>c.id===bp.id));
- store.verify(alias,{verified:true,reason:'too_late'},end);assert.equal(store.admission(alias,end).expired,true);
+ store.verify(alias,{verified:false,reason:'still_unverified'},end);assert.equal(store.admission(alias,end).expired,true);store.save(bp);store.verify(bp,{verified:true,reason:'independently_verified'},end);assert.equal(store.admission(bp,end).mode,'long_term');
  }finally{store?.close();await rm(dir,{recursive:true,force:true})}
 });
 test('losing long-term eligibility starts one bounded grace period without extension',async()=>{

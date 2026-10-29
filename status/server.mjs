@@ -17,13 +17,14 @@ const raw=JSON.parse(await readFile(process.env.STATUS_CONFIG||path.join(root,'c
 }));
 const config=normalizeConfig(raw);
 const data=process.env.STATUS_DATA||path.join(root,'data');
-const store=await openStore(data);store.seed(config.bps);store.registerExisting();
+const store=await openStore(data);if(raw.foundationBps)store.setFoundationAccounts(raw.foundationBps);store.seed(config.bps);store.registerExisting();
 const collectors=new Map(),timers=new Map();
 const activeConfigs=new Map();
 let policy={};
 async function readPolicy(){
  if(process.env.STATUS_ADMISSION_POLICY)policy=JSON.parse(await readFile(process.env.STATUS_ADMISSION_POLICY,'utf8'));
  else policy={};
+ policy.networks={...Object.fromEntries(discoverySources(raw).map(s=>[s.network,{chainId:s.chainId,rpc:s.rpc}])),...policy.networks};
 }
 await readPolicy();
 async function removeExpired(bp){
@@ -33,9 +34,13 @@ async function removeExpired(bp){
  await rm(path.join(data,bp.id),{recursive:true,force:true});
  return true;
 }
+async function eligibility(bp){
+ try{store.validateTopology(bp)}catch{return {verified:false,reason:'node_topology_conflict'}}
+ return verifyAdmission(bp,policy,Date.now(),fetch,{foundationApproved:store.foundationEligible(bp)});
+}
 async function install(bp){
+ store.verify(bp,await eligibility(bp));
  if(await removeExpired(bp))return;
- store.verify(bp,await verifyAdmission(bp,policy));
  const collector=await createCollector(bp,store);
  activeConfigs.set(bp.id,bp);collectors.set(bp.id,collector);
  if(timers.has(bp.id))clearInterval(timers.get(bp.id));
@@ -53,7 +58,7 @@ async function recheck(){
  if(checking)return;checking=true;
  try{
   try{await readPolicy()}catch{policy={}}
-  await Promise.all([...activeConfigs.values()].map(async bp=>{if(await removeExpired(bp))return;store.verify(bp,await verifyAdmission(bp,policy));await removeExpired(bp)}));
+  await Promise.all([...activeConfigs.values()].map(async bp=>{if(await removeExpired(bp))return;store.verify(bp,await eligibility(bp));await removeExpired(bp)}));
  }finally{checking=false}
 }
 setInterval(()=>recheck().catch(()=>{}),30000).unref();
