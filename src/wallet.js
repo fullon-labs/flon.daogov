@@ -369,8 +369,9 @@ export async function loadProducerRewards(producer){
   };
 }
 export async function loadVotingAccount(account){
-  const [balances,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows,rewardConfigRows]=await Promise.all([
-    rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'GLON'}).catch(()=>[]),
+  const governance=config().governance||'dao.gov';
+  const [powerRows,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows,rewardConfigRows]=await Promise.all([
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'powers',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'FLON'}).catch(()=>[]),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendingvote',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
@@ -390,7 +391,7 @@ export async function loadVotingAccount(account){
   const pendingAllocation=pendingAllocationRows.rows?.find(row=>row.voter===account)||null;
   const rewards=rewardRows.rows?.find(row=>row.owner===account)||null;
   const refund=refundRows.rows?.find(row=>row.owner===account)||null;
-  const glon=Array.isArray(balances)&&balances.length?balances[0]:'0.00000000 GLON';
+  const governancePower=powerRows.rows?.find(row=>row.voter===account)?.power||'0.00000000 POWER';
   const flon=Array.isArray(flonBalances)&&flonBalances.length?flonBalances[0]:'0.00000000 FLON';
   const actions=new Set((abi.abi?.actions||[]).map(item=>item.name));
   const nodeVoteUnits=pending?.votes??voter?.votes??0;
@@ -402,7 +403,7 @@ export async function loadVotingAccount(account){
   const hasUnsettledVote=Boolean(pendingAllocation||pending)&&
     Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>=nextEpoch;
   return {
-    account,glon,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,effectiveAllocation,pendingAllocation,rewards,refund,
+    account,governancePower,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,effectiveAllocation,pendingAllocation,rewards,refund,
     stakeSupported:actions.has('addvote')&&actions.has('subvote')&&actions.has('voterefund'),
     voteAllocationSupported:actions.has('votealloc'),
     nextEpoch,
@@ -422,13 +423,14 @@ export async function loadProducerStake(owner){
   return result.rows.find(row=>row.owner===owner)?.staked||'0.00000000 FLON';
 }
 export async function loadElection(){
-  const [producerRows,schedule,statusRows,configRows,stakeRows,glonStats]=await Promise.all([
+  const governance=config().governance||'dao.gov';
+  const [producerRows,schedule,statusRows,configRows,stakeRows,governanceRows]=await Promise.all([
     readTablePages(rpcPost,{json:true,code:'flon',scope:'flon',table:'producers',limit:200}),
     rpcPost('/v1/chain/get_producer_schedule',{}),
     readTablePages(rpcPost,{json:true,code:'flon',scope:'flon',table:'bpstatus',limit:200}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'electconfig',limit:1}).catch(()=>({rows:[]})),
     readTablePages(rpcPost,{json:true,code:'flon',scope:'flon',table:'bpstakes',limit:200}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_currency_stats',{code:'flon.token',symbol:'GLON'}).catch(()=>({})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'global',limit:1}).catch(()=>({rows:[]})),
   ]);
   const active=new Set((schedule.active?.producers||[]).map(row=>row.producer_name));
   const performance=new Map((statusRows.rows||[]).map(row=>[row.producer,row]));
@@ -443,7 +445,7 @@ export async function loadElection(){
     if(Number(producer.performance?.status)===4)producer.status='suspended';
     else if(standbyRank++<30)producer.status='standby';
   }
-  return {producers,activeTarget,activeCount:active.size,...summarizeNetworkEconomics(producers,stakeRows.rows||[],glonStats)};
+  return {producers,activeTarget,activeCount:active.size,...summarizeNetworkEconomics(producers,stakeRows.rows||[],governanceRows.rows?.[0])};
 }
 export async function loadNetworkProduction(){
   const epochRows=await rpcPost('/v1/chain/get_table_rows',{
@@ -473,7 +475,7 @@ export async function loadGovernance(account=''){
   ]);
   const actions=new Set((abi.abi?.actions||[]).map(item=>item.name));
   const tables=new Set((abi.abi?.tables||[]).map(item=>item.name));
-  const requiredActions=['propose','endorse','activate','castvote','finalize','queue','execute','expire','cancel','syncpower'];
+  const requiredActions=['propose','endorse','activate','castvote','finalize','queue','execute','expire','cancel'];
   const supported=requiredActions.every(action=>actions.has(action))&&tables.has('proposals')&&tables.has('powers');
   const global=globalRows.rows?.[0]||null,governanceConfig=configRows.rows?.[0]||null;
   let power=null,ballots=new Map(),endorsements=new Set();
