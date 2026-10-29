@@ -127,13 +127,15 @@ test('proposal preflight validates a restored HuFu session without reopening acc
   assert.match(authorization,/assertAccountOnChain\(session\.account\)/);
 });
 
-test('HuFu signing uses only the injected bridge and never the iframe Client',()=>{
+test('HuFu signing matches FullSwap by preferring the existing HuFu parent bridge',()=>{
   const start=walletSource.indexOf('export async function transact(session,actions,options={})');
   const end=walletSource.indexOf("if(isHuFuApp())throw",start);
   const branch=walletSource.slice(start,end);
 
-  assert.doesNotMatch(walletSource,/@fullon\/flonjs|new Client\(|isInIframe\(|__DAO_HUFU_CLIENT__/);
-  assert.doesNotMatch(branch,/postMessage|runtimeClient/);
+  assert.match(walletSource,/import \{Client\} from '@fullon\/flonjs'/);
+  assert.match(branch,/if\(window\.parent!==window\)/);
+  assert.match(branch,/hufuParentClient\|\|=new Client\(\)/);
+  assert.match(branch,/return hufuParentClient\.transact\(authorized\)/);
   assert.match(branch,/const provider=window\.HuFu\|\|null/);
   assert.match(branch,/session\.provider==='hufu'&&provider\?\.transact/);
   assert.match(branch,/provider\.transact\(\{transaction\}\)/);

@@ -1,4 +1,5 @@
 import {loadProducerEpochs} from './producer-status.js';
+import {Client} from '@fullon/flonjs';
 import {latestCompleteEpoch,summarizeBPProduction} from './production.js';
 import {summarizeNetworkEconomics} from './network-summary.js';
 import {readTablePages} from './table-pages.js';
@@ -18,6 +19,7 @@ let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
 let hufuFullOnRequested=false;
+let hufuParentClient=null;
 
 function normalizeAccount(value){
   if(typeof value==='string'){try{return normalizeAccount(JSON.parse(value))}catch{return /^[a-z1-5.]{1,12}$/.test(value)?{account:value,permission:'active',chainId:''}:null}}
@@ -535,6 +537,14 @@ export async function authorizeHuFuSigning(session){
 export async function transact(session,actions,options={}){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
+  // HuFu hosts some DApps inside its own parent container. FullSwap uses this
+  // parent transaction bridge first; it is the route that opens HuFu's native
+  // transaction sheet. This does not create an iframe and is deliberately not
+  // used for account selection or RPC reads.
+  if(window.parent!==window){
+    hufuParentClient||=new Client();
+    return hufuParentClient.transact(authorized);
+  }
   // Opening HuFu's native signer must remain in the original click task.
   // Awaiting bridge discovery or RPC/TAPOS preparation first loses the user
   // gesture in affected HuFu WebViews, so use only the injected bridge already
