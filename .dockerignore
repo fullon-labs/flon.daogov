@@ -2,3 +2,12 @@
 node_modules
 npm-debug.log
 deploy/arm/config.*.js
+
+**/.env
+**/.env.*
+!**/.env.example
+deploy/.local
+deploy/secrets
+status/config.json
+status/data
+**/*.private.json

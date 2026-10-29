@@ -47,7 +47,7 @@ npm run build
 npm run preview
 ```
 
-生产环境通过 `/config.js` 注入链环境，不需要为主网和测试网分别编译前端。`deploy/app-host/` 包含两个容器实例的运行时配置，`deploy/edge-host/` 包含网关反向代理配置。
+生产环境通过 `/config.js` 注入链环境，不需要为主网和测试网分别编译前端。`deploy/app/` 和 `deploy/gateway/` 仅保留通用模板；实际配置来自不入库的 `deploy/.env`，渲染方法见 [部署说明](deploy/README.md)。
 
 ## 项目结构
 
