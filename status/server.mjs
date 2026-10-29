@@ -8,6 +8,7 @@ import {openStore} from './store.mjs';
 import {startAdmin} from './admin.mjs';
 import {verifyAdmission} from './admission.mjs';
 import {rm} from 'node:fs/promises';
+import {createDiscovery,discoverySources,mergeDirectory} from './discovery.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 // An explicit configuration error must stop startup, never silently select another network.
 const raw=JSON.parse(await readFile(process.env.STATUS_CONFIG||path.join(root,'config.json'),'utf8').catch(error=>{
@@ -57,18 +58,24 @@ async function recheck(){
 }
 setInterval(()=>recheck().catch(()=>{}),30000).unref();
 setInterval(()=>{for(const bp of activeConfigs.values())removeExpired(bp).catch(()=>{})},1000).unref();
+const discovery=createDiscovery(discoverySources(raw),{title:config.title});
+await discovery.refresh();
+setInterval(()=>discovery.refresh().catch(()=>{}),30000).unref();
+const directory=()=>mergeDirectory(discovery.snapshots(),[...collectors.values()].map(c=>c.status()).filter(s=>!s.admission?.expired));
 await startAdmin({root,store,config,install});
 http.createServer(async(req,res)=>{
  const url=new URL(req.url,'http://localhost');
  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Cache-Control','no-store');
  const json=(value,code=200)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value))};
- if(url.pathname==='/api/bps.json')return json({title:config.title,public_origin:config.publicOrigin,default_bp:collectors.has(config.defaultBp)?config.defaultBp:collectors.keys().next().value,bps:[...collectors.values()].filter(c=>!c.status().admission?.expired).map(c=>{const s=c.status();return {id:s.id,label:s.label,network:s.network,producer:s.producer,role:s.role,status:s.stale?'unknown':s.status,updated_at:s.updated_at,stale:s.stale,admission:s.admission}})});
+ if(url.pathname==='/api/bps.json'){
+  const entries=directory();
+  return json({title:config.title,public_origin:config.publicOrigin,default_bp:entries.some(s=>s.id===config.defaultBp)?config.defaultBp:entries[0]?.id,discovery:discovery.health(),bps:entries.map(s=>({id:s.id,label:s.label,network:s.network,producer:s.producer,role:s.role,status:s.stale?'unknown':s.status,updated_at:s.updated_at,stale:s.stale,admission:s.admission,source:s.source||'node_monitor'}))});
+ }
  if(url.pathname==='/api/status.json'){
-  const id=url.searchParams.get('bp')||config.defaultBp;
-  const collector=collectors.get(id);
-  if(collector?.status().admission?.expired)return json({error:'observation_expired'},410);
-  return collector?json(collector.status()):json({error:'unknown_bp'},404);
+  const entries=directory(),id=url.searchParams.get('bp')||(entries.some(s=>s.id===config.defaultBp)?config.defaultBp:entries[0]?.id);
+  const snapshot=entries.find(s=>s.id===id)||discovery.snapshots().find(s=>s.id===id);
+  return snapshot?json(snapshot):json({error:'unknown_bp'},404);
  }
  const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
  if(!files[url.pathname]){res.writeHead(404);return res.end('Not found');}
