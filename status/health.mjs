@@ -1,7 +1,7 @@
 export function production(row) {
   if (!row) return null;
   const keys=['expected_blocks','produced_blocks','missed_blocks'];
-  if(keys.some(k=>!Number.isSafeInteger(Number(row[k]))||Number(row[k])<0)) return null;
+  if(keys.some(k=>!/^\d+$/.test(String(row[k]??''))||!Number.isSafeInteger(Number(row[k]))||Number(row[k])<0)) return null;
   const [expected,produced,missed]=keys.map(k=>Number(row[k]));
   return {...Object.fromEntries(keys.map(k=>[k,Number(row[k])])),idle_skipped_blocks:row.idle_skipped_blocks??null,
     production_rate:expected>0&&expected===produced+missed?produced/expected*100:null,
@@ -23,4 +23,10 @@ export function summary(samples,now,days,interval){
   return {uptime:known.length?known.filter(r=>r.status==='operational').length/known.length*100:null,
     coverage:Math.min(100,known.length*interval/(days*86400)*100),samples:known.length,
     p50_ms:times.length?times[Math.ceil(times.length*.5)-1]:null,p95_ms:times.length?times[Math.ceil(times.length*.95)-1]:null};
+}
+
+export function epochPerformance(epoch,row,{queryFailed=false}={}){
+  const stats=production(row);
+  const data_status=queryFailed?'query_failed':!row?'no_record':!stats?'invalid':!stats.consistent?'inconsistent':stats.expected_blocks===0?'no_expected':'observed';
+  return {epoch_id:epoch.epoch_id,closed:epoch.closed,stats:queryFailed?null:stats,data_status};
 }

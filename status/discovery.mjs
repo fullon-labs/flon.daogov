@@ -1,4 +1,4 @@
-import {production,summary} from './health.mjs';
+import {epochPerformance,summary} from './health.mjs';
 export function discoverySources(raw){
  const sources=raw.discovery??(raw.bps||[raw]).filter(b=>b.network&&b.chainId&&b.rpc);
  const seen=new Set();
@@ -34,13 +34,13 @@ export function createDiscovery(sources,{title='FULLON Status',fetchImpl=fetch,n
    for(const owner of active)if(!ranked.some(p=>p.owner===owner))ranked.push({owner,is_active:false});
    const history=await Promise.all((epochs?.rows||[]).map(async e=>({...e,stats:await optional(rows(source,'bpstats',String(e.epoch_id)))})));
    const gas=history[0]?await optional(rows(source,'gasnodestats',String(history[0].epoch_id))):null;
-   networks.set(key,{source,info,schedule,ranked,active,history,stakes,gas,updated_at:new Date(now()).toISOString(),failed:false});
+   networks.set(key,{source,info,schedule,ranked,active,history,stakes,gas,epoch_history_error:epochs===null,updated_at:new Date(now()).toISOString(),failed:false});
   }catch{const previous=networks.get(key);networks.set(key,previous?{...previous,failed:true}:{source,failed:true,ranked:[]})}
  }
  function snapshots(){
   const out=[];
   for(const n of networks.values())for(const [index,p] of n.ranked.entries()){
-   const account=p.owner,epochHistory=n.history.map(e=>({epoch_id:e.epoch_id,closed:e.closed,stats:production(e.stats?.find(r=>r.producer===account))}));
+   const account=p.owner,epochHistory=n.history.map(e=>epochPerformance(e,e.stats?.find(r=>r.producer===account),{queryFailed:e.stats===null}));
    const stats=epochHistory[0]?.stats;
    const g=n.gas?.find(r=>r.owner===account);
    const stale=n.failed||now()-Date.parse(n.updated_at)>75000;
@@ -51,7 +51,7 @@ export function createDiscovery(sources,{title='FULLON Status',fetchImpl=fetch,n
     head_lib_gap:n.info.head_block_num-n.info.last_irreversible_block_num,node_version:n.info.server_version_string??null,
     sync_lag_blocks:null,sync_lag_seconds:null,head_age_seconds:Math.max(0,(now()-Date.parse(n.info.head_block_time+(n.info.head_block_time.endsWith('Z')?'':'Z')))/1000),
     schedule_version:n.schedule.active.version,current_epoch:epochHistory[0]?.epoch_id??null,...stats,
-    epoch_history:epochHistory,candidate_status:p.is_active?'registered':'schedule_transition',rank:index+1,votes:p.total_votes??null,
+    epoch_history:epochHistory,epoch_history_error:n.epoch_history_error,candidate_status:p.is_active?'registered':'schedule_transition',rank:index+1,votes:p.total_votes??null,
     votes_to_21:n.ranked[20]&&p.total_votes!=null?Math.max(0,Number(n.ranked[20].total_votes)-Number(p.total_votes)):null,
     self_stake:n.stakes?.find(r=>r.owner===account)?.staked??null,gas:g?{eligible:g.eligible,score:g.score,allocated:g.allocated}:null,
     readiness:'unknown',finalizer_status:'unknown',p2p_peers:null,last_produced_at:null,location:null,contact:null,

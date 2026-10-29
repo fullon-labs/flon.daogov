@@ -77,7 +77,7 @@ http.createServer(async(req,res)=>{
   const snapshot=entries.find(s=>s.id===id)||discovery.snapshots().find(s=>s.id===id);
   return snapshot?json(snapshot):json({error:'unknown_bp'},404);
  }
- const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
+ const files={'/':'index.html','/app.js':'app.js','/epoch-chart.js':'epoch-chart.js','/style.css':'style.css','/epoch-chart.css':'epoch-chart.css'};
  if(!files[url.pathname]){res.writeHead(404);return res.end('Not found');}
  res.setHeader('Content-Type',url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.css')?'text/css':'text/html; charset=utf-8');
  res.end(await readFile(path.join(root,'public',files[url.pathname])));
