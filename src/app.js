@@ -1,5 +1,6 @@
+import '../status/public/epoch-chart.css';
 import {producerStatusUrl,renderProducerPerformance} from './producer-status.js';
-import {autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadChainGovernanceParameters,loadContractAbi,loadElection,loadEpochTiming,loadGovernance,loadGovernanceActionDefaults,loadNetworkProduction,loadProducerRewards,loadProducerPerformance,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
+import {authorizeHuFuSigning,autoConnectHuFuWallet,connectWallet,disconnectWallet,isHuFuApp,loadBPAccount,loadChainGovernanceParameters,loadContractAbi,loadElection,loadEpochTiming,loadGovernance,loadGovernanceActionDefaults,loadNetworkProduction,loadProducerRewards,loadProducerPerformance,loadProducerStake,loadVotingAccount,restoreWallet,serializeGovernanceAction,transact} from './wallet.js';
 
 import {accountExplorerUrl} from './explorer.js';
 import {DAO_STATUS_META,abiFieldValue,actionAbiFields,effectiveProposalPhase,enabledAllowlist,governanceAction,proposalCounts,validateFrozenActions} from './governance.js';
@@ -42,6 +43,7 @@ const discussions=createDiscussionsClient({baseUrl:runtimeConfig.discussionApiUr
 const contractAbiCache=new Map();
 const proposalActionChecks=new WeakMap();
 let pendingVoteAllocations=null;
+let pendingProposalTransaction=null;
 let epochCountdownTimer=null;
 let refundCountdownTimer=null;
 let epochCountdownAnchor=null;
@@ -91,7 +93,7 @@ const translations=new Map([
   ['选择并支持可信的区块生产者','Choose and support trusted block producers'],['选择节点并直接填写分配的 FLON 数量','Select nodes and enter the FLON allocation for each'],['排序','Sort'],['综合排名','Overall rank'],['票权最高','Highest voting power'],['分享比例','Reward share'],['已选择优先','Selected first'],['尚可分配','Available to allocate'],['下一 Epoch 生效','Effective next epoch'],['修改节点或票数后即可提交','Change a node or vote amount to submit'],['分配票数','My vote allocation'],['连接钱包后管理投票','Connect wallet to manage votes'],['请输入最多 8 位小数的有效票数','Enter a valid amount with up to 8 decimals'],['分配总额超过账户可投 FLON','Allocation exceeds available FLON'],['当前分配尚未修改','No allocation changes'],['修改将在下一 Epoch 生效','Changes take effect next epoch']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
-  ['BP 生产状态','BP production status'],['连接 BP 账户钱包后读取链上状态','Connect the BP account wallet to load on-chain status'],['正在读取链上状态…','Loading on-chain status…'],['当前账户未注册为 BP','The current account is not registered as a BP'],['当前合约尚未支持 BP 自助恢复','The current contract does not yet support BP self-service recovery'],['链上状态读取失败','Failed to load on-chain status'],['暂停次数','Suspensions'],['当前 Epoch','Current Epoch'],['连续漏块','Consecutive misses'],['恢复生产','Resume production'],['冷却期尚未结束','Cooldown has not ended'],['暂停','Suspended'],['试运行','Probation'],['合格','Qualified'],['降级','Degraded'],['警告','Warning'],['样本不足','Insufficient sample'],['网络事件','Network incident'],['未评估','Not assessed'],['恢复后先进入试运行，不会直接视为合格。','Recovery starts probation and does not immediately restore qualified status.'],['试运行期间连续漏掉 12 个分配槽位会立即再次暂停。','Missing 12 consecutive assigned slots during probation causes immediate re-suspension.'],['再次暂停的冷却期按 6、12、24、48 小时递增，最高 48 小时。','Repeated suspension cooldowns escalate through 6, 12, 24, and 48 hours, capped at 48 hours.'],['需要 BP 账户 active 权限签名','Requires the BP account active permission'],['确认恢复生产','Confirm production recovery'],['交易成功后进入试运行，排班更新后才会重新获得出块槽位。','After the transaction succeeds, probation begins; block slots return only after the schedule updates.'],['我确认节点已在线并可持续签署区块','I confirm the node is online and can continuously sign blocks'],['签名并进入试运行','Sign and enter probation'],['正在请求钱包签名…','Requesting wallet signature…'],['恢复交易已广播','Recovery transaction broadcast'],['已进入试运行','Probation started'],['刷新状态','Refresh status']
+  ['BP 生产状态','BP production status'],['连接 BP 账户钱包后读取链上状态','Connect the BP account wallet to load on-chain status'],['正在读取链上状态…','Loading on-chain status…'],['当前账户未注册为 BP','The current account is not registered as a BP'],['当前合约尚未支持 BP 自助恢复','The current contract does not yet support BP self-service recovery'],['链上状态读取失败','Failed to load on-chain status'],['当前账户不属于此网络','The current account does not belong to this network'],['请在 HuFu 切换到 FullOn 测试网账户，然后断开并重新连接钱包。','Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.'],['重新连接钱包','Reconnect wallet'],['暂停次数','Suspensions'],['当前 Epoch','Current Epoch'],['连续漏块','Consecutive misses'],['恢复生产','Resume production'],['冷却期尚未结束','Cooldown has not ended'],['暂停','Suspended'],['试运行','Probation'],['合格','Qualified'],['降级','Degraded'],['警告','Warning'],['样本不足','Insufficient sample'],['网络事件','Network incident'],['未评估','Not assessed'],['恢复后先进入试运行，不会直接视为合格。','Recovery starts probation and does not immediately restore qualified status.'],['试运行期间连续漏掉 12 个分配槽位会立即再次暂停。','Missing 12 consecutive assigned slots during probation causes immediate re-suspension.'],['再次暂停的冷却期按 6、12、24、48 小时递增，最高 48 小时。','Repeated suspension cooldowns escalate through 6, 12, 24, and 48 hours, capped at 48 hours.'],['需要 BP 账户 active 权限签名','Requires the BP account active permission'],['确认恢复生产','Confirm production recovery'],['交易成功后进入试运行，排班更新后才会重新获得出块槽位。','After the transaction succeeds, probation begins; block slots return only after the schedule updates.'],['我确认节点已在线并可持续签署区块','I confirm the node is online and can continuously sign blocks'],['签名并进入试运行','Sign and enter probation'],['正在请求钱包签名…','Requesting wallet signature…'],['恢复交易已广播','Recovery transaction broadcast'],['已进入试运行','Probation started'],['刷新状态','Refresh status']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['领取 BP 奖励','Claim BP rewards'],['代 BP 领取','Claim for a BP'],['BP 奖励领取','BP reward claim'],['当前账户可为自己或任意 BP 触发领取','The connected account can trigger a claim for itself or any BP'],['BP 收款账户','BP recipient'],['触发账户','Caller'],['基础奖励','Base rewards'],['GAS 奖励','GAS rewards'],['待领取记录','claim rows'],['本次最多处理','Maximum rows this claim'],['奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。','Rewards are always paid directly to the BP. The caller cannot change the recipient or receive the rewards.'],['检查奖励','Check rewards'],['确认代领','Confirm claim'],['BP 奖励领取交易已广播','BP reward claim broadcast'],['请输入有效的 BP 账户名','Enter a valid BP account name'],['未找到该 BP','BP not found'],['当前合约尚未启用 BP 奖励领取','BP reward claims are not enabled by the current contract'],['处理中…','Processing…'],['可由任意钱包代为触发','Any wallet can trigger this claim'],['可为 BP 代触发','Can trigger for a BP'],['治理权','Governance power'],['暂无可领取的 BP 奖励','No BP rewards are currently claimable']
@@ -112,6 +114,7 @@ const translations=new Map([
   ['提案类型','Proposal type'],['风险等级','Risk tier'],['最低全网票权','Minimum network power'],['待激活','Pending activation'],['Quorum / 通过率 / 绝对支持','Quorum / approval / absolute support'],['反对','Against'],['弃权','Abstain'],['拟议变更','Proposed changes'],['提案文档','Proposal document'],['社区讨论','Community discussion'],['尚未关联论坛讨论','No forum discussion linked'],['关闭','Close'],
   ['支持本提案','Support this proposal'],['拒绝本提案','Reject this proposal'],['人附议','endorsers'],['提案类型','Proposal type'],['拟议变更','Proposed changes'],['提案文档','Proposal document'],['社区讨论','Community discussion'],['尚未关联论坛讨论','No forum discussion linked'],['关闭','Close'],
   ['信号提案表达社区意见；可执行提案通过后只执行创建时锁定的白名单 action。','Signal proposals express community intent. Executable proposals may only run allowlisted actions locked when the proposal was created.'],['可执行参数提案','Executable parameter proposal'],['（白名单为空）',' (allowlist is empty)'],['标题','Title'],['摘要','Summary'],['提案文档 URI','Proposal document URI'],['社区讨论 URI','Community discussion URI'],['白名单 action','Allowlisted action'],['移除此 action','Remove this action'],['添加 action','Add action'],['参数输入框根据目标 action 的链上 ABI 自动生成。签名前由当前网络 RPC 序列化，并检查白名单及字节上限。','Input fields are generated from the target action ABI. Before signing, the current network RPC serializes the arguments and validates allowlist and byte limits.'],['正在读取 action ABI…','Loading action ABI…'],['此 action 不需要参数。','This action has no arguments.'],['无法读取 action ABI：','Unable to load action ABI: '],['Action ABI 尚未加载完成','The action ABI is still loading'],['请检查 action 参数','Check the action arguments'],['提案正文保存在公开文档或去中心化存储，链上保存内容哈希和 URI；论坛链接在附议期结束后冻结。','Proposal content is stored in a public document or decentralized storage. The chain stores its hash and URI; the forum link is frozen when endorsement ends.'],['提案交易已广播','Proposal transaction broadcast'],['个执行操作已锁定','execution actions locked'],['交易已广播','Transaction broadcast'],['单个提案最多','A proposal supports at most'],['个 action','actions'],['附议交易已广播','Endorsement transaction broadcast'],
+  ['确认提案交易','Confirm proposal transaction'],['交易内容已检查完成，下一步将直接打开 HuFu 签名窗口。','The transaction has been checked. The next step opens the HuFu signer directly.'],['账户','Account'],['执行 actions','Execution actions'],['参数大小','Argument size'],['请在 HuFu 签名页再次核对账户、合约、action 和参数。','Verify the account, contract, action, and arguments again in HuFu.'],['取消','Cancel'],['在 HuFu 中签名','Sign in HuFu'],
   ['正在读取链上治理状态','Loading on-chain governance status'],['读取链上治理状态','Load on-chain governance status'],['治理帮助','Governance help'],['节点投票、Epoch、提案与奖励','Node voting, epochs, proposals, and rewards'],['治理中心导航','Governance center navigation'],['你有 3 项治理任务','You have 3 governance tasks'],['治理记录来自链上数据','Governance history comes from on-chain data'],['个 BP','BPs'],['— 个 BP','— BPs']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
@@ -154,6 +157,11 @@ Object.assign(localeTerms.ja,{'Vote changes':'投票の変更','Before':'変更�
 Object.assign(localeTerms.ko,{'Vote changes':'투표 변경','Before':'변경 전','After':'변경 후','Added':'추가','Changed':'변경','Removed':'삭제'});
 Object.assign(localeTerms.es,{'Vote changes':'Cambios de voto','Before':'Antes','After':'Después','Added':'Añadido','Changed':'Modificado','Removed':'Eliminado'});
 Object.assign(localeTerms['zh-TW'],{'Vote changes':'投票變更','Before':'變更前','After':'變更後','Added':'新增','Changed':'修改','Removed':'移除'});
+Object.assign(localeTerms.fr,{'The current account does not belong to this network':'Le compte actuel n’appartient pas à ce réseau','Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.':'Passez à un compte FullOn Testnet dans HuFu, puis déconnectez et reconnectez le portefeuille.','Reconnect wallet':'Reconnecter le portefeuille'});
+Object.assign(localeTerms.ja,{'The current account does not belong to this network':'現在のアカウントはこのネットワークに属していません','Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.':'HuFu で FullOn テストネットのアカウントに切り替え、ウォレットを再接続してください。','Reconnect wallet':'ウォレットを再接続'});
+Object.assign(localeTerms.ko,{'The current account does not belong to this network':'현재 계정은 이 네트워크에 속하지 않습니다','Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.':'HuFu에서 FullOn 테스트넷 계정으로 전환한 후 지갑을 다시 연결하세요.','Reconnect wallet':'지갑 다시 연결'});
+Object.assign(localeTerms.es,{'The current account does not belong to this network':'La cuenta actual no pertenece a esta red','Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.':'Cambia a una cuenta de FullOn Testnet en HuFu y vuelve a conectar la cartera.','Reconnect wallet':'Volver a conectar la cartera'});
+Object.assign(localeTerms['zh-TW'],{'The current account does not belong to this network':'目前帳戶不屬於此網路','Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.':'請在 HuFu 切換到 FullOn 測試網帳戶，然後中斷並重新連接錢包。','Reconnect wallet':'重新連接錢包'});
 const sourceText=new WeakMap();
 const sourceAttrs=new WeakMap();
 function normalizeLanguage(value){const locale=String(value||'').replace('_','-'),lower=locale.toLowerCase();if(lower==='zh-tw'||lower==='zh-hk'||lower==='zh-hant')return'zh-TW';if(lower.startsWith('zh'))return'zh-CN';const base=lower.split('-')[0];return supportedLanguages.has(base)?base:'en'}
@@ -166,6 +174,7 @@ function networkName(){
 }
 function renderNetworkNames(){document.querySelectorAll('[data-network-name]').forEach(node=>node.textContent=networkName())}
 
+[['无统计记录','No statistics recorded'],['无应出块','No expected blocks'],['查询失败','Query failed'],['数据无效','Invalid data'],['暂无 Epoch 记录','No epoch records yet'],['Epoch 出块率趋势','Epoch production rate trend'],['期记录','epochs recorded'],['柱高表示出块率，实出数量见提示；无统计记录不代表漏块。','Bar height shows production rate; counts appear in the tooltip. Missing records do not imply missed blocks.']].forEach(([zh,en])=>translations.set(zh,en));
 [['Epoch 表现','Epoch performance'],['完整节点状态','Full node status'],['实出 / 应出','produced / expected'],['统计不一致','Inconsistent statistics'],['最近 30 个 Epoch 出块率','Production rate for the last 30 epochs'],['已观测出块率','Observed production rate'],['未知 / 无应出块','Unknown / no expected blocks'],['无观测数据','No observations'],['已封存','Closed'],['未封存','Open'],['Idle skipped 不计入出块率','Idle skipped is excluded from the production rate']].forEach(([zh,en])=>translations.set(zh,en));
 function translateText(value){if(currentLanguage==='zh-CN')return value;let output=value;[...translations.entries()].sort((a,b)=>b[0].length-a[0].length).forEach(([zh,en])=>{output=output.split(zh).join(en)});const terms=localeTerms[currentLanguage];if(terms)Object.entries(terms).sort((a,b)=>b[0].length-a[0].length).forEach(([en,localized])=>{output=output.split(en).join(localized)});return output}
 function applyTranslations(root=document){
@@ -250,7 +259,7 @@ function renderBPRecovery(state){
   const card=document.querySelector('[data-bp-recovery]');if(!card)return;
   if(!walletSession){card.innerHTML='<div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>连接 BP 账户钱包后读取链上状态</small></div>';applyTranslations(card);return}
   if(!state){card.innerHTML='<div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>正在读取链上状态…</small></div>';applyTranslations(card);return}
-  if(state.error){card.innerHTML=`<div class="bp-recovery-empty"><strong>链上状态读取失败</strong><small>${escapeHtml(state.error)}</small></div><button class="primary-button" type="button" data-action="refresh-bp-status">刷新状态</button>`;applyTranslations(card);return}
+  if(state.error){const accountMissing=state.error==='ACCOUNT_NOT_FOUND_ON_NETWORK';card.innerHTML=`<div class="bp-recovery-empty"><strong>${accountMissing?'当前账户不属于此网络':'链上状态读取失败'}</strong><small>${accountMissing?'请在 HuFu 切换到 FullOn 测试网账户，然后断开并重新连接钱包。':escapeHtml(state.error)}</small></div><button class="primary-button" type="button" data-action="${accountMissing?'wallet':'refresh-bp-status'}">${accountMissing?'重新连接钱包':'刷新状态'}</button>`;applyTranslations(card);return}
   if(!state.supported||!state.recoverySupported){card.innerHTML='<div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>当前合约尚未支持 BP 自助恢复</small></div>';applyTranslations(card);return}
   if(!state.producer){card.innerHTML=`<div class="bp-recovery-empty"><strong>当前账户未注册为 BP</strong><small>${escapeHtml(state.account)}</small></div>`;applyTranslations(card);return}
   const status=Number(state.performance?.status??0),meta=bpStatusMeta[status]||bpStatusMeta[0];
@@ -469,6 +478,7 @@ function openProposalDetails(id){
   openSheet(`<h2 id="sheet-title">${escapeHtml(proposal.title)}</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml((DAO_STATUS_META[Number(proposal.status)]||['未知'])[0])}</p><div class="sign-summary"><div><span>提案人</span><strong>${escapeHtml(proposal.proposer)}</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal.proposal_type)}</strong></div>${policy?`<div><span>风险等级</span><strong>L${Number(policy.risk_level)}</strong></div><div><span>最低全网票权</span><strong>${escapeHtml(formatOverviewAsset(policy.min_total_power||'待激活'))}</strong></div><div><span>Quorum / 通过率 / 绝对支持</span><strong>${Number(policy.quorum_bps||0)/100}% / ${Number(policy.approval_bps||0)/100}% / ${Number(policy.min_support_bps||0)/100}%</strong></div>`:''}<div><span>附议</span><strong>${Number(proposal.endorsement_count||0)}</strong></div><div><span>赞成</span><strong>${escapeHtml(formatOverviewAsset(proposal.for_votes))}</strong></div><div><span>反对</span><strong>${escapeHtml(formatOverviewAsset(proposal.against_votes))}</strong></div><div><span>弃权</span><strong>${escapeHtml(formatOverviewAsset(proposal.abstain_votes))}</strong></div><div><span>拟议变更</span><strong>${proposal.actions?.length||0}</strong></div></div><p class="proposal-summary">${escapeHtml(proposal.summary)}</p><div class="profile-review">${metadata?`<strong>提案文档</strong><a href="${escapeHtml(metadata)}" target="_blank" rel="noopener noreferrer">${escapeHtml(metadata)}</a>`:''}${forum?`<strong>社区讨论</strong><a href="${escapeHtml(forum)}" target="_blank" rel="noopener noreferrer">${escapeHtml(forum)}</a>`:'<strong>社区讨论</strong><small>尚未关联论坛讨论</small>'}</div><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">关闭</button>${action?`<button class="primary-button" data-action="${action.action}" data-governance-action="${escapeHtml(action.name||'')}" data-proposal-id="${proposal.proposal_id}">${escapeHtml(action.label)}</button>`:''}</div>`);
 }
 function openCreateProposal(prefill={}){
+  pendingProposalTransaction=null;
   if(!walletSession){openWalletSheet();return}if(!governanceState?.config){showToast('治理参数尚未配置');return}
   const rules=governanceExecutableRules(),executable=rules.length>0;
   const title=escapeHtml(String(prefill.title||'').slice(0,128)),summary=escapeHtml(String(prefill.summary||'').slice(0,1024)),discussionUri=escapeHtml(safePublicUrl(prefill.discussionUri)||''),metadataUri=escapeHtml(safePublicUrl(prefill.metadataUri)||discussionUri);
@@ -617,6 +627,7 @@ async function submitProposal(target){
   if(!walletSession)return;const form=sheetContent.querySelector('[data-proposal-form]');if(!form?.reportValidity())return;
   const proposal_type=form.proposalType.value,title=form.title.value.trim(),summary=form.summary.value.trim(),metadata_uri=form.metadataUri.value.trim(),discussion_uri=form.discussionUri.value.trim();target.disabled=true;
   try{
+    if(isHuFuApp())walletSession=await authorizeHuFuSigning(walletSession);
     const actions=[];
     if(proposal_type==='parameter')for(const row of form.querySelectorAll('.proposal-action-row')){
       const [contract,action_name]=row.querySelector('[name="targetAction"]').value.split('::'),args=proposalActionArgs(row);
@@ -624,12 +635,42 @@ async function submitProposal(target){
     }
     const bytes=actions.length?validateFrozenActions(actions,enabledAllowlist(governanceState.allowlist),governanceState.config):0;
     const content_hash=await sha256Hex(JSON.stringify({title,summary,metadata_uri,discussion_uri,actions}));
-    const result=await transact(walletSession,[{account:'dao.gov',name:'propose',data:{proposer:walletSession.account,proposal_type,title,summary,content_hash,metadata_uri,discussion_uri,actions}}]),id=transactionId(result);
-    openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">提案交易已广播</h2><p>${actions.length} 个执行操作已锁定 · ${bytes} bytes</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshGovernance();
+    const action={account:'dao.gov',name:'propose',data:{proposer:walletSession.account,proposal_type,title,summary,content_hash,metadata_uri,discussion_uri,actions}};
+    pendingProposalTransaction={action,bytes};
+    const actionParameterSize=actions.length?`${bytes} bytes`:(currentLanguage==='zh-CN'?'无执行参数':'No execution parameters');
+    openSheet(`<h2 id="sheet-title">确认提案交易</h2><p class="sheet-subtitle">交易内容已检查完成，下一步将直接打开 HuFu 签名窗口。</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>dao.gov::propose</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal_type)}</strong></div><div><span>标题</span><strong>${escapeHtml(title)}</strong></div><div><span>执行 actions</span><strong>${actions.length}</strong></div><div><span>参数大小</span><strong>${actionParameterSize}</strong></div></div><p class="sign-warning">请在 HuFu 签名页再次核对账户、合约、action 和参数。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-confirm">在 HuFu 中签名</button></div>`);
   }catch(error){target.disabled=false;const code=String(error?.message||error);showToast(code.includes('ACTION_ABI_NOT_READY')?'Action ABI 尚未加载完成':code.includes('INVALID_ABI_FIELD')||code.includes('REQUIRED_ABI_FIELD')?'请检查 action 参数':code.includes('ACTION_DATA_TOO_LARGE')||code.includes('TOTAL_ACTION_DATA_TOO_LARGE')?(currentLanguage==='zh-CN'?'Action 参数内容过长，请缩短后再提交。':'The action arguments are too long. Shorten them before submitting.'):walletErrorMessage(error))}
 }
+async function confirmProposal(target){
+  if(!walletSession||!pendingProposalTransaction)return;
+  const prepared=pendingProposalTransaction;
+  target.disabled=true;
+  target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
+  showToast(currentLanguage==='zh-CN'?'正在打开 HuFu 签名窗口…':'Opening the HuFu signer…');
+  try{
+    const result=await transact(walletSession,[prepared.action]),id=transactionId(result),actions=prepared.action.data.actions;
+    pendingProposalTransaction=null;
+    openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">提案交易已广播</h2><p>${actions.length} 个执行操作已锁定 · ${prepared.bytes} bytes</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshGovernance();
+  }catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中签名':'Sign in HuFu';showToast(walletErrorMessage(error))}
+}
 function openVoteProposal(id){const proposal=findProposal(id);if(!proposal)return;if(!walletSession){openWalletSheet();return}openSheet(`<h2 id="sheet-title">参与投票</h2><p class="sheet-subtitle">#${proposal.proposal_id} · ${escapeHtml(proposal.title)}</p><div class="proposal-choice-grid"><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="1">赞成<small>支持本提案</small></button><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="0">反对<small>拒绝本提案</small></button><button data-action="dao-vote-sign" data-proposal-id="${id}" data-choice="2">弃权<small>计入 quorum</small></button></div>`)}
-async function submitDaoAction(target,name,id,data={}){if(!walletSession){openWalletSheet();return}target.disabled=true;try{const result=await transact(walletSession,[{account:'dao.gov',name,data:{...data,proposal_id:Number(id)}}]),tx=transactionId(result);showToast(tx?`交易已广播 ${tx.slice(0,10)}…`:'交易已广播');closeSheet();await refreshGovernance()}catch(error){target.disabled=false;showToast(walletErrorMessage(error))}}
+async function submitDaoAction(target,name,id,data={}){
+  if(!walletSession){openWalletSheet();return}
+  const label=target.innerHTML;
+  target.disabled=true;
+  target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
+  showToast(currentLanguage==='zh-CN'?'正在打开 HuFu 签名窗口…':'Opening the HuFu signer…');
+  try{
+    const result=await transact(walletSession,[{account:'dao.gov',name,data:{...data,proposal_id:Number(id)}}]),tx=transactionId(result);
+    showToast(tx?`交易已广播 ${tx.slice(0,10)}…`:'交易已广播');
+    closeSheet();
+    await refreshGovernance();
+  }catch(error){
+    target.disabled=false;
+    target.innerHTML=label;
+    showToast(walletErrorMessage(error));
+  }
+}
 function setText(selector,value){document.querySelectorAll(selector).forEach(node=>node.textContent=value)}
 function formatCountdown(milliseconds){
   const seconds=Math.max(0,Math.ceil(milliseconds/1000));
@@ -935,6 +976,7 @@ document.addEventListener('click',async event=>{
   }
   if(action==='dao-remove-proposal-action')target.closest('.proposal-action-row')?.remove();
   if(action==='dao-propose-sign')await submitProposal(target);
+  if(action==='dao-propose-confirm')await confirmProposal(target);
   if(action==='dao-details')openProposalDetails(target.dataset.proposalId);
   if(action==='dao-vote')openVoteProposal(target.dataset.proposalId);
   if(action==='dao-vote-sign')await submitDaoAction(target,'castvote',target.dataset.proposalId,{voter:walletSession?.account,choice:Number(target.dataset.choice)});

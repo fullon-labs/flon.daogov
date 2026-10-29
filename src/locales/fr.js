@@ -565,4 +565,7 @@ export default {
   "Committed to BP registration": "Engagé dans l’inscription BP", "Not yet committed to BP registration": "Pas encore engagé dans l’inscription BP",
   "A new staking generation cannot start while a refund is pending. Claim or cancel the refund first.": "Une nouvelle génération de staking ne peut pas commencer tant qu’un remboursement est en attente. Récupérez-le ou annulez-le d’abord.",
   "Enter a valid amount no greater than the current self-stake": "Saisissez un montant valide ne dépassant pas l’auto-staking actuel",
+  "The current account does not belong to this network": "Le compte actuel n’appartient pas à ce réseau",
+  "Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.": "Passez à un compte FullOn Testnet dans HuFu, puis déconnectez et reconnectez le portefeuille.",
+  "Reconnect wallet": "Reconnecter le portefeuille",
 };

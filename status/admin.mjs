@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import net from 'node:net';
 import {targetKey} from './admission.mjs';
+import {nodeBinding} from './node-policy.mjs';
 export function validateBP(body){
  if(!/^[a-z0-9][a-z0-9-]{0,63}$/.test(body.id||''))throw Error('ID 需为唯一的小写字母、数字或连字符');
  if(!/^[a-z1-5.]{1,12}$/.test(body.producer||''))throw Error('请输入合法 BP account');
@@ -12,7 +13,8 @@ export function validateBP(body){
  const rpc=url(body.rpc),referenceRpc=body.referenceRpc?url(body.referenceRpc):'';
  const services=[{id:'rpc',name:'Chain RPC',type:'rpc',url:rpc}];
  if(body.p2pHost||body.p2pPort){if(!net.isIP(body.p2pHost)||!Number.isInteger(Number(body.p2pPort))||Number(body.p2pPort)<1||Number(body.p2pPort)>65535)throw Error('P2P 需输入合法 IP 与 1–65535 端口');services.push({id:'p2p',name:'P2P Network',type:'tcp',host:body.p2pHost,port:Number(body.p2pPort)})}
- return {id:body.id,label:String(body.label||body.producer).slice(0,100),producer:body.producer,network:body.network,chainId:body.chainId,rpc,referenceRpc,services,rpcScope:body.rpcScope==='bp'?'bp':'reference',intervalSeconds:30};
+ const bp={id:body.id,label:String(body.label||body.producer).slice(0,100),producer:body.producer,network:body.network,chainId:body.chainId,rpc,referenceRpc,services,rpcScope:body.rpcScope==='bp'?'bp':'reference',intervalSeconds:30,...(body.foundationGroup?{foundationGroup:String(body.foundationGroup).trim()}:{})};
+ nodeBinding(bp);return bp;
 }
 export async function startAdmin({root,store,config,install}){
  if(process.env.STATUS_ADMIN_PORT==='off')return;
@@ -23,14 +25,20 @@ export async function startAdmin({root,store,config,install}){
   const json=(x,code=200)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(x))};
   const host=req.headers.host,allowed=['127.0.0.1:'+port,'localhost:'+port];
   if(!allowed.includes(host))return json({error:'Forbidden host'},403);
-  if(req.method==='GET'&&req.url==='/api/configs')return json({bps:store.configs().map(bp=>({...bp,target_key:targetKey(bp),admission:store.admission(bp)}))});
+  if(req.method==='GET'&&req.url==='/api/configs')return json({foundation_accounts:store.foundationAccounts(),bps:store.configs().map(bp=>({...bp,target_key:targetKey(bp),admission:store.admission(bp)}))});
   if(req.method==='POST'&&req.url==='/api/bps'){
    if(req.headers.origin!=='http://'+host||req.headers['content-type']!=='application/json')return json({error:'Forbidden origin'},403);
    try{
     let body='';for await(const part of req){body+=part;if(Buffer.byteLength(body)>16384)return json({error:'Payload too large'},413)}
-    const bp=validateBP(JSON.parse(body));
-    if(store.configs().some(c=>c.id===bp.id))return json({error:'ID 已存在；请使用新 ID，避免混入不同节点的历史'},409);
-    const normalized={...bp,title:config.title};store.save(normalized);if(store.admission(normalized).expired){store.purge(normalized);return json({error:'该目标的临时观察已满 30 分钟，不能通过新 ID 延期'},410)}await install(normalized);return json({id:bp.id,admission:store.admission(normalized)},201);
+    const input=JSON.parse(body),bp=validateBP(input);
+    const owners=bp.foundationGroup?[...new Set([bp.producer,...String(input.foundationAccounts||'').split(/[\s,，]+/).filter(Boolean)])]:[bp.producer];
+    const bps=owners.map((producer,i)=>({...validateBP({...input,id:i===0?bp.id:`${bp.network}-${producer}`,producer}),title:config.title}));
+    if(bps.some(bp=>store.configs().some(c=>c.id===bp.id)))return json({error:'ID 已存在；请使用新 ID，避免混入不同节点的历史'},409);
+    store.saveMany(bps);
+    for(const entry of bps)await install(entry);
+    const expired=bps.filter(entry=>store.admission(entry).expired);for(const entry of expired)store.purge(entry);
+    if(expired.length===bps.length)return json({error:'该目标的临时观察已满 30 分钟，不能通过新 ID 延期'},410);
+    return json({id:bp.id,admission:store.admission(bp),ids:bps.filter(entry=>!store.admission(entry).expired).map(bp=>bp.id)},201);
    }catch(error){return json({error:error.message?.startsWith('SQL')?'保存失败':error.message},400)}
   }
   if(req.method!=='GET')return json({error:'Method not allowed'},405);

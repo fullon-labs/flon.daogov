@@ -1,5 +1,6 @@
+import {sharedProbe} from './probe-cache.mjs';
 import net from 'node:net';
-import {production,aggregate,summary} from './health.mjs';
+import {epochPerformance,aggregate,summary} from './health.mjs';
 export async function createCollector(config,store){
 const interval=Math.max(15,Number(config.intervalSeconds)||30);
 await store.migrate(config.id);
@@ -12,7 +13,7 @@ const rpc=async(base,method,body={})=>{
 };
 const table=async(name,scope='flon',extra={})=> (await rpc(config.rpc,'get_table_rows',{json:true,code:'flon',scope,table:name,limit:30,...extra})).rows;
 const safe=promise=>promise.catch(()=>null);
-async function probe(s){
+async function runProbe(s){
   const start=performance.now();let status='unknown',detail='未配置';
   if(s.type==='tcp'&&s.host&&s.port){
     status=await new Promise(resolve=>{const socket=net.connect({host:s.host,port:s.port});const finish=x=>{socket.destroy();resolve(x)};socket.setTimeout(5000,()=>finish('outage'));socket.once('connect',()=>finish('operational'));socket.once('error',()=>finish('outage'))});detail='TCP connectivity · 不代表 P2P 握手或同步';
@@ -22,6 +23,7 @@ async function probe(s){
   }catch{status='outage';detail='探测失败';}}
   return {id:s.id,name:s.name,type:s.type,status,detail,latency_ms:status==='unknown'?null:Math.round(performance.now()-start)};
 }
+const probe=s=>sharedProbe(JSON.stringify([config.network,config.chainId,s.type,s.url||null,s.host||null,s.port||null]),()=>runProbe(s)).then(result=>({...result,id:s.id,name:s.name}));
 async function collect(){
  const now=Date.now();
  const [info,reference,schedule,epochs,services]=await Promise.all([safe(rpc(config.rpc,'get_info')),safe(rpc(config.referenceRpc,'get_info')),safe(rpc(config.rpc,'get_producer_schedule')),safe(table('epochstats','flon',{reverse:true,limit:30})),Promise.all((config.services||[]).map(probe))]);
@@ -41,7 +43,12 @@ async function collect(){
  const rank=candidate&&ranked?ranked.findIndex(p=>p.owner===config.producer)+1:null;
  const gas=gasRows?.find(p=>p.owner===config.producer);
 
- const rows=await Promise.all((epochs||[]).map(async e=>({epoch_id:e.epoch_id,closed:e.closed,stats:production((await safe(table('bpstats',String(e.epoch_id),{lower_bound:config.producer,upper_bound:config.producer,limit:1})))?.find(r=>r.producer===config.producer))})));
+ const rows=await Promise.all((epochs||[]).map(async e=>{
+  try{const entries=await table('bpstats',String(e.epoch_id),{lower_bound:config.producer,upper_bound:config.producer,limit:1});
+    if(!Array.isArray(entries))throw Error('Invalid response');
+    return epochPerformance(e,entries.find(r=>r.producer===config.producer));
+  }catch{return epochPerformance(e,null,{queryFailed:true})}
+ }));
  const stats=rows[0]?.stats;
  const chainStatus=!config.rpc?'unknown':!info?'outage':chainMatches!==true?'unknown':age===null?'unknown':age>(config.lagThresholdSeconds||36)||lag>12?'degraded':config.referenceRpc&&!refMatches?'unknown':'operational';
  const bpStatus=role==='unknown'?'unknown':role==='active'&&(!stats||!stats.consistent)?'unknown':role==='active'&&['warning','degraded','suspended'].includes(stats?.qualification)?'degraded':'operational';
@@ -50,7 +57,7 @@ async function collect(){
  const status=maintenance.length&&overall==='operational'?'maintenance':overall;
  store.append(config.id,[{at:now,id:'overall',status,latency_ms:null},...services.map(s=>({at:now,id:s.id,status:s.status,latency_ms:s.latency_ms}))]);
  history=store.history(config.id);
- snapshot={rpc_scope:config.rpcScope||'unverified',id:config.id,label:config.label,title:config.title,network:config.network,producer:config.producer||null,role,status,chain_status:chainStatus,
+ snapshot={node_category:config.foundationGroup?'foundation_legacy':config.rpcScope==='bp'?'third_party':'observer',rpc_scope:config.rpcScope||'unverified',id:config.id,label:config.label,title:config.title,network:config.network,producer:config.producer||null,role,status,chain_status:chainStatus,
  chain_id:info?.chain_id??null,chain_verified:chainMatches,node_version:info?.server_version_string??null,
  head_block:info?.head_block_num??null,lib_block:info?.last_irreversible_block_num??null,
  head_lib_gap:info?info.head_block_num-info.last_irreversible_block_num:null,sync_lag_blocks:lag,head_age_seconds:age,
@@ -62,7 +69,7 @@ async function collect(){
  votes:candidate?.total_votes??null,votes_to_21:ranked?.[20]&&candidate?Math.max(0,Number(ranked[20].total_votes)-Number(candidate.total_votes)):null,
  self_stake:stakes?.find(p=>p.owner===config.producer)?.staked??null,
  gas:gas?{eligible:gas.eligible,score:gas.score,allocated:gas.allocated}:null,
- incidents:config.incidents||[],maintenance:config.maintenance||[],epoch_history:rows,
+ incidents:config.incidents||[],maintenance:config.maintenance||[],epoch_history:rows,epoch_history_error:epochs===null,
  uptime:Object.fromEntries([1,7,30,90].map(d=>[d,summary(history.filter(r=>r.id==='overall'),now,d,interval)])),
  services:services.map(s=>({...s,windows:Object.fromEntries([1,7,30,90].map(d=>[d,summary(history.filter(r=>r.id===s.id),now,d,interval)])),days:Array.from({length:90},(_,i)=>{const end=now-(89-i)*86400000;return {date:new Date(end).toISOString().slice(0,10),...summary(history.filter(r=>r.id===s.id&&r.at>end-86400000&&r.at<=end),end,1,interval)}})})),
  updated_at:new Date(now).toISOString(),interval_seconds:interval};

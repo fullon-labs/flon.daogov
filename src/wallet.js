@@ -1,5 +1,5 @@
 import {loadProducerEpochs} from './producer-status.js';
-import { Client } from '@fullon/flonjs';
+import {Client} from '@fullon/flonjs';
 import {latestCompleteEpoch,summarizeBPProduction} from './production.js';
 import {summarizeNetworkEconomics} from './network-summary.js';
 import {readTablePages} from './table-pages.js';
@@ -13,12 +13,41 @@ const storageKey=()=>`flon.daogov.wallet.${config().network||'mainnet'}`;
 const rewardEpochMilliseconds=21600000;
 const blockTimestampEpochMilliseconds=Date.UTC(2000,0,1);
 const transactionOptions={blocksBehind:3,expireSeconds:300};
-const hufuTransactionTimeoutMilliseconds=45000;
+const hufuTransactionTimeoutMilliseconds=60000;
 const hufuExpirationSeconds=300;
 let anchorLink;
 let hufuChainInfo=null;
 let automaticConnection=null;
-let injectedAuthorizationReady=false;
+let hufuFullOnRequested=false;
+let hufuParentClient=null;
+
+function transactHuFuNativeChannel(actions){
+  const channel=window.flutter_inappwebview;
+  if(typeof channel?.callHandler!=='function')return null;
+  const id=`daogov-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return new Promise((resolve,reject)=>{
+    const previousSuccess=window.onSignEOSSuccessful,previousError=window.onSignEOSError;
+    let settled=false;
+    const restore=()=>{
+      if(window.onSignEOSSuccessful===success)window.onSignEOSSuccessful=previousSuccess;
+      if(window.onSignEOSError===failure)window.onSignEOSError=previousError;
+    };
+    const success=(responseId,value)=>{
+      if(responseId!==id){previousSuccess?.(responseId,value);return}
+      if(settled)return;settled=true;restore();
+      try{resolve(typeof value==='string'?JSON.parse(value):value)}catch{resolve(value)}
+    };
+    const failure=(responseId,error,code)=>{
+      if(responseId!==id){previousError?.(responseId,error,code);return}
+      if(settled)return;settled=true;restore();
+      const failureError=new Error(typeof error==='string'?error:JSON.stringify(error));failureError.code=code||402;reject(failureError);
+    };
+    window.onSignEOSSuccessful=success;
+    window.onSignEOSError=failure;
+    const message=JSON.stringify({type:'pushTransaction',id,data:JSON.stringify({transaction:{actions}})});
+    Promise.resolve(channel.callHandler('FlutterChannel',message)).catch(error=>{if(!settled){settled=true;restore();reject(error)}});
+  });
+}
 
 function normalizeAccount(value){
   if(typeof value==='string'){try{return normalizeAccount(JSON.parse(value))}catch{return /^[a-z1-5.]{1,12}$/.test(value)?{account:value,permission:'active',chainId:''}:null}}
@@ -46,13 +75,24 @@ function formatAssetUnits(value,symbol,precision=8){
 }
 async function rpcPost(path,body){
   const response=await timeout(fetch(`${rpcUrl()}${path}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}),12000,'RPC_TIMEOUT');
-  if(!response.ok)throw new Error(`RPC_HTTP_${response.status}`);
-  return response.json();
+  const payload=await response.json().catch(()=>null);
+  if(!response.ok){
+    const details=payload?.error?.details||[];
+    if(path==='/v1/chain/get_account'&&details.some(item=>/unknown key.*name/i.test(String(item?.message||''))))throw new Error('ACCOUNT_NOT_FOUND_ON_NETWORK');
+    throw new Error(`RPC_HTTP_${response.status}`);
+  }
+  return payload;
 }
 async function rpcInfo(){
   const info=await rpcPost('/v1/chain/get_info',{});
   if(String(info.chain_id)!==config().chainId)throw new Error('RPC_CHAIN_ID_MISMATCH');
   return info;
+}
+function optionalTableRows(body){
+  return rpcPost('/v1/chain/get_table_rows',body).catch(()=>({rows:[]}));
+}
+async function assertAccountOnChain(account){
+  await rpcPost('/v1/chain/get_account',{account_name:account});
 }
 function utcMilliseconds(value){
   const text=String(value||'');
@@ -134,8 +174,7 @@ function assertFreshChainTime(info,now=Date.now()){
 function assertChain(chainId){if(chainId&&String(chainId)!==config().chainId)throw new Error('WALLET_CHAIN_ID_MISMATCH')}
 export function isHuFuApp(){
   return navigator.userAgent.toLowerCase().includes('hufu')||
-    Boolean(window.HuFu||window.HuFuJSProvider)||
-    window.self!==window.top;
+    Boolean(window.HuFu||window.HuFuJSProvider);
 }
 async function captureHuFuChainInfo(bridge){
   if(!bridge)return;
@@ -154,6 +193,10 @@ async function prepareHuFu(){
   if(!isHuFuApp())return window.HuFu||null;
   for(let count=0;count<30&&!window.HuFuJSProvider;count++)await wait(100);
   const bridge=window.HuFuJSProvider;
+  if(bridge?.HuFuSwitchChain&&!hufuFullOnRequested){
+    hufuFullOnRequested=true;
+    await Promise.resolve(bridge.HuFuSwitchChain('FLON'));
+  }
   await captureHuFuChainInfo(bridge);
   for(let count=0;count<50&&!window.HuFu;count++)await wait(100);
   return window.HuFu||null;
@@ -203,53 +246,33 @@ export async function restoreWallet(){
   const stored=load();if(!stored)return null;
   try{
     assertChain(stored.chainId);
-    // Restore the iframe bridge only for a session that was actually connected
-    // through HuFuClient. Merely being framed is not proof that the parent page
-    // hosts a flonjs Server transport.
-    const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
-    if(stored.provider==='iframe'&&runtimeClient.isInIframe()){
-      const info=await timeout(runtimeClient.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
-      const account=normalizeAccount(await timeout(runtimeClient.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
-      if(!account||account.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
-      return save({...stored,provider:'iframe'});
-    }
-    if(stored.provider==='hufu'&&isHuFuApp()){
+    if((stored.provider==='hufu'||stored.provider==='iframe')&&isHuFuApp()){
       const current=accountSnapshot(window.HuFu);
       if(current&&current.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
       // HuFu's only public account getter is interactive in several releases.
       // A domain/network-scoped session is therefore restored without calling
-      // requestAccountsHuFu(). When the provider exposes a passive snapshot we
+      // the interactive account picker. When the provider exposes a passive snapshot we
       // still reject account changes; otherwise the transaction actor and the
       // wallet signature enforce ownership of the cached account.
       const chainId=chainIdFrom(current)||chainIdFrom(window.HuFu)||chainIdFrom(hufuChainInfo);if(chainId)assertChain(chainId);
-      injectedAuthorizationReady=true;
-      return stored;
+      await assertAccountOnChain(stored.account);
+      return save({...stored,provider:'hufu'});
     }
     if(stored.provider==='anchor'){
+      // An Anchor session cached by a normal browser must never be reused by
+      // HuFu's embedded browser. It bypasses the native bridge and leaves the
+      // user waiting for a signing surface that cannot open in this context.
+      if(isHuFuApp()){forget();return null}
       await rpcInfo();
       const session=await (await getAnchorLink()).restoreSession(appId());
       if(!session||session.auth.actor.toString()!==stored.account)throw new Error('SESSION_EXPIRED');
       assertChain(String(session.chainId));
-    }
-    if(stored.provider==='iframe'){
-      const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
-      if(!client.isInIframe())throw new Error('IFRAME_SESSION_EXPIRED');
-      const info=await timeout(client.rpc.get_info(),12000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
-      const account=normalizeAccount(await timeout(client.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
-      if(!account||account.account!==stored.account)throw new Error('ACCOUNT_CHANGED');
     }
     return stored;
   }catch{forget();return null}
 }
 export async function connectWallet(){
   const restored=await restoreWallet();if(restored)return restored;
-  const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
-  if(client.isInIframe()){
-    const info=await timeout(client.rpc.get_info(),10000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
-    const account=normalizeAccount(await timeout(client.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
-    if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
-    return save({...account,chainId:config().chainId,provider:'iframe'});
-  }
   const provider=isHuFuApp()?await prepareHuFu():window.HuFu;
   if(provider?.requestAccountsHuFu){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
@@ -257,25 +280,20 @@ export async function connectWallet(){
     if(!account)throw new Error('HUFU_ACCOUNT_UNAVAILABLE');
     await wait(650);
     const chainId=await confirmInjectedChain(provider,account);
-    injectedAuthorizationReady=true;
+    await assertAccountOnChain(account.account);
     return save({...account,chainId,provider:'hufu'});
   }
   if(isHuFuApp())throw new Error('HUFU_PROVIDER_UNAVAILABLE');
   await rpcInfo();
   const link=await getAnchorLink(),identity=await link.login(appId()),session=identity.session;
   assertChain(String(session.chainId));
+  await assertAccountOnChain(session.auth.actor.toString());
   return save({account:session.auth.actor.toString(),permission:session.auth.permission.toString(),chainId:config().chainId,provider:'anchor'});
 }
 export function autoConnectHuFuWallet(){
   if(!isHuFuApp())return Promise.resolve(null);
   if(!automaticConnection)automaticConnection=(async()=>{
     const restored=await restoreWallet();if(restored)return restored;
-    const client=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=client;
-    if(client.isInIframe()){
-      const info=await timeout(client.rpc.get_info(),10000,'HUFU_NETWORK_TIMEOUT');assertChain(info?.chain_id);
-      const account=normalizeAccount(await timeout(client.getAccount(),10000,'HUFU_ACCOUNT_TIMEOUT'));
-      return account?save({...account,chainId:config().chainId,provider:'iframe'}):null;
-    }
     const provider=await prepareHuFu();if(!provider)return null;
     const account=accountSnapshot(provider);
     // Page load must never open HuFu's interactive account picker. A passive
@@ -283,7 +301,7 @@ export function autoConnectHuFuWallet(){
     // Connect wallet explicitly once and the resulting session is cached.
     if(!account)return null;
     const chainId=await confirmInjectedChain(provider,account);
-    injectedAuthorizationReady=true;
+    await assertAccountOnChain(account.account);
     return save({...account,chainId,provider:'hufu'});
   })();
   return automaticConnection;
@@ -291,7 +309,7 @@ export function autoConnectHuFuWallet(){
 export async function disconnectWallet(){
   const stored=load();
   if(stored?.provider==='anchor'){try{(await getAnchorLink()).clearSessions(appId())}catch{}}
-  automaticConnection=null;injectedAuthorizationReady=false;forget();
+  automaticConnection=null;forget();
 }
 export async function loadBPAccount(account){
   const [accountInfo,abi,chainInfo]=await Promise.all([
@@ -312,14 +330,14 @@ export async function loadBPAccount(account){
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'producers',lower_bound:account,upper_bound:account,limit:1}),
   ];
   if(selfStakeSupported){
-    requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakecfg',limit:1}));
-    requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstakes',lower_bound:account,upper_bound:account,limit:1}));
-    if(selfStakeRefundSupported)requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstkrefund',lower_bound:account,upper_bound:account,limit:1}));
+    requests.push(optionalTableRows({json:true,code:'flon',scope:'flon',table:'bpstakecfg',limit:1}));
+    requests.push(optionalTableRows({json:true,code:'flon',scope:'flon',table:'bpstakes',lower_bound:account,upper_bound:account,limit:1}));
+    if(selfStakeRefundSupported)requests.push(optionalTableRows({json:true,code:'flon',scope:'flon',table:'bpstkrefund',lower_bound:account,upper_bound:account,limit:1}));
   }
   if(recoverySupported){
-    requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'bpstatus',lower_bound:account,upper_bound:account,limit:1}));
-    requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}));
-    requests.push(rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}));
+    requests.push(optionalTableRows({json:true,code:'flon',scope:'flon',table:'bpstatus',lower_bound:account,upper_bound:account,limit:1}));
+    requests.push(optionalTableRows({json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}));
+    requests.push(optionalTableRows({json:true,code:'flon',scope:'flon',table:'global',limit:1}));
   }
   const results=await Promise.all(requests);
   const producerRows=results[0];
@@ -342,7 +360,7 @@ export async function loadBPAccount(account){
   const calculatedEpoch=Number.isFinite(startMs)&&Number.isFinite(headMs)&&headMs>=startMs?Math.floor((headMs-startMs)/21600000):fallbackEpoch;
   let currentStats=null;
   if(recoverySupported&&tables.some(item=>item.name==='bpstats')){
-    const statsRows=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:String(calculatedEpoch),table:'bpstats',lower_bound:account,upper_bound:account,limit:1});
+    const statsRows=await optionalTableRows({json:true,code:'flon',scope:String(calculatedEpoch),table:'bpstats',lower_bound:account,upper_bound:account,limit:1});
     currentStats=statsRows.rows?.find(row=>row.producer===account)||null;
   }
   return {account:accountInfo.account_name,producer,performance,currentStats,currentEpoch:calculatedEpoch,recoverySupported,selfStakeSupported,selfStakeRefundSupported,cancelBPRefundSupported,selfStakeConfig,selfStake,selfStakeRefund,headTime,supported:true};
@@ -528,45 +546,57 @@ export async function loadChainGovernanceParameters(){
   const rewardPlan=normalizeRewardPlans(rewardPlans).at(-1);
   return{rewardEpochSlots:rewardPlan?.epochSlots||null,activeBpTarget:Number(electionConfig?.active_bp_quorum)||null,bpStakeConfig,gasRewardConfig};
 }
-export async function transact(session,actions){
+export async function prepareHuFuSigningTransaction(session,actions){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
-  // Detect the live HuFu transport on every signing attempt. A session may
-  // have been saved as `hufu` by an older page load while the current HuFu
-  // WebView exposes the iframe Client transport. Client.transact is the native
-  // transaction sheet entry point in that environment and must win over the
-  // stale cached label.
-  const runtimeClient=window.__DAO_HUFU_CLIENT__||new Client();window.__DAO_HUFU_CLIENT__=runtimeClient;
-  // HuFu injects the full-transaction bridge asynchronously. In an iframe
-  // session it is common for HuFuClient to be ready several seconds before
-  // window.HuFu; taking an immediate snapshot here incorrectly selects the
-  // legacy actions-only path and recreates a 30-second transaction envelope.
-  const provider=window.HuFu||(isHuFuApp()?await prepareHuFu():null);
-  if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact){
-    if(session.provider==='hufu'&&!injectedAuthorizationReady)throw new Error('HUFU_REAUTH_REQUIRED');
+  return prepareHuFuTransaction(authorized);
+}
+
+export async function authorizeHuFuSigning(session){
+  assertChain(session.chainId);
+  const provider=window.HuFu||null;
+  const current=accountSnapshot(provider);
+  if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
+  confirmTransactionSnapshot(provider,current,session.chainId);
+  await assertAccountOnChain(session.account);
+  return session;
+}
+
+export async function transact(session,actions,options={}){
+  assertChain(session.chainId);
+  const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
+  // FlutterChannel is registered when HuFu creates the WebView, while the
+  // newer injected `HuFu` handler is only registered after an asynchronous
+  // chain-switch flow. Use the always-ready native transaction channel so a
+  // restored FullOn session can open the signing sheet immediately.
+  const nativeTransaction=transactHuFuNativeChannel(authorized);
+  if(nativeTransaction)return nativeTransaction;
+  // HuFu hosts some DApps inside its own parent container. FullSwap uses this
+  // parent transaction bridge first; it is the route that opens HuFu's native
+  // transaction sheet. This does not create an iframe and is deliberately not
+  // used for account selection or RPC reads.
+  if(window.parent!==window){
+    hufuParentClient||=new Client();
+    return hufuParentClient.transact(authorized);
+  }
+  // Opening HuFu's native signer must remain in the original click task.
+  // Awaiting bridge discovery or RPC/TAPOS preparation first loses the user
+  // gesture in affected HuFu WebViews, so use only the injected bridge already
+  // exposed at click time.
+  const provider=window.HuFu||null;
+  if(session.provider==='hufu'&&provider?.transact){
     const current=accountSnapshot(provider);if(current&&current.account!==session.account)throw new Error('ACCOUNT_CHANGED');
     confirmTransactionSnapshot(provider,current,session.chainId);
-    // HuFuClient's legacy iframe protocol accepts actions only, so HuFu builds
-    // a short-lived transaction envelope that can expire while its approval
-    // sheet is open. The injected bridge accepts a complete transaction; use
-    // it for both injected and iframe-authenticated sessions whenever present.
-    const transaction=await prepareHuFuTransaction(authorized);
-    return timeout(
-      Promise.resolve(provider.transact({transaction})),
-      hufuTransactionTimeoutMilliseconds,
-      'HUFU_TRANSACTION_TIMEOUT',
-    );
+    // Keep the testnet invocation byte-for-byte equivalent to FullSwap's
+    // proven HuFu path. In particular, call the injected bridge directly in
+    // the click stack; Promise/timeout wrappers around this call can postpone
+    // the WebView bridge dispatch on affected HuFu releases.
+    if(config().network!=='mainnet')return provider.transact({transaction:{actions:authorized}});
+    const transaction=options.preparedTransaction||await prepareHuFuTransaction(authorized);
+    return timeout(Promise.resolve(provider.transact({transaction})),hufuTransactionTimeoutMilliseconds,'HUFU_TRANSACTION_TIMEOUT');
   }
-  if(session.provider==='iframe'&&runtimeClient.isInIframe()){
-    return timeout(
-      Promise.resolve(runtimeClient.transact(authorized)),
-      hufuTransactionTimeoutMilliseconds,
-      'HUFU_IFRAME_TRANSACTION_TIMEOUT',
-    );
-  }
-  if(session.provider==='hufu')throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
+  if(isHuFuApp())throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
   const info=await rpcInfo();assertFreshChainTime(info);
-  if(session.provider==='iframe')throw new Error('IFRAME_SESSION_EXPIRED');
   const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
 }

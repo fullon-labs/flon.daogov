@@ -18,9 +18,67 @@ test('BP registration persists the status page on chain',()=>{
   assert.match(appSource,/candidateDraft\.statusUrl=state\.producer\.status_url/);
 });
 
+test('governance lifecycle actions show immediate signer feedback and recover on failure',()=>{
+  const start=appSource.indexOf('async function submitDaoAction');
+  const end=appSource.indexOf('function setText',start);
+  const submission=appSource.slice(start,end);
+
+  assert.ok(start>=0&&end>start,'governance lifecycle submission was not found');
+  assert.match(submission,/target\.textContent=currentLanguage==='zh-CN'\?'正在请求钱包签名…':'Requesting wallet signature…'/);
+  assert.match(submission,/showToast\(currentLanguage==='zh-CN'\?'正在打开 HuFu 签名窗口…':'Opening the HuFu signer…'\)/);
+  assert.match(submission,/catch\(error\)[\s\S]*target\.disabled=false;[\s\S]*target\.innerHTML=label;/);
+});
+
+test('proposal checking completes before a separate direct HuFu actions signing click',()=>{
+  const prepareStart=appSource.indexOf('async function submitProposal');
+  const confirmStart=appSource.indexOf('async function confirmProposal',prepareStart);
+  const confirmEnd=appSource.indexOf('function openVoteProposal',confirmStart);
+  const preparation=appSource.slice(prepareStart,confirmStart);
+  const confirmation=appSource.slice(confirmStart,confirmEnd);
+
+  assert.ok(prepareStart>=0&&confirmStart>prepareStart&&confirmEnd>confirmStart,'two-stage proposal submission was not found');
+  assert.match(preparation,/pendingProposalTransaction=\{action,bytes\}/);
+  assert.match(preparation,/data-action="dao-propose-confirm"/);
+  assert.match(preparation,/authorizeHuFuSigning\(walletSession\)/);
+  assert.ok(preparation.indexOf('authorizeHuFuSigning(walletSession)')<preparation.indexOf('sha256Hex('),'HuFu authorization must be the first asynchronous proposal operation');
+  assert.doesNotMatch(preparation,/await transact\(/);
+  assert.doesNotMatch(preparation,/prepareHuFuSigningTransaction/);
+  assert.match(preparation,/actions\.length\?`\$\{bytes\} bytes`:[^;]*'无执行参数'/);
+  assert.match(confirmation,/const prepared=pendingProposalTransaction;[\s\S]*await transact\(walletSession,\[prepared\.action\]\)/);
+  assert.doesNotMatch(confirmation,/sha256Hex|serializeGovernanceAction/);
+});
+
+test('optional BP status tables cannot fail the whole account status card',()=>{
+  const helperStart=walletSource.indexOf('function optionalTableRows');
+  const helperEnd=walletSource.indexOf('function utcMilliseconds',helperStart);
+  const loadStart=walletSource.indexOf('export async function loadBPAccount');
+  const loadEnd=walletSource.indexOf('export async function loadProducerRewards',loadStart);
+  const helper=walletSource.slice(helperStart,helperEnd);
+  const loader=walletSource.slice(loadStart,loadEnd);
+
+  assert.ok(helperStart>=0&&helperEnd>helperStart,'optional table helper was not found');
+  assert.match(helper,/\.catch\(\(\)=>\(\{rows:\[\]\}\)\)/);
+  for(const table of ['bpstakecfg','bpstakes','bpstkrefund','bpstatus','rewardepoch','global','bpstats']){
+    assert.match(loader,new RegExp(`optionalTableRows\\([^;]*table:'${table}'`));
+  }
+  assert.match(loader,/const requests=\[\s*rpcPost\([^\n]+table:'producers'/);
+});
+
+test('wallet sessions require the selected account to exist on the configured chain',()=>{
+  assert.match(walletSource,/ACCOUNT_NOT_FOUND_ON_NETWORK/);
+  assert.match(walletSource,/async function assertAccountOnChain\(account\)/);
+  const restore=walletSource.slice(walletSource.indexOf('export async function restoreWallet'),walletSource.indexOf('export async function connectWallet'));
+  const connect=walletSource.slice(walletSource.indexOf('export async function connectWallet'),walletSource.indexOf('export function autoConnectHuFuWallet'));
+  const automatic=walletSource.slice(walletSource.indexOf('export function autoConnectHuFuWallet'),walletSource.indexOf('export async function disconnectWallet'));
+  assert.match(restore,/assertAccountOnChain/);
+  assert.match(connect,/assertAccountOnChain/);
+  assert.match(automatic,/assertAccountOnChain/);
+  assert.match(appSource,/当前账户不属于此网络/);
+});
+
 test('an existing HuFu session does not reopen account selection',()=>{
-  const start=walletSource.indexOf("if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact)");
-  const end=walletSource.indexOf("if(session.provider==='iframe')",start);
+  const start=walletSource.indexOf("if(session.provider==='hufu'&&provider?.transact)");
+  const end=walletSource.indexOf("if(isHuFuApp())throw",start);
   const hufuTransactionBranch=walletSource.slice(start,end);
 
   assert.ok(start>=0&&end>start,'HuFu transaction branch was not found');
@@ -31,55 +89,93 @@ test('an existing HuFu session does not reopen account selection',()=>{
   assert.doesNotMatch(hufuTransactionBranch,/provider\.(?:request|getInfo|getChainId|getChainID)\(/);
   assert.doesNotMatch(hufuTransactionBranch,/waitForHuFuProvider/);
   assert.doesNotMatch(hufuTransactionBranch,/await wait\(/);
-  assert.doesNotMatch(hufuTransactionBranch,/config\(\)\.network==='mainnet'/);
-  assert.match(hufuTransactionBranch,/const transaction=await prepareHuFuTransaction\(authorized\)/);
+  assert.match(hufuTransactionBranch,/if\(config\(\)\.network!==\'mainnet\'\)return provider\.transact\(\{transaction:\{actions:authorized\}\}\)/);
   assert.match(hufuTransactionBranch,/provider\.transact\(\{transaction\}\)/);
   assert.match(hufuTransactionBranch,/HUFU_TRANSACTION_TIMEOUT/);
 });
 
-test('HuFu testnet uses chain-derived TAPOS before opening the native signer',()=>{
-  const start=walletSource.indexOf("if((session.provider==='hufu'||session.provider==='iframe')&&provider?.transact)");
-  const end=walletSource.indexOf("if(session.provider==='iframe')",start);
+test('the injected HuFu signer uses HuFu native testnet actions without awaiting TAPOS',()=>{
+  const start=walletSource.indexOf("if(session.provider==='hufu'&&provider?.transact)");
+  const end=walletSource.indexOf("if(isHuFuApp())throw",start);
   const branch=walletSource.slice(start,end);
-  const preparation=branch.indexOf('await prepareHuFuTransaction(authorized)');
-  const nativeSigner=branch.indexOf('provider.transact({transaction})');
+  const nativeSigner=branch.indexOf('provider.transact({transaction:{actions:authorized}})');
 
-  assert.ok(preparation>=0&&nativeSigner>preparation,'HuFu chain-derived TAPOS path was not found');
-  assert.doesNotMatch(branch,/\{actions:authorized\}/);
+  assert.ok(nativeSigner>=0,'HuFu native transaction path was not found');
+  assert.ok(nativeSigner<branch.indexOf('await prepareHuFuTransaction(authorized)'),'testnet must invoke HuFu before any TAPOS preparation');
+  assert.doesNotMatch(branch.slice(0,branch.indexOf('const transaction=options.preparedTransaction')),/Promise\.resolve|timeout\(/);
 });
 
-test('the iframe transport is used only by an iframe wallet session',()=>{
-  const start=walletSource.indexOf('export async function transact(session,actions)');
-  const end=walletSource.indexOf("if(session.provider==='hufu')throw",start);
+test('a prechecked HuFu transaction is passed directly to the injected signer',()=>{
+  const prepareStart=walletSource.indexOf('export async function prepareHuFuSigningTransaction');
+  const prepareEnd=walletSource.indexOf('export async function transact',prepareStart);
+  const preparation=walletSource.slice(prepareStart,prepareEnd);
+  assert.doesNotMatch(preparation,/HuFuSwitchChain|abi_json_to_bin/);
+  assert.match(preparation,/return prepareHuFuTransaction\(authorized\)/);
+  const start=walletSource.indexOf("if(session.provider==='hufu'&&provider?.transact)");
+  const end=walletSource.indexOf("if(isHuFuApp())throw",start);
   const branch=walletSource.slice(start,end);
-
-  assert.ok(start>=0&&end>start,'transaction dispatch was not found');
-  assert.match(branch,/session\.provider==='iframe'&&runtimeClient\.isInIframe\(\)/);
-  assert.match(branch,/runtimeClient\.transact\(authorized\)/);
-  assert.match(branch,/HUFU_IFRAME_TRANSACTION_TIMEOUT/);
+  assert.match(branch,/options\.preparedTransaction\|\|/);
 });
 
-test('an iframe-authenticated HuFu session prefers the full-transaction bridge',()=>{
-  const start=walletSource.indexOf('export async function transact(session,actions)');
-  const end=walletSource.indexOf("if(session.provider==='hufu')throw",start);
-  const branch=walletSource.slice(start,end);
-  const injected=branch.indexOf("session.provider==='hufu'||session.provider==='iframe'");
-  const legacyIframe=branch.indexOf("session.provider==='iframe'&&runtimeClient.isInIframe()");
+test('proposal preflight validates a restored HuFu session without reopening account selection',()=>{
+  const start=walletSource.indexOf('export async function authorizeHuFuSigning');
+  const end=walletSource.indexOf('export async function transact',start);
+  const authorization=walletSource.slice(start,end);
+  assert.doesNotMatch(authorization,/requestAccountsHuFu\(\)/);
+  assert.match(authorization,/current&&current\.account!==session\.account/);
+  assert.match(authorization,/confirmTransactionSnapshot\(provider,current,session\.chainId\)/);
+  assert.match(authorization,/assertAccountOnChain\(session\.account\)/);
+});
 
-  assert.ok(injected>=0&&legacyIframe>injected,'full-transaction HuFu bridge must precede the legacy iframe fallback');
-  assert.match(branch,/window\.HuFu\|\|\(isHuFuApp\(\)\?await prepareHuFu\(\):null\)/);
-  assert.match(branch,/const transaction=await prepareHuFuTransaction\(authorized\)/);
+test('HuFu signing matches FullSwap by preferring the existing HuFu parent bridge',()=>{
+  const start=walletSource.indexOf('export async function transact(session,actions,options={})');
+  const end=walletSource.indexOf("if(isHuFuApp())throw",start);
+  const branch=walletSource.slice(start,end);
+
+  assert.match(walletSource,/import \{Client\} from '@fullon\/flonjs'/);
+  assert.match(branch,/if\(window\.parent!==window\)/);
+  assert.match(branch,/hufuParentClient\|\|=new Client\(\)/);
+  assert.match(branch,/return hufuParentClient\.transact\(authorized\)/);
+  assert.match(branch,/const provider=window\.HuFu\|\|null/);
+  assert.match(branch,/session\.provider==='hufu'&&provider\?\.transact/);
   assert.match(branch,/provider\.transact\(\{transaction\}\)/);
 });
 
-test('wallet restore does not treat iframe geometry as wallet authorization',()=>{
+test('HuFu WebView signing uses the always-registered native Flutter channel',()=>{
+  const helperStart=walletSource.indexOf('function transactHuFuNativeChannel(actions)');
+  const helperEnd=walletSource.indexOf('function normalizeAccount',helperStart);
+  const helper=walletSource.slice(helperStart,helperEnd);
+  const transactStart=walletSource.indexOf('export async function transact(session,actions,options={})');
+  const transactEnd=walletSource.indexOf("if(isHuFuApp())throw",transactStart);
+  const branch=walletSource.slice(transactStart,transactEnd);
+
+  assert.ok(helperStart>=0&&helperEnd>helperStart,'native HuFu channel helper was not found');
+  assert.match(helper,/callHandler\('FlutterChannel',message\)/);
+  assert.match(helper,/type:'pushTransaction'/);
+  assert.match(helper,/data:JSON\.stringify\(\{transaction:\{actions\}\}\)/);
+  assert.match(helper,/onSignEOSSuccessful/);
+  assert.match(helper,/onSignEOSError/);
+  assert.match(branch,/const nativeTransaction=transactHuFuNativeChannel\(authorized\)/);
+  assert.match(branch,/if\(nativeTransaction\)return nativeTransaction/);
+});
+
+test('wallet restore migrates legacy iframe sessions to the injected provider',()=>{
   const start=walletSource.indexOf('export async function restoreWallet()');
   const end=walletSource.indexOf('export async function connectWallet()',start);
   const branch=walletSource.slice(start,end);
 
   assert.ok(start>=0&&end>start,'wallet restore branch was not found');
-  assert.match(branch,/stored\.provider==='iframe'&&runtimeClient\.isInIframe\(\)/);
-  assert.ok(branch.indexOf("stored.provider==='iframe'&&runtimeClient.isInIframe()")<branch.indexOf("stored.provider==='hufu'"));
+  assert.match(branch,/\(stored\.provider==='hufu'\|\|stored\.provider==='iframe'\)&&isHuFuApp\(\)/);
+  assert.match(branch,/return save\(\{\.\.\.stored,provider:'hufu'\}\)/);
+  assert.doesNotMatch(branch,/isInIframe|runtimeClient/);
+});
+
+test('HuFu discards a cached Anchor session before reconnecting natively',()=>{
+  const start=walletSource.indexOf('export async function restoreWallet()');
+  const end=walletSource.indexOf('export async function connectWallet()',start);
+  const branch=walletSource.slice(start,end);
+
+  assert.match(branch,/if\(stored\.provider==='anchor'\)[\s\S]*if\(isHuFuApp\(\)\)\{forget\(\);return null\}/);
 });
 
 test('a cached injected session restores silently without account selection',()=>{
@@ -91,19 +187,19 @@ test('a cached injected session restores silently without account selection',()=
   const auto=walletSource.slice(autoStart,autoEnd);
 
   assert.doesNotMatch(restore,/if\(!current\)return null/);
-  assert.match(restore,/injectedAuthorizationReady=true/);
+  assert.doesNotMatch(restore,/requestAccountsHuFu/);
   assert.doesNotMatch(auto,/requestAccountsHuFu/);
-  assert.match(auto,/injectedAuthorizationReady=true/);
 });
 
-test('HuFu chain inspection never switches the wallet network on page load',()=>{
+test('HuFu setup selects only the FullOn chain family',()=>{
   const start=walletSource.indexOf('async function captureHuFuChainInfo');
-  const end=walletSource.indexOf('async function prepareHuFu()',start);
+  const end=walletSource.indexOf('function chainIdFrom',start);
   const branch=walletSource.slice(start,end);
 
   assert.ok(start>=0&&end>start,'HuFu chain inspection branch was not found');
   assert.match(branch,/HuFuGetChain/);
-  assert.doesNotMatch(branch,/HuFuSwitchChain/);
+  assert.match(branch,/HuFuSwitchChain\('FLON'\)/);
+  assert.doesNotMatch(branch,/HuFuSwitchChain\('STT'\)/);
 });
 
 test('HuFu TAPOS uses irreversible block data and chain-derived expiration',()=>{
@@ -117,4 +213,5 @@ test('HuFu TAPOS uses irreversible block data and chain-derived expiration',()=>
   assert.match(preparation,/ref_block_prefix:blockPrefixFromId/);
   assert.match(preparation,/expiration:expirationFromChainTime/);
   assert.match(walletSource,/const hufuExpirationSeconds=300/);
+  assert.match(walletSource,/const hufuTransactionTimeoutMilliseconds=60000/);
 });

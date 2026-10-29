@@ -14,7 +14,9 @@ export function effectiveProposalPhase(proposal,now=Date.now()){
   if(status===0&&now>=timestamp(proposal.endorsement_end))return'activation';
   if((status===1||status===2)&&now>=timestamp(proposal.vote_end))return'finalization';
   if(status===1&&now>=timestamp(proposal.vote_start))return'voting';
-  if(status===4&&Array.isArray(proposal.actions)&&proposal.actions.length)return'queue';
+  const executable=Array.isArray(proposal.actions)&&proposal.actions.length>0;
+  if(status===4)return executable?'queue':'closed';
+  if(status===6&&!executable)return'closed';
   if(status===6&&now>=timestamp(proposal.execute_before))return'expiry';
   if(status===6&&now>=timestamp(proposal.execute_after))return'execution';
   return DAO_STATUS_META[status]?.[1]||'closed';

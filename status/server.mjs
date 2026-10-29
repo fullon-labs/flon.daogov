@@ -17,13 +17,14 @@ const raw=JSON.parse(await readFile(process.env.STATUS_CONFIG||path.join(root,'c
 }));
 const config=normalizeConfig(raw);
 const data=process.env.STATUS_DATA||path.join(root,'data');
-const store=await openStore(data);store.seed(config.bps);store.registerExisting();
+const store=await openStore(data);if(raw.foundationBps)store.setFoundationAccounts(raw.foundationBps);store.seed(config.bps);store.registerExisting();
 const collectors=new Map(),timers=new Map();
 const activeConfigs=new Map();
 let policy={};
 async function readPolicy(){
  if(process.env.STATUS_ADMISSION_POLICY)policy=JSON.parse(await readFile(process.env.STATUS_ADMISSION_POLICY,'utf8'));
  else policy={};
+ policy.networks={...Object.fromEntries(discoverySources(raw).map(s=>[s.network,{chainId:s.chainId,rpc:s.rpc}])),...policy.networks};
 }
 await readPolicy();
 async function removeExpired(bp){
@@ -33,9 +34,13 @@ async function removeExpired(bp){
  await rm(path.join(data,bp.id),{recursive:true,force:true});
  return true;
 }
+async function eligibility(bp){
+ try{store.validateTopology(bp)}catch{return {verified:false,reason:'node_topology_conflict'}}
+ return verifyAdmission(bp,policy,Date.now(),fetch,{foundationApproved:store.foundationEligible(bp)});
+}
 async function install(bp){
+ store.verify(bp,await eligibility(bp));
  if(await removeExpired(bp))return;
- store.verify(bp,await verifyAdmission(bp,policy));
  const collector=await createCollector(bp,store);
  activeConfigs.set(bp.id,bp);collectors.set(bp.id,collector);
  if(timers.has(bp.id))clearInterval(timers.get(bp.id));
@@ -53,7 +58,7 @@ async function recheck(){
  if(checking)return;checking=true;
  try{
   try{await readPolicy()}catch{policy={}}
-  await Promise.all([...activeConfigs.values()].map(async bp=>{if(await removeExpired(bp))return;store.verify(bp,await verifyAdmission(bp,policy));await removeExpired(bp)}));
+  await Promise.all([...activeConfigs.values()].map(async bp=>{if(await removeExpired(bp))return;store.verify(bp,await eligibility(bp));await removeExpired(bp)}));
  }finally{checking=false}
 }
 setInterval(()=>recheck().catch(()=>{}),30000).unref();
@@ -77,7 +82,7 @@ http.createServer(async(req,res)=>{
   const snapshot=entries.find(s=>s.id===id)||discovery.snapshots().find(s=>s.id===id);
   return snapshot?json(snapshot):json({error:'unknown_bp'},404);
  }
- const files={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
+ const files={'/':'index.html','/app.js':'app.js','/epoch-chart.js':'epoch-chart.js','/style.css':'style.css','/epoch-chart.css':'epoch-chart.css'};
  if(!files[url.pathname]){res.writeHead(404);return res.end('Not found');}
  res.setHeader('Content-Type',url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.css')?'text/css':'text/html; charset=utf-8');
  res.end(await readFile(path.join(root,'public',files[url.pathname])));
