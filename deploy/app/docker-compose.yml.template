@@ -4,7 +4,7 @@ services:
     container_name: flon-daogov-mainnet
     restart: unless-stopped
     ports:
-      - "127.0.0.1:20101:80"
+      - "127.0.0.1:${DEPLOY_APP_MAINNET_PORT}:80"
     volumes:
       - ./config.mainnet.js:/usr/share/nginx/html/config.js:ro
       - ./community-api.conf:/etc/nginx/daogov/community-api.conf:ro
@@ -14,7 +14,7 @@ services:
     container_name: flon-daogov-testnet
     restart: unless-stopped
     ports:
-      - "127.0.0.1:20102:80"
+      - "127.0.0.1:${DEPLOY_APP_TESTNET_PORT}:80"
     volumes:
       - ./config.testnet.js:/usr/share/nginx/html/config.js:ro
       - ./api.testnet.conf:/etc/nginx/daogov/api.conf:ro
@@ -35,36 +35,36 @@ services:
       GITHUB_APP_PRIVATE_KEY_FILE: /run/secrets/github_app_private_key
       COMMUNITY_DATA_FILE: /data/community-state.json
     volumes:
-      - /data/flon-daogov/community:/data
+      - ${DEPLOY_COMMUNITY_DATA_DIR}:/data
     secrets:
       - github_app_id
       - github_app_installation_id
       - github_app_private_key
     ports:
-      - "127.0.0.1:20103:8789"
+      - "127.0.0.1:${DEPLOY_COMMUNITY_PORT}:8789"
 
   daogov-keeper-mainnet:
     image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.2.0}
     container_name: flon-daogov-keeper-mainnet
     restart: unless-stopped
     environment:
-      KEEPER_RPC_URL: https://m.flonscan.io
+      KEEPER_RPC_URL: ${DEPLOY_MAINNET_RPC_URL}
       KEEPER_CHAIN_ID: d4019d7d8633a337973408c6c00e5c4888933ad1b6ce10edddea8145317d8d12
       KEEPER_BROADCAST: "false"
       KEEPER_HEALTH_PORT: "8788"
     ports:
-      - "127.0.0.1:20111:8788"
+      - "127.0.0.1:${DEPLOY_MAINNET_KEEPER_PORT}:8788"
 
   daogov-keeper-testnet:
     image: ghcr.io/fullon-labs/flon.daogov-keeper:${KEEPER_TAG:-0.2.0}
     container_name: flon-daogov-keeper-testnet
     restart: unless-stopped
     environment:
-      KEEPER_RPC_URL: http://47.237.17.245:19889
+      KEEPER_RPC_URL: ${DEPLOY_TESTNET_RPC_URL}
       KEEPER_CHAIN_ID: 18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f
-      KEEPER_BROADCAST: "true"
-      KEEPER_SIGNER_ACTOR: epoch.keeper
-      KEEPER_SIGNER_PERMISSION: claimer
+      KEEPER_BROADCAST: "${DEPLOY_TESTNET_KEEPER_BROADCAST}"
+      KEEPER_SIGNER_ACTOR: ${DEPLOY_TESTNET_KEEPER_ACTOR}
+      KEEPER_SIGNER_PERMISSION: ${DEPLOY_TESTNET_KEEPER_PERMISSION}
       KEEPER_PRIVATE_KEY_FILE: /run/secrets/testnet_keeper_key
       KEEPER_MAX_STEPS: "24"
       KEEPER_POLL_MS: "3600000"
@@ -72,14 +72,14 @@ services:
     secrets:
       - testnet_keeper_key
     ports:
-      - "127.0.0.1:20112:8788"
+      - "127.0.0.1:${DEPLOY_TESTNET_KEEPER_PORT}:8788"
 
 secrets:
   testnet_keeper_key:
-    file: /data/flon-daogov/secrets/testnet-epoch-keeper.key
+    file: ${DEPLOY_TESTNET_KEEPER_KEY_FILE}
   github_app_id:
-    file: /data/flon-daogov/secrets/github-app-id
+    file: ${DEPLOY_GITHUB_APP_ID_FILE}
   github_app_installation_id:
-    file: /data/flon-daogov/secrets/github-app-installation-id
+    file: ${DEPLOY_GITHUB_INSTALLATION_ID_FILE}
   github_app_private_key:
-    file: /data/flon-daogov/secrets/github-app-private-key.pem
+    file: ${DEPLOY_GITHUB_PRIVATE_KEY_FILE}

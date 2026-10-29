@@ -5,3 +5,10 @@ artifacts/testnet-e2e/
 *.log
 .env
 .env.local
+
+# Private deployment inputs and generated configuration
+.env.*
+!.env.example
+deploy/.local/
+deploy/**/*.local.*
+deploy/secrets/
