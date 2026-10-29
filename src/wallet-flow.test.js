@@ -127,6 +127,15 @@ test('proposal preflight validates a restored HuFu session without reopening acc
   assert.match(authorization,/assertAccountOnChain\(session\.account\)/);
 });
 
+test('proposal creation checks governance power before opening the proposal form and again before signing',()=>{
+  const openStart=appSource.indexOf('function openCreateProposal');
+  const openEnd=appSource.indexOf('const governanceActionLabels',openStart);
+  assert.match(appSource.slice(openStart,openEnd),/proposalPowerRequirement\(\)\.sufficient/);
+  const submitStart=appSource.indexOf('async function submitProposal');
+  const submitEnd=appSource.indexOf('async function confirmProposal',submitStart);
+  assert.match(appSource.slice(submitStart,submitEnd),/proposalPowerRequirement\(\)\.sufficient/);
+});
+
 test('HuFu signing matches FullSwap by preferring the existing HuFu parent bridge',()=>{
   const start=walletSource.indexOf('export async function transact(session,actions,options={})');
   const end=walletSource.indexOf("if(isHuFuApp())throw",start);
