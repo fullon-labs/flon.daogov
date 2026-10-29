@@ -232,7 +232,7 @@ export default {
   "Registration transaction": "Transacción de registro",
   "Verify the contract parameters before requesting a HuFu signature.": "Verifique los parámetros del contrato antes de solicitar una firma HuFu.",
   "On successful registration, flon.system also registers the producer with voter.reward.": "Tras un registro exitoso, flon.system también registra al productor con voter.reward.",
-  "X, status page, P2P, and API endpoints are not stored by the current regproducer table and require a metadata service.": "Los puntos finales X, página de estado, P2P y API no se almacenan en la tabla del productor de registro actual y requieren un servicio de metadatos.",
+  "The status page is stored in the on-chain BP registration; X, P2P, and API endpoints still require a metadata service.": "La página de estado se guarda en el registro BP en cadena; los endpoints X, P2P y API aún requieren un servicio de metadatos.",
   "Requesting wallet signature…": "Solicitando firma de billetera...",
   "Registration transaction broadcast": "Transmisión de transacción de registro",
   "Update BP profile": "Actualizar perfil BP",
