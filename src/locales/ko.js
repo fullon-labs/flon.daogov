@@ -563,4 +563,7 @@ export default {
   "Committed to BP registration": "BP 등록에 사용됨", "Not yet committed to BP registration": "BP 등록에 아직 사용되지 않음",
   "A new staking generation cannot start while a refund is pending. Claim or cancel the refund first.": "환불이 대기 중이면 새 스테이크 세대를 시작할 수 없습니다. 먼저 환불을 수령하거나 상환을 취소하세요.",
   "Enter a valid amount no greater than the current self-stake": "현재 자체 스테이크 이하의 유효한 수량을 입력하세요",
+  "The current account does not belong to this network": "현재 계정은 이 네트워크에 속하지 않습니다",
+  "Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.": "HuFu에서 FullOn 테스트넷 계정으로 전환한 후 지갑을 다시 연결하세요.",
+  "Reconnect wallet": "지갑 다시 연결",
 };

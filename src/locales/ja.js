@@ -563,4 +563,7 @@ export default {
   "Committed to BP registration": "BP登録に使用済み", "Not yet committed to BP registration": "BP登録には未使用",
   "A new staking generation cannot start while a refund is pending. Claim or cancel the refund first.": "返金処理中は新しいステーク世代を開始できません。先に返金を受け取るか引き出しを取り消してください。",
   "Enter a valid amount no greater than the current self-stake": "現在の自己ステーク以下の有効な数量を入力してください",
+  "The current account does not belong to this network": "現在のアカウントはこのネットワークに属していません",
+  "Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.": "HuFu で FullOn テストネットのアカウントに切り替え、ウォレットを再接続してください。",
+  "Reconnect wallet": "ウォレットを再接続",
 };
