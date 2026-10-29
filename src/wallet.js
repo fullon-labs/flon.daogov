@@ -21,7 +21,16 @@ let automaticConnection=null;
 let hufuFullOnRequested=false;
 let hufuParentClient=null;
 
-function transactHuFuNativeChannel(actions){
+async function serializeHuFuNativeActions(actions){
+  return Promise.all(actions.map(async action=>{
+    const result=await rpcPost('/v1/chain/abi_json_to_bin',{code:action.account,action:action.name,args:action.data});
+    const binargs=String(result?.binargs||'');
+    if(!/^(?:[0-9a-f]{2})*$/i.test(binargs))throw new Error('INVALID_ABI_SERIALIZATION');
+    return {...action,data:binargs};
+  }));
+}
+
+function transactHuFuNativeChannel(transaction){
   const channel=window.flutter_inappwebview;
   if(typeof channel?.callHandler!=='function')return null;
   const id=`daogov-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -44,7 +53,7 @@ function transactHuFuNativeChannel(actions){
     };
     window.onSignEOSSuccessful=success;
     window.onSignEOSError=failure;
-    const message=JSON.stringify({type:'pushTransaction',id,data:JSON.stringify({transaction:{actions}})});
+    const message=JSON.stringify({type:'pushTransaction',id,data:JSON.stringify({transaction})});
     Promise.resolve(channel.callHandler('FlutterChannel',message)).catch(error=>{if(!settled){settled=true;restore();reject(error)}});
   });
 }
@@ -569,8 +578,11 @@ export async function transact(session,actions,options={}){
   // newer injected `HuFu` handler is only registered after an asynchronous
   // chain-switch flow. Use the always-ready native transaction channel so a
   // restored FullOn session can open the signing sheet immediately.
-  const nativeTransaction=transactHuFuNativeChannel(authorized);
-  if(nativeTransaction)return nativeTransaction;
+  if(typeof window.flutter_inappwebview?.callHandler==='function'){
+    const serialized=await serializeHuFuNativeActions(authorized);
+    const transaction=options.preparedTransaction||await prepareHuFuTransaction(serialized);
+    return transactHuFuNativeChannel(transaction);
+  }
   // HuFu hosts some DApps inside its own parent container. FullSwap uses this
   // parent transaction bridge first; it is the route that opens HuFu's native
   // transaction sheet. This does not create an iframe and is deliberately not
