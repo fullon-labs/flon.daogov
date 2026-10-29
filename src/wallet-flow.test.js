@@ -141,6 +141,24 @@ test('HuFu signing matches FullSwap by preferring the existing HuFu parent bridg
   assert.match(branch,/provider\.transact\(\{transaction\}\)/);
 });
 
+test('HuFu WebView signing uses the always-registered native Flutter channel',()=>{
+  const helperStart=walletSource.indexOf('function transactHuFuNativeChannel(actions)');
+  const helperEnd=walletSource.indexOf('function normalizeAccount',helperStart);
+  const helper=walletSource.slice(helperStart,helperEnd);
+  const transactStart=walletSource.indexOf('export async function transact(session,actions,options={})');
+  const transactEnd=walletSource.indexOf("if(isHuFuApp())throw",transactStart);
+  const branch=walletSource.slice(transactStart,transactEnd);
+
+  assert.ok(helperStart>=0&&helperEnd>helperStart,'native HuFu channel helper was not found');
+  assert.match(helper,/callHandler\('FlutterChannel',message\)/);
+  assert.match(helper,/type:'pushTransaction'/);
+  assert.match(helper,/data:JSON\.stringify\(\{transaction:\{actions\}\}\)/);
+  assert.match(helper,/onSignEOSSuccessful/);
+  assert.match(helper,/onSignEOSError/);
+  assert.match(branch,/const nativeTransaction=transactHuFuNativeChannel\(authorized\)/);
+  assert.match(branch,/if\(nativeTransaction\)return nativeTransaction/);
+});
+
 test('wallet restore migrates legacy iframe sessions to the injected provider',()=>{
   const start=walletSource.indexOf('export async function restoreWallet()');
   const end=walletSource.indexOf('export async function connectWallet()',start);

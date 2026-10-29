@@ -21,6 +21,34 @@ let automaticConnection=null;
 let hufuFullOnRequested=false;
 let hufuParentClient=null;
 
+function transactHuFuNativeChannel(actions){
+  const channel=window.flutter_inappwebview;
+  if(typeof channel?.callHandler!=='function')return null;
+  const id=`daogov-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return new Promise((resolve,reject)=>{
+    const previousSuccess=window.onSignEOSSuccessful,previousError=window.onSignEOSError;
+    let settled=false;
+    const restore=()=>{
+      if(window.onSignEOSSuccessful===success)window.onSignEOSSuccessful=previousSuccess;
+      if(window.onSignEOSError===failure)window.onSignEOSError=previousError;
+    };
+    const success=(responseId,value)=>{
+      if(responseId!==id){previousSuccess?.(responseId,value);return}
+      if(settled)return;settled=true;restore();
+      try{resolve(typeof value==='string'?JSON.parse(value):value)}catch{resolve(value)}
+    };
+    const failure=(responseId,error,code)=>{
+      if(responseId!==id){previousError?.(responseId,error,code);return}
+      if(settled)return;settled=true;restore();
+      const failureError=new Error(typeof error==='string'?error:JSON.stringify(error));failureError.code=code||402;reject(failureError);
+    };
+    window.onSignEOSSuccessful=success;
+    window.onSignEOSError=failure;
+    const message=JSON.stringify({type:'pushTransaction',id,data:JSON.stringify({transaction:{actions}})});
+    Promise.resolve(channel.callHandler('FlutterChannel',message)).catch(error=>{if(!settled){settled=true;restore();reject(error)}});
+  });
+}
+
 function normalizeAccount(value){
   if(typeof value==='string'){try{return normalizeAccount(JSON.parse(value))}catch{return /^[a-z1-5.]{1,12}$/.test(value)?{account:value,permission:'active',chainId:''}:null}}
   if(Array.isArray(value)){for(const item of value){const found=normalizeAccount(item);if(found)return found}return null}
@@ -537,6 +565,12 @@ export async function authorizeHuFuSigning(session){
 export async function transact(session,actions,options={}){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
+  // FlutterChannel is registered when HuFu creates the WebView, while the
+  // newer injected `HuFu` handler is only registered after an asynchronous
+  // chain-switch flow. Use the always-ready native transaction channel so a
+  // restored FullOn session can open the signing sheet immediately.
+  const nativeTransaction=transactHuFuNativeChannel(authorized);
+  if(nativeTransaction)return nativeTransaction;
   // HuFu hosts some DApps inside its own parent container. FullSwap uses this
   // parent transaction bridge first; it is the route that opens HuFu's native
   // transaction sheet. This does not create an iframe and is deliberately not
