@@ -421,10 +421,10 @@ export async function loadVotingAccount(account){
   const pendingActivationEpoch=Number(pendingAllocation?.activation_epoch??pending?.activation_epoch);
   const nextEpoch=Number(epochRows.rows?.[0]?.next_epoch_to_close||0);
   // Pending rows are materialized lazily by the voter actions. Once the epoch
-  // cursor has advanced past activation_epoch, their vote deltas are already
+  // cursor has reached activation_epoch, their vote deltas are already
   // effective even if the per-voter pending row still exists.
   const hasUnsettledVote=Boolean(pendingAllocation||pending)&&
-    Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>=nextEpoch;
+    Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>nextEpoch;
   return {
     account,governancePower,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,effectiveAllocation,pendingAllocation,rewards,refund,
     stakeSupported:actions.has('addvote')&&actions.has('subvote')&&actions.has('voterefund'),
@@ -569,9 +569,10 @@ export async function authorizeHuFuSigning(session){
 export async function transact(session,actions,options={}){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
-  // Prefer the supported injected signer. The legacy Flutter route requires
-  // a complete transaction before its native JSON parser can open the sheet.
-  if(!window.HuFu?.transact&&typeof window.flutter_inappwebview?.callHandler==='function'){
+  // FlutterChannel is registered at WebView creation. The injected HuFu
+  // object does not prove its asynchronously registered handler is ready.
+  // This native route requires a complete transaction and binary action data.
+  if(typeof window.flutter_inappwebview?.callHandler==='function'){
     const transaction=options.preparedTransaction||await prepareHuFuTransaction(authorized);
     const serialized=await Promise.all(transaction.actions.map(async action=>({...action,data:typeof action.data==='string'?action.data:await serializeGovernanceAction(action.account,action.name,action.data)})));
     return transactHuFuNativeChannel(serialized,{...transaction,actions:serialized});
