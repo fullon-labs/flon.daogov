@@ -1,3 +1,36 @@
 /* Proposal choices stay readable inside both the mobile sheet and desktop drawer. */
 .proposal-type-picker{grid-template-columns:1fr}
 .proposal-type-picker legend{grid-column:1}
+
+/* Keep mobile navigation compact; wallet chrome supplies its own back action. */
+.header-wallet,.mobile-bp-apply{display:none}
+.profile-help{display:flex;justify-content:flex-end;margin:12px 0}
+.profile-help button{color:var(--brand);font-size:12px;min-height:44px}
+@media(max-width:899px){
+  .topbar{height:calc(60px + env(safe-area-inset-top));grid-template-columns:minmax(0,1fr) auto;gap:8px;padding-left:16px;padding-right:16px}
+  .topbar>[data-action="back"],.top-actions>[data-action="help"]{display:none}
+  .top-title{flex-direction:row;justify-content:flex-start;gap:6px;min-width:0}
+  .top-title>strong{font-size:14px;white-space:nowrap}
+  .brand-lockup{gap:4px}.brand-lockup img{width:22px;height:22px}
+  .top-title .network{flex-shrink:0;font-size:0;min-height:44px;gap:0}
+  .top-title .network i{display:none}
+  .top-title .network span{font-size:0}
+  .top-title .network span::after{content:'Mainnet';font-size:9px;padding:3px 5px;border-radius:5px;background:var(--soft);color:var(--muted)}
+  html[data-network="testnet"] .top-title .network span::after{content:'Testnet'}
+  .top-actions{gap:4px}
+  .header-wallet{display:block;max-width:100px;min-height:44px;padding:0 6px;font-size:11px;color:var(--deep)}
+  .header-wallet span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .language-trigger{min-width:40px;padding:8px}
+  .language-trigger [data-language-label],.language-trigger b{display:none}
+  .node-page-heading{display:none}
+  [data-view="nodes"]>.content{padding-top:12px}
+  .mobile-vote-tabs button{display:flex;justify-content:center;align-items:center;gap:6px;min-height:40px}
+  .mobile-vote-tabs span{display:inline;margin:0;font-size:10px}
+  .mobile-bp-apply{display:flex;justify-content:flex-end}
+  .mobile-bp-apply button{min-height:40px;color:var(--brand);font-size:12px}
+}
+
+/* An empty box means unselected; keep keyboard focus visible on the native control. */
+.select-node{cursor:pointer}
+.check-control>input:not(:checked)+.check svg{visibility:hidden}
+.check-control>input:focus-visible+.check{outline:2px solid var(--brand);outline-offset:3px}
