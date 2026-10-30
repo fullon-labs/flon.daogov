@@ -421,10 +421,10 @@ export async function loadVotingAccount(account){
   const pendingActivationEpoch=Number(pendingAllocation?.activation_epoch??pending?.activation_epoch);
   const nextEpoch=Number(epochRows.rows?.[0]?.next_epoch_to_close||0);
   // Pending rows are materialized lazily by the voter actions. Once the epoch
-  // cursor has advanced past activation_epoch, their vote deltas are already
+  // cursor has reached activation_epoch, their vote deltas are already
   // effective even if the per-voter pending row still exists.
   const hasUnsettledVote=Boolean(pendingAllocation||pending)&&
-    Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>=nextEpoch;
+    Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>nextEpoch;
   return {
     account,governancePower,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,effectiveAllocation,pendingAllocation,rewards,refund,
     stakeSupported:actions.has('addvote')&&actions.has('subvote')&&actions.has('voterefund'),

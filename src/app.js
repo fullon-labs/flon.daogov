@@ -328,13 +328,28 @@ async function openProducerDetails(owner){
 let electionRefreshing=false;
 let electionLastRefresh=0;
 async function refreshElection({preserveDraft=false}={}){
-  if(electionRefreshing||voteDraftDirty)return;
+  if(electionRefreshing||(voteDraftDirty&&!preserveDraft))return;
   electionRefreshing=true;
   try{
     const [election,production]=await Promise.all([
       loadElection(),
       loadNetworkProduction().catch(error=>({available:false,reason:'error',error:String(error?.message||error)})),
     ]);
+    // Update read-only values in place while editing: never replace inputs or
+    // remove a selected producer when the candidate snapshot changes.
+    if(voteDraftDirty){
+      electionState=election;
+      const producers=new Map(election.producers.map((producer,index)=>[producer.owner,{...producer,rank:index+1}]));
+      document.querySelectorAll('.select-node').forEach(row=>{
+        const producer=producers.get(row.dataset.producer);if(!producer)return;
+        row.dataset.votes=String(producer.total_votes||0);
+        row.dataset.rank=String(producer.rank);
+        const votes=row.querySelector('.node-votes strong'),rank=row.querySelector('.rank');
+        if(votes)votes.textContent=formatVotes(producer.total_votes);
+        if(rank)rank.textContent=String(producer.rank).padStart(2,'0');
+      });
+      return;
+    }
     // Capture at render time so edits made while the request is in flight survive.
     const draft=(preserveDraft||voteDraftDirty)?new Map([...document.querySelectorAll('.select-node')].map(row=>[row.dataset.producer,{checked:row.querySelector('input[type="checkbox"]').checked,value:row.querySelector('[data-node-votes]').value}])):null;
     electionState=election;
@@ -636,7 +651,7 @@ async function openHelpCenter(){
     <details open><summary>${zh?'L1–L4 分级治理门槛':'L1-L4 governance safety tiers'}</summary><p>${zh?'每个可执行 action 都必须同时存在执行白名单和风险等级。activate 会检查该等级的最低全网治理权并冻结规则；finalize 同时检查参与率、赞成率和绝对赞成票。多个 action 采用最高风险等级。setriskcfg 与 setactrisk 只能由 flon 权限修改，DAO 不能降低自己的安全门槛。':'Every executable action needs both an execution allowlist rule and a risk tier. activate checks the tier minimum network governance power and freezes its rules; finalize checks turnout, approval, and absolute support. A multi-action proposal uses its highest tier. Only flon authority may call setriskcfg or setactrisk, so the DAO cannot lower its own safety floor.'}</p>${riskTable}</details>
     <details open><summary>${zh?'治理 Actions 与治理权要求':'Governance actions and power requirements'}</summary><p>${zh?'本栏目实时合并执行白名单、action 风险等级与 L1–L4 配置。未分类、已禁用或不在白名单中的 action 不会显示，也不能创建可执行提案；多 action 提案采用最高 Level。':'This section combines the live execution allowlist, action risk policies, and L1-L4 configuration. Unclassified, disabled, or non-allowlisted actions are hidden and cannot create executable proposals; multi-action proposals use the highest level.'}</p>${actionTable}</details>
     <details><summary>${zh?'奖励不会自动空投':'Rewards are claimed, not airdropped'}</summary><p>${zh?'BP 基础出块奖励和 GAS 奖励先形成链上待领取记录。奖励可以跨 Epoch 累积，不会因为没有立即领取而丢失。投票人奖励由受益账户本人调用 voter.reward::claimrewards。':'BP block and GAS rewards first become on-chain claim records. They accumulate across epochs and do not expire merely because they were not claimed immediately. Voters claim through voter.reward::claimrewards.'}</p></details>
-    <details><summary>epoch.keeper</summary><p>${zh?'epoch.keeper 对应的 Keeper 程序会定期触发 Epoch 关闭和 BP 奖励领取等 permissionless 操作。Keeper 不持有 BP 私钥、不托管奖励，也不能更改收款账户；奖励始终支付给链上记录的 BP。':'The Keeper program associated with epoch.keeper periodically triggers permissionless operations such as epoch closing and BP reward claims. It does not hold BP keys, custody rewards, or change recipients; rewards always go to the BP recorded on-chain.'}</p><p>${zh?'Keeper 是便利设施，不是单点依赖。如果 Keeper 下线，BP 本人或任何用户都可以在本 DApp 手动调用 flon::claimrewards，代为触发后奖励仍直接进入 BP 账户。':'Keeper is a convenience, not a single point of failure. If it is offline, the BP or any user may manually call flon::claimrewards from this DApp; the reward still goes directly to the BP.'}</p></details>
+    <details><summary>epoch.keeper</summary><p>${zh?'epoch.keeper 对应的 Keeper 程序会定期触发 BP 奖励领取等 permissionless 操作；Epoch 封存由 onblock 自动推进。Keeper 不持有 BP 私钥、不托管奖励，也不能更改收款账户；奖励始终支付给链上记录的 BP。':'The Keeper program associated with epoch.keeper periodically triggers permissionless BP reward claims; epoch sealing advances automatically through onblock. It does not hold BP keys, custody rewards, or change recipients; rewards always go to the BP recorded on-chain.'}</p><p>${zh?'Keeper 是便利设施，不是单点依赖。如果 Keeper 下线，BP 本人或任何用户都可以在本 DApp 手动调用 flon::claimrewards，代为触发后奖励仍直接进入 BP 账户。':'Keeper is a convenience, not a single point of failure. If it is offline, the BP or any user may manually call flon::claimrewards from this DApp; the reward still goes directly to the BP.'}</p></details>
     <details><summary>${zh?'签名前检查':'Before signing'}</summary><p>${zh?'核对网络、Chain ID、账户、合约、action、参数和收款人。帮助文档不构成交易授权；只有钱包确认页中的实际交易内容会被签名。':'Verify the network, Chain ID, account, contract, action, parameters, and recipient. Help content is not transaction authorization; only the actual transaction shown by the wallet is signed.'}</p></details>
   </div><div class="sheet-actions"><button class="secondary-button" data-action="help-voting">${zh?'查看节点投票':'Open node voting'}</button><button class="primary-button" data-action="bp-claim">${zh?'手动触发 BP 领取':'Trigger BP claim'}</button></div>`);
 }
@@ -699,7 +714,7 @@ function refreshAfterEpochBoundary(){
   if(epochBoundaryRefreshPromise||now-epochBoundaryRefreshAt<5000)return;
   epochBoundaryRefreshAt=now;
   epochBoundaryRefreshPromise=new Promise(resolve=>window.setTimeout(resolve,1200))
-    .then(()=>refreshVotingAccount())
+    .then(()=>Promise.all([refreshVotingAccount(),refreshElection({preserveDraft:true})]))
     .catch(error=>console.error('Failed to refresh voting state at epoch boundary',error))
     .finally(()=>{epochBoundaryRefreshPromise=null});
 }
