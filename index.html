@@ -41,6 +41,7 @@
       <button class="icon-button" type="button" aria-label="返回 HuFu" data-action="back"><svg><use href="#i-back"/></svg></button>
       <div class="top-title"><strong class="brand-lockup"><img src="/assets/brand/fullon-dao-mark-192.png" alt=""><span>FullOn DAO</span></strong><button class="network" type="button" data-action="network"><i></i><span data-network-name>FullOn 测试网</span></button></div>
       <div class="top-actions">
+        <button class="header-wallet" type="button" data-action="account"><span data-wallet-account>未连接</span></button>
         <div class="top-language">
           <button class="language-trigger" type="button" data-action="language-toggle" aria-label="选择语言" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-globe"/></svg><span data-language-label>中文</span><b>⌄</b></button>
           <div class="language-menu" role="menu" data-language-menu hidden>
@@ -99,7 +100,7 @@
           <div class="vote-content">
             <div class="mobile-vote-tabs" role="tablist" aria-label="BP 与投票页面">
               <button class="is-active" type="button" role="tab" aria-selected="true" data-mobile-vote-tab="directory">BP 列表</button>
-              <button type="button" role="tab" aria-selected="false" data-mobile-vote-tab="summary">我的总投票 <span class="din" data-selected-count>0 个 BP</span></button>
+              <button type="button" role="tab" aria-selected="false" data-mobile-vote-tab="summary">我的投票 <span class="din" data-selected-count>0 个 BP</span></button>
             </div>
             <div class="vote-layout">
               <main class="vote-directory" data-mobile-vote-panel="directory">
@@ -110,6 +111,7 @@
                     <label class="node-sort"><span>排序</span><select data-node-sort><option value="rank">综合排名</option><option value="votes">票权最高</option><option value="share">分享比例</option><option value="selected">已选择优先</option></select></label>
                   </div>
                 </div>
+                <div class="mobile-bp-apply"><button type="button" data-action="candidate">申请成为 BP</button></div>
                 <div class="section-title node-list-title"><span><h2>BP 列表</h2><small>选择节点并直接填写分配的 FLON 数量</small></span><button type="button" data-action="clear-selection">清空选择</button></div>
                 <div class="select-list"><div class="loading-state"><i></i><span>正在读取候选 BP…</span></div></div>
               </main>
@@ -164,6 +166,7 @@
           <section class="section bp-recovery-card" data-bp-recovery>
             <div class="bp-recovery-empty"><strong>BP 生产状态</strong><small>连接 BP 账户钱包后读取链上状态</small></div>
           </section>
+          <div class="profile-help"><button type="button" data-action="help">治理帮助</button></div>
           <div class="action-grid"><button type="button" data-action="claim"><span class="task-icon mint"><svg><use href="#i-reward"/></svg></span><strong>领取投票奖励</strong><small data-profile-claimable>连接钱包后读取</small></button><button type="button" data-action="stake"><span class="task-icon amber"><svg><use href="#i-clock"/></svg></span><strong>投票本金与退款</strong><small data-refund-status>增加、撤回或领取</small></button><button type="button" data-view-target="nodes" data-node-mode-target="vote"><span class="task-icon blue"><svg><use href="#i-vote"/></svg></span><strong>我的节点投票</strong><small data-profile-votes>— 个 BP</small></button><button type="button" data-action="candidate"><span class="task-icon purple"><svg><use href="#i-node"/></svg></span><strong>竞选管理</strong><small>读取链上状态</small></button></div>
         </div>
       </section>
