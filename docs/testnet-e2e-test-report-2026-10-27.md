@@ -133,6 +133,33 @@
 - PASS：30 分钟门槛后执行 `flon::claimbpstake`，交易 `2607752514ec1beb98b894b67c89085c4fac3e39467c6d06a21fab3310224367`。trace 显示 `flon.stake` 向 `hellotoworld` 精确转账 `500000.00000000 FLON`；账户余额由 `490654.34407317` 增至 `990654.34205427 FLON`，净增与本金扣除交易 GAS 一致。退款行已删除，状态验证锚点 head `21786319` 已由 LIB `21786319` 覆盖。
 - PASS：重复调用 `claimbpstake` 被 `BP self-stake refund not found` 拒绝，失败交易 ID `b0dab06da7a23f180ec88c2636b60419c0f794fbce253ca0833b61f462359334`。BP 注销、全额 unstake、30 分钟门槛、到账、退款行删除和重复领取拒绝闭环完成。证据摘要见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/bp-full-unstake-hellotoworld-20261029/summary.md`。
 
+### 2026-10-29 Epoch 798 逐 slot 独立重算
+
+- FAIL（发布阻断）：按不可逆区块头及每块隐式 `flon::onblock` trace 独立重算，Epoch 798 范围内共有 303 个已生产区块，且每个 onblock payload 均与前一不可逆区块头吻合；链上 `bpstats.produced_blocks` 合计仅 302。
+- 差异为 `bpflowtest11` 实际 57、表内 56；其余三名 BP 实际生产数与表内一致。链表同时给 `miner2222222` 多记 1 个 miss。总 slot 仍满足 `expected + idle_skipped = 7200`，逐行仍满足 `expected = produced + missed`，但生产者归属不满足独立证据。
+- 差异集中在 Epoch 内 schedule version `4 -> 5` 切换附近。必须解释或修复 schedule 切换时的 slot resolver/统计归属，并在包含 Active schedule 变化的新自然 Epoch 复测通过，方可解除门禁。证据见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/epoch798-slot-recompute-20261029/summary.md`。
+- ROOT CAUSE / LOCAL PASS：Core v2 的旧逻辑把 head-state slot resolver 同时用于空 slot 与已提交区块；IF proposer-policy 切换边界缺少完整历史 policy 时，resolver 将一个实际由 `bpflowtest11` 提交的区块解析给 `miner2222222`，真实区块因 producer 不匹配被转成 miss。补丁仅修改 v2：空 slot 继续由 resolver 归属，唯一 produced slot 以共识已接受区块头的 `actual_producer` 为权威；v0 保持不变。
+- PASS（补丁模型回放）：用新规则回放同一不可逆证据后，`bpflowtest11.produced=57`、`miner2222222` 多出的 1 个 miss 被移除，区块头/onblock 与统计 produced 总数均为 303，且 `expected + idle_skipped = 7200` 不变。Core 的 `eosio_chain` 编译成功；5 个 v2/transition 专项用例共 29 个断言全部通过，包括新增 stale-resolver 回归用例。
+- INFO：仓库全量 monolithic `unit_test` 仍被既有 `block_tests.cpp` 编译错误阻断（`tester`/`legacy_tester` 无 `head_block_num()`）；完整八用例运行还暴露一个既有 v0 schedule 覆盖断言，v0 源码未被本补丁修改。这两项不归因于本次 v2 修复，但应另行清理。
+- WAIT / 发布阻断仍未解除：Epoch 798 已封存，链上旧表不可改。必须将修复后的 Core 部署到测试网节点，并在新的自然 Epoch 发生 Active schedule 切换后，重新执行不可逆区块头 + onblock trace + `bpstats` 三方逐 slot 核算。当前只完成源码修复、历史回放与本地专项测试，未自动重启或部署节点。
+
+### 2026-10-30 Epoch 838 只读异常复查
+
+- 链 ID 核对通过；采集时 head/LIB 为 `21791674/21791673`。此前 TLS 失败由本地 HTTP 代理链路造成，使用 `NO_PROXY=t4.flon.network` 直连后 RPC 正常，测试网网关故障判断撤销。
+- FAIL（发布阻断）：`get_producer_schedule` 显示 Active schedule version `7` 仅有 `bpflowtest11` 一席；Epoch 838 同样记录 `active_bp_count=1`，当前 `bpflowtest11` 为 `expected=313 / produced=313 / missed=0 / idle_skipped=6887`。这与 Epoch 815/816/817 已验证的 21 席状态相比发生了实质性退化。
+- ROOT CAUSE（链上状态）：链上 `producers` 表仍有 25 名 `is_active=1` 且自质押满足门槛，但除 `bpflowtest11.total_votes=100000000` 外其余 producer 票数均为 0。`hellotoworld` 当前 `voters.votes=100000000`，且 `voteallocs` 仅把全部票投给 `bpflowtest11`；其他有治理票的 voter 均没有 producer allocation。因而 schedule version 7 缩为一席是当前投票分配的确定性结果，并非候选注册或自质押过滤错误。
+- WAIT：需确认这是否为 active/standby 切换测试的预期中间态；若是，应按既定 21 BP 清单恢复多席投票并等待自然 schedule/epoch 生效，再完成逐 slot 独立复测。恢复前不得宣告可发布主网。
+- 快照证据：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/heartbeat-20261030T0136Z/`。本轮仅只读采集，未提交交易、未修改 Epoch/治理配置、未重启节点。
+
+### 2026-10-30 FullOn Core v0.9.1 Active/Standby 与 slot resolver 复测
+
+- PASS：测试链 ID 与节点版本分别核对为 `18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f`、`v0.9.1-aaf6b7c3a81e6d818fd0b224c82a6769d7999428`。未触碰主网、未调用 `closeepoch`、未修改 Epoch 配置、未重启节点。
+- PASS：`hellotoworld` 将精确 `100000000` 票权从单席 `bpflowtest11` 恢复分配至原 21 席；前 16 席各 `4761905`、后 5 席各 `4761904`，合计严格为 `100000000`。交易 `c0a6707ac510d8b592c0b9798a947200b155d78e3e9b2a31453c31b8050a8d0f`，区块 `21791954`，已由 LIB 确认。
+- PASS：Epoch 839 在 schedule v7 下以 `bpflowtest11` 单席自然封存，统计 `303/303`、零 miss；Epoch 840 内 Active schedule 自然切换为 v8 的原 21 席。封存后 `pendingvote/pendallocs/votedeltas` 均已消费，`voteallocs`、`voters.producers` 和 21 席 `total_votes` 与请求逐项精确一致，`bpflowtest11.total_votes=0` 且已退出 Active schedule。Active/Standby 专项闭环通过。
+- PASS（逐 slot 独立门禁）：Epoch 840 范围 `[1693285638,1693292837]` 共 7200 slots，独立读取不可逆区块 `21791964..21792268` 得到 305 个 produced header；每个 header 均与下一不可逆区块 trace 的隐式 `flon::onblock` 二进制载荷吻合，缺失/不匹配均为 0。逐 producer header 数与链上 `bpstats.produced_blocks` 的 22 行完全一致，总计 `305 produced + 0 missed + 6895 idle = 7200`。
+- PASS：历史空 slot 的 proposer-policy 生效边界为 slot `1693287397`（v7 区块 `21792038`）；该区块头独立携带 `new_producer_schedule.version=8` 及精确 21 席 policy，并非根据 `bpstats` 循环反推。它比首个 v8 已提交区块 slot `1693287445` 早 48 slots。空 slot 按该 policy 边界解析、produced slot 按已提交区块头 producer 解析后，22 名 producer 的 `expected/produced/missed/idle_skipped` 全部逐行精确匹配，score 0。Epoch 798 的“真实 produced 少记一块并转成他人 miss”未复现，slot resolver 发布阻断项解除。
+- 证据：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v091-active-standby-restore-20261030/` 与 `v091-epoch840-slot-recompute-20261030/`。
+
 ### 2026-10-28 18:00 UTC 只读复查
 
 - 测试链 ID 核对通过；head/LIB 为 `21782084/21782054`。快照见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/live-check-20261028T1800Z/`。
