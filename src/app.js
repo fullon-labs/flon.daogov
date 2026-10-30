@@ -10,6 +10,8 @@ import {formatOverviewAsset} from './network-summary.js';
 import {iso3166Regions,regionByNumeric,regionDisplayName} from './countries.js';
 import {createDiscussionsClient} from './discussions.js';
 
+document.documentElement.classList.toggle('hufu-app',isHuFuApp());
+
 const formatGovernancePower=value=>formatOverviewAsset(value).replace(/\s+POWER$/,'');
 
 const views=[...document.querySelectorAll('.view')];
@@ -32,6 +34,10 @@ let walletSession=null;
 let bpRecoveryState=null;
 let bpRecoveryRequest=0;
 let votingState=null;
+let voteDraftDirty=false;
+let voteDraftAccount=null;
+let votingRefreshId=0;
+document.documentElement.classList.add('vote-account-loading');
 let profileBPRewards=null;
 let electionState=null;
 let governanceState=null;
@@ -253,7 +259,7 @@ function syncVisualViewport(){
 function openSheet(html){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetViewportBaseline=Math.max(window.innerHeight,window.visualViewport?.height||0);sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden';syncVisualViewport()}
 function closeSheet(){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;sheet.classList.remove('is-keyboard-open');document.body.style.overflow='';document.documentElement.style.setProperty('--visual-keyboard-inset','0px');document.documentElement.style.setProperty('--visual-viewport-height','100dvh')}
 function walletProviderName(provider){return provider==='iframe'?'HuFu App':provider==='hufu'?'HuFu Wallet':'Anchor Wallet'}
-function renderWallet(){const account=walletSession?.account||'未连接',label=walletSession?walletProviderName(walletSession.provider):'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
+function renderWallet(){const nextAccount=walletSession?.account||null;if(nextAccount!==voteDraftAccount){voteDraftAccount=nextAccount;voteDraftDirty=false;votingState=null;document.documentElement.classList.add('vote-account-loading')} const account=walletSession?.account||'未连接',label=walletSession?walletProviderName(walletSession.provider):'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
 const bpStatusMeta={0:['未评估',''],1:['合格','qualified'],2:['降级',''],3:['警告',''],4:['暂停','suspended'],5:['样本不足',''],6:['网络事件',''],7:['试运行','probation']};
 function renderBPRecovery(state){
   const card=document.querySelector('[data-bp-recovery]');if(!card)return;
@@ -322,7 +328,7 @@ async function openProducerDetails(owner){
 let electionRefreshing=false;
 let electionLastRefresh=0;
 async function refreshElection({preserveDraft=false}={}){
-  if(electionRefreshing)return;
+  if(electionRefreshing||voteDraftDirty)return;
   electionRefreshing=true;
   try{
     const [election,production]=await Promise.all([
@@ -330,10 +336,10 @@ async function refreshElection({preserveDraft=false}={}){
       loadNetworkProduction().catch(error=>({available:false,reason:'error',error:String(error?.message||error)})),
     ]);
     // Capture at render time so edits made while the request is in flight survive.
-    const draft=preserveDraft?new Map([...document.querySelectorAll('.select-node')].map(row=>[row.dataset.producer,{checked:row.querySelector('input[type="checkbox"]').checked,value:row.querySelector('[data-node-votes]').value}])):null;
+    const draft=(preserveDraft||voteDraftDirty)?new Map([...document.querySelectorAll('.select-node')].map(row=>[row.dataset.producer,{checked:row.querySelector('input[type="checkbox"]').checked,value:row.querySelector('[data-node-votes]').value}])):null;
     electionState=election;
     const selectList=document.querySelector('.select-list');
-    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').map((producer,index)=>`<div class="select-node status-${escapeHtml(producer.status)}" data-producer="${escapeHtml(producer.owner)}" data-status="${escapeHtml(producer.status)}" data-name="${escapeHtml(`${producer.owner} ${producer.url||''}`.toLowerCase())}" data-rank="${index+1}" data-votes="${escapeHtml(producer.total_votes||0)}" data-share="${Number(producer.reward_shared_ratio||0)}"><label class="check-control" aria-label="选择 ${escapeHtml(producer.owner)}"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span></label><span class="rank din">${String(index+1).padStart(2,'0')}</span><span class="node-logo ${producer.status==='active'?'green-logo':producer.status==='standby'?'amber-logo':'gray-logo'}">${escapeHtml(producerInitials(producer.owner))}</span><div class="node-main node-details-trigger"><strong>${escapeHtml(producer.owner)}</strong><small>${escapeHtml(producer.url||'No public URL')}</small><span><b>${escapeHtml(producer.status)}</b><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></span></div><button class="node-votes" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong class="din">${escapeHtml(formatVotes(producer.total_votes))}</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></button><label class="node-allocation-field"><span>我的投票</span><span class="node-vote-control"><input class="node-vote-input din" type="number" min="0.00000001" step="0.00000001" inputmode="decimal" placeholder="0.00000000" data-node-votes disabled aria-label="${escapeHtml(producer.owner)} FLON votes"><b>FLON</b></span></label></div>`).join('');
+    if(selectList)selectList.innerHTML=electionState.producers.filter(producer=>producer.status!=='suspended').map((producer,index)=>`<div class="select-node status-${escapeHtml(producer.status)}" data-producer="${escapeHtml(producer.owner)}" data-status="${escapeHtml(producer.status)}" data-name="${escapeHtml(`${producer.owner} ${producer.url||''}`.toLowerCase())}" data-rank="${index+1}" data-votes="${escapeHtml(producer.total_votes||0)}" data-share="${Number(producer.reward_shared_ratio||0)}"><label class="check-control" aria-label="选择 ${escapeHtml(producer.owner)}"><input type="checkbox"><span class="check"><svg><use href="#i-check"/></svg></span></label><span class="rank din">${String(index+1).padStart(2,'0')}</span><span class="node-logo ${producer.status==='active'?'green-logo':producer.status==='standby'?'amber-logo':'gray-logo'}">${escapeHtml(producerInitials(producer.owner))}</span><div class="node-main node-details-trigger"><strong>${escapeHtml(producer.owner)}</strong><small>${escapeHtml(producer.url||'No public URL')}</small><span><b>${escapeHtml(producer.status)}</b><em>分享 ${Number(producer.reward_shared_ratio||0)/100}%</em></span></div><button class="node-votes" type="button" data-action="producer-details" data-producer="${escapeHtml(producer.owner)}"><strong class="din">${escapeHtml(formatVotes(producer.total_votes))}</strong><small>有效票权</small><svg><use href="#i-chevron"/></svg></button><label class="node-allocation-field"><span>我的投票</span><span class="node-vote-control"><input class="node-vote-input din" type="number" min="0" step="1" inputmode="decimal" placeholder="0.00000000" data-node-votes disabled aria-label="${escapeHtml(producer.owner)} FLON votes"><b>FLON</b></span></label></div>`).join('');
     const standbyCount=electionState.producers.filter(producer=>producer.status==='standby').length;
     const summary=document.querySelector('.rank-summary');if(summary)summary.querySelector('strong').textContent=`${electionState.activeCount} / ${electionState.activeTarget}`;
     document.querySelectorAll('[data-active-count]').forEach(node=>node.textContent=String(electionState.activeCount));
@@ -366,18 +372,29 @@ async function refreshElection({preserveDraft=false}={}){
   }finally{electionRefreshing=false;electionLastRefresh=Date.now()}
 }
 async function refreshVotingAccount(){
+  const request=++votingRefreshId,account=walletSession?.account||null;
+  try{
   if(walletSession){
     const [accountState,bpRewards]=await Promise.all([
       loadVotingAccount(walletSession.account),
       loadProducerRewards(walletSession.account).catch(error=>({error:String(error?.message||error)}))
     ]);
+    if(request!==votingRefreshId||account!==(walletSession?.account||null))return;
     votingState=accountState;
     profileBPRewards=bpRewards;
   }else{
     votingState={epochTiming:await loadEpochTiming(),hasPendingVote:false};
     profileBPRewards=null;
   }
+  if(request!==votingRefreshId||account!==(walletSession?.account||null))return;
+  document.documentElement.classList.remove('vote-account-loading');
   renderVotingAccount();syncVotingSelection();updateAllocation();
+  }catch(error){
+    if(request===votingRefreshId&&account===(walletSession?.account||null)){
+      showToast(currentLanguage==='zh-CN'?'投票状态读取失败，已保留原有选择，请稍后重试':'Vote refresh failed. Your selections are preserved; please retry.');
+    }
+    throw error;
+  }
 }
 function chainTimeMs(){const value=governanceState?.chainInfo?.head_block_time;return value?Date.parse(String(value).endsWith('Z')?value:`${value}Z`):Date.now()}
 function proposalEffectiveStatus(proposal){return effectiveProposalPhase(proposal,chainTimeMs())}
@@ -681,11 +698,8 @@ function refreshAfterEpochBoundary(){
   const now=Date.now();
   if(epochBoundaryRefreshPromise||now-epochBoundaryRefreshAt<5000)return;
   epochBoundaryRefreshAt=now;
-  let draft=null;
-  try{draft=votingState?draftVoteAllocations():null}catch{draft=null}
   epochBoundaryRefreshPromise=new Promise(resolve=>window.setTimeout(resolve,1200))
     .then(()=>refreshVotingAccount())
-    .then(()=>{if(draft)restoreVoteAllocations(draft)})
     .catch(error=>console.error('Failed to refresh voting state at epoch boundary',error))
     .finally(()=>{epochBoundaryRefreshPromise=null});
 }
@@ -741,7 +755,7 @@ function renderVotingAccount(){
   startEpochCountdown(votingState?.epochTiming,votingState?.hasPendingVote===true);
 }
 function syncVotingSelection(){
-  if(!votingState)return;
+  if(!votingState||voteDraftDirty)return;
   const source=votingState.pendingAllocations||votingState.effectiveAllocations;
   const producers=votingState.pendingProducers||votingState.effectiveProducers||[];
   const totalUnits=BigInt(votingState.pending?.votes??votingState.voter?.votes??0);
@@ -851,7 +865,7 @@ async function submitVote(target){
   if(delta>0n)actions.push({account:'flon',name:'addvote',data:{voter:walletSession.account,vote_staked:`${formatUnits(delta)} FLON`}});else if(delta<0n)actions.push({account:'flon',name:'subvote',data:{voter:walletSession.account,vote_staked:`${formatUnits(-delta)} FLON`}});
   actions.push({account:'flon',name:'votealloc',data:{voter:walletSession.account,allocations:allocations.map(item=>({producer:item.producer,votes:item.votes.toString()}))}});
   target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
-  try{const result=await transact(walletSession,actions),id=transactionId(result);const count=allocations.length;pendingVoteAllocations=null;openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">节点投票已广播</h2><p>${formatUnits(total)} FLON · ${count} 个 BP · 下一 Epoch 生效</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中确认':'Confirm in HuFu';showToast(walletErrorMessage(error))}
+  try{const result=await transact(walletSession,actions),id=transactionId(result);const count=allocations.length;voteDraftDirty=false;pendingVoteAllocations=null;openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">节点投票已广播</h2><p>${formatUnits(total)} FLON · ${count} 个 BP · 下一 Epoch 生效</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'在 HuFu 中确认':'Confirm in HuFu';showToast(walletErrorMessage(error))}
 }
 function formatFlon(value){return `${Number(value).toFixed(8)} FLON`}
 function refundReadyAt(refund){
@@ -955,8 +969,8 @@ document.addEventListener('click',async event=>{
     target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'连接中…':'Connecting…';
     try{walletSession=await connectWallet();renderWallet();await Promise.all([refreshVotingAccount(),refreshGovernance()]);closeSheet();showToast(currentLanguage==='zh-CN'?'钱包已连接':'Wallet connected')}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'连接钱包':'Connect wallet';showToast(walletErrorMessage(error))}
   }
-  if(action==='disconnect-wallet'){await disconnectWallet();walletSession=null;votingState=null;profileBPRewards=null;renderWallet();renderVotingAccount();syncVotingSelection();updateAllocation();closeSheet();await refreshGovernance();showToast(currentLanguage==='zh-CN'?'钱包已断开':'Wallet disconnected')}
-  if(action==='clear-selection'){document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),amount=label.querySelector('[data-node-votes]');if(checkbox)checkbox.checked=false;if(amount){amount.value='';amount.disabled=true}});updateAllocation();applyNodeFilters()}
+  if(action==='disconnect-wallet'){await disconnectWallet();walletSession=null;votingState=null;profileBPRewards=null;renderWallet();renderVotingAccount();syncVotingSelection();updateAllocation();closeSheet();await Promise.all([refreshVotingAccount(),refreshGovernance()]);showToast(currentLanguage==='zh-CN'?'钱包已断开':'Wallet disconnected')}
+  if(action==='clear-selection'){voteDraftDirty=true;document.querySelectorAll('.select-node').forEach(label=>{const checkbox=label.querySelector('input[type="checkbox"]'),amount=label.querySelector('[data-node-votes]');if(checkbox)checkbox.checked=false;if(amount){amount.value='';amount.disabled=true}});updateAllocation();applyNodeFilters()}
   if(action==='producer-details')await openProducerDetails(target.dataset.producer);
   if(action==='sign-vote')await confirmVote();
   if(action==='vote-sign')await submitVote(target);
@@ -1027,8 +1041,8 @@ window.visualViewport?.addEventListener('resize',syncVisualViewport);
 window.visualViewport?.addEventListener('scroll',syncVisualViewport);
 window.addEventListener('orientationchange',()=>window.setTimeout(syncVisualViewport,100));
 overlay.addEventListener('click',closeSheet);
-document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-votes]')){try{const units=decimalUnits(event.target.value||'0');if(units>0n)event.target.value=formatVoteInput(units)}catch{}}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
-document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]'))updateAllocation()});
+document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){voteDraftDirty=true;const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-votes]')){try{const units=decimalUnits(event.target.value||'0');if(units>0n)event.target.value=formatVoteInput(units)}catch{}}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
+document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]')){voteDraftDirty=true;updateAllocation()}});
 document.addEventListener('click',event=>{if(!event.target.closest('.top-language'))closeLanguageMenu()});
 document.addEventListener('keydown',event=>{if(event.key==='Escape')closeLanguageMenu()});
 
@@ -1037,7 +1051,7 @@ function allocationTotal(){try{return draftVoteAllocations().reduce((sum,item)=>
 function canonicalAllocations(items){return(items||[]).map(item=>({producer:item.producer,votes:String(item.votes||0)})).filter(item=>BigInt(item.votes)>0n).sort((a,b)=>a.producer.localeCompare(b.producer)).map(item=>`${item.producer}:${item.votes}`).join('|')}
 function currentVoteAllocations(){if(!votingState)return[];const source=votingState.pendingAllocations||votingState.effectiveAllocations;if(source)return source;const producers=votingState.pendingProducers||votingState.effectiveProducers||[],total=BigInt(votingState.pending?.votes??votingState.voter?.votes??0),fallback=producers.length?total/BigInt(producers.length):0n;return producers.map(producer=>({producer,votes:fallback.toString()}))}
 function updateAllocation(){let allocations=[],valid=true;try{allocations=draftVoteAllocations()}catch{valid=false}const total=valid?allocations.reduce((sum,item)=>sum+item.votes,0n):0n,count=selectedCount(),owned=assetUnits(votingState?.nodeVoteStake)+assetUnits(votingState?.flon),remaining=owned-total,overLimit=valid&&total>owned,changes=valid?voteAllocationChanges(currentVoteAllocations(),allocations):[],changed=changes.length>0;document.querySelectorAll('.select-node').forEach(row=>row.classList.toggle('is-selected',row.querySelector('input[type="checkbox"]')?.checked===true));setText('[data-selected-count]',currentLanguage==='zh-CN'?`${count} 个 BP`:`${count} BPs`);setText('[data-per-node]',count?translateText('自定义'):'—');setText('[data-allocation-total]',`${formatVoteInput(total)} FLON`);setText('[data-vote-remaining]',walletSession?`${overLimit?'−':''}${formatVoteInput(overLimit?-remaining:remaining)} FLON`:'— FLON');const card=document.querySelector('.vote-summary-card');if(card)card.classList.toggle('is-over-limit',overLimit||!valid);setText('[data-vote-submit-hint]',translateText(!walletSession?'连接钱包后管理投票':!valid?'请输入最多 8 位小数的有效票数':overLimit?'分配总额超过账户可投 FLON':!changed?'当前分配尚未修改':'修改将在下一 Epoch 生效'));const confirm=document.querySelector('[data-action="sign-vote"]');if(confirm)confirm.disabled=!walletSession||!votingState||!valid||count>30||overLimit||!changed;const dock=document.querySelector('[data-mobile-vote-dock]');if(dock){dock.dataset.hasChanges=String(Boolean(walletSession&&votingState&&valid&&!overLimit&&changed));dock.hidden=!mobileVoteMedia.matches||mobileVoteTab!=='directory'||dock.dataset.hasChanges!=='true'}}
-function applyNodeFilters(){const filter=document.querySelector('[data-node-filter].is-active')?.dataset.nodeFilter||'all',query=document.querySelector('[data-node-search]')?.value.trim().toLowerCase()||'',selectedOnly=document.querySelector('[data-node-selected-only]')?.classList.contains('is-active')===true,sort=document.querySelector('[data-node-sort]')?.value||'rank',list=document.querySelector('.select-list'),rows=[...document.querySelectorAll('.select-node')];rows.forEach(row=>{const selected=row.querySelector('input[type="checkbox"]')?.checked===true;row.hidden=(filter!=='all'&&row.dataset.status!==filter)||Boolean(query&&!row.dataset.name.includes(query))||(selectedOnly&&!selected)});rows.sort((a,b)=>{const aSelected=a.querySelector('input[type="checkbox"]')?.checked?1:0,bSelected=b.querySelector('input[type="checkbox"]')?.checked?1:0;if(sort==='selected'&&aSelected!==bSelected)return bSelected-aSelected;if(sort==='votes'){const av=BigInt(a.dataset.votes||0),bv=BigInt(b.dataset.votes||0);if(av!==bv)return av>bv?-1:1}if(sort==='share'){const delta=Number(b.dataset.share||0)-Number(a.dataset.share||0);if(delta)return delta}return Number(a.dataset.rank||0)-Number(b.dataset.rank||0)}).forEach(row=>list?.appendChild(row))}
+function applyNodeFilters(){const filter=document.querySelector('[data-node-filter].is-active')?.dataset.nodeFilter||'all',query=document.querySelector('[data-node-search]')?.value.trim().toLowerCase()||'',selectedOnly=document.querySelector('[data-node-selected-only]')?.classList.contains('is-active')===true,sort=document.querySelector('[data-node-sort]')?.value||'rank',list=document.querySelector('.select-list'),rows=[...document.querySelectorAll('.select-node')];rows.forEach(row=>{const selected=row.querySelector('input[type="checkbox"]')?.checked===true;row.hidden=(filter!=='all'&&row.dataset.status!==filter)||Boolean(query&&!row.dataset.name.includes(query))||(selectedOnly&&!selected)});rows.sort((a,b)=>{const aSelected=a.querySelector('input[type="checkbox"]')?.checked?1:0,bSelected=b.querySelector('input[type="checkbox"]')?.checked?1:0;if(sort==='selected'&&aSelected!==bSelected)return bSelected-aSelected;if(sort==='votes'){const av=BigInt(a.dataset.votes||0),bv=BigInt(b.dataset.votes||0);if(av!==bv)return av>bv?-1:1}if(sort==='share'){const delta=Number(b.dataset.share||0)-Number(a.dataset.share||0);if(delta)return delta}return Number(a.dataset.rank||0)-Number(b.dataset.rank||0)});if(list)rows.forEach((row,index)=>{if(list.children[index]!==row)list.insertBefore(row,list.children[index]||null)})}
 document.querySelectorAll('[data-node-filter]').forEach(button=>button.addEventListener('click',()=>{document.querySelectorAll('[data-node-filter]').forEach(b=>b.classList.toggle('is-active',b===button));applyNodeFilters()}));
 document.querySelector('[data-node-selected-only]')?.addEventListener('click',event=>{event.currentTarget.classList.toggle('is-active');applyNodeFilters()});
 document.querySelector('[data-node-search]').addEventListener('input',applyNodeFilters);
@@ -1070,11 +1084,14 @@ async function initializeWallet(){
   if(!session&&isHuFuApp())session=await autoConnectHuFuWallet();
   walletSession=session;
   renderWallet();
-  await Promise.all([refreshVotingAccount(),refreshGovernance()]);
+  await Promise.all([refreshVotingAccount(),refreshGovernance()]).catch(error=>{
+    console.error('Failed to load wallet data; keeping the authenticated session and draft',error);
+  });
 }
 initializeWallet().catch(error=>{
   walletSession=null;
   renderWallet();
+  refreshVotingAccount().catch(()=>{});
   if(isHuFuApp())showToast(walletErrorMessage(error));
 });
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')Promise.all([refreshVotingAccount(),refreshGovernance(),refreshDiscussions()]).catch(error=>console.error('Failed to refresh state',error))});

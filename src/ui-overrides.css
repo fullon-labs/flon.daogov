@@ -34,3 +34,14 @@
 .select-node{cursor:pointer}
 .check-control>input:not(:checked)+.check svg{visibility:hidden}
 .check-control>input:focus-visible+.check{outline:2px solid var(--brand);outline-offset:3px}
+
+/* HuFu already reserves space for its native status and navigation bars. */
+@media(max-width:899px){
+  html.hufu-app .topbar{height:56px;padding-top:0}
+}
+
+/* Do not display provisional selections while the wallet account is resolving. */
+.vote-account-loading .select-list{position:relative;min-height:80px}
+.vote-account-loading .select-list>.select-node{display:none}
+.vote-account-loading .select-list::before{content:'Loading voting account…';display:block;padding:24px;text-align:center;color:var(--muted);font-size:12px}
+html[lang="zh-CN"].vote-account-loading .select-list::before{content:'正在读取账户投票状态…'}

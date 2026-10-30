@@ -392,18 +392,20 @@ export async function loadVotingAccount(account){
   const [powerRows,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows,rewardConfigRows]=await Promise.all([
     rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'powers',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'FLON'}).catch(()=>[]),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendingvote',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voteallocs',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendallocs',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendingvote',lower_bound:account,upper_bound:account,limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voteallocs',lower_bound:account,upper_bound:account,limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendallocs',lower_bound:account,upper_bound:account,limit:1}),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'voter.reward',scope:'voter.reward',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:account,table:'voterefund',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>({abi:{actions:[]}})),
     rpcInfo(),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}).catch(()=>({rows:[]})),
     loadRewardPlans(),
   ]);
+  // Never turn an incomplete vote snapshot into an empty allocation.
+  if([voterRows,pendingRows,allocationRows,pendingAllocationRows,epochRows].some(result=>!Array.isArray(result?.rows)))throw new Error('INVALID_VOTE_STATE_RESPONSE');
   const voter=voterRows.rows?.find(row=>row.owner===account)||null;
   const pending=pendingRows.rows?.find(row=>row.voter===account)||null;
   const effectiveAllocation=allocationRows.rows?.find(row=>row.voter===account)||null;
