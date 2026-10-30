@@ -156,7 +156,7 @@ test('HuFu WebView signing uses the always-registered native Flutter channel',()
   assert.match(helper,/onSignEOSSuccessful/);
   assert.match(helper,/onSignEOSError/);
   assert.match(branch,/return transactHuFuNativeChannel\(serialized,\{\.\.\.transaction,actions:serialized\}\)/);
-  assert.match(branch,/!window\.HuFu\?\.transact/);
+  assert.ok(branch.indexOf('return transactHuFuNativeChannel(serialized,')<branch.indexOf("const provider=window.HuFu"));
 });
 
 test('wallet restore migrates legacy iframe sessions to the injected provider',()=>{

@@ -569,9 +569,10 @@ export async function authorizeHuFuSigning(session){
 export async function transact(session,actions,options={}){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
-  // Prefer the supported injected signer. The legacy Flutter route requires
-  // a complete transaction before its native JSON parser can open the sheet.
-  if(!window.HuFu?.transact&&typeof window.flutter_inappwebview?.callHandler==='function'){
+  // FlutterChannel is registered at WebView creation. The injected HuFu
+  // object does not prove its asynchronously registered handler is ready.
+  // This native route requires a complete transaction and binary action data.
+  if(typeof window.flutter_inappwebview?.callHandler==='function'){
     const transaction=options.preparedTransaction||await prepareHuFuTransaction(authorized);
     const serialized=await Promise.all(transaction.actions.map(async action=>({...action,data:typeof action.data==='string'?action.data:await serializeGovernanceAction(action.account,action.name,action.data)})));
     return transactHuFuNativeChannel(serialized,{...transaction,actions:serialized});
