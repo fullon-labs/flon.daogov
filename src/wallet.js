@@ -21,14 +21,16 @@ let automaticConnection=null;
 let hufuFullOnRequested=false;
 let hufuParentClient=null;
 
-function transactHuFuNativeChannel(actions){
+function transactHuFuNativeChannel(actions,transaction={actions}){
   const channel=window.flutter_inappwebview;
   if(typeof channel?.callHandler!=='function')return null;
   const id=`daogov-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return new Promise((resolve,reject)=>{
     const previousSuccess=window.onSignEOSSuccessful,previousError=window.onSignEOSError;
     let settled=false;
+    const timer=window.setTimeout(()=>failure(id,'HUFU_TRANSACTION_TIMEOUT'),hufuTransactionTimeoutMilliseconds);
     const restore=()=>{
+      window.clearTimeout(timer);
       if(window.onSignEOSSuccessful===success)window.onSignEOSSuccessful=previousSuccess;
       if(window.onSignEOSError===failure)window.onSignEOSError=previousError;
     };
@@ -44,8 +46,8 @@ function transactHuFuNativeChannel(actions){
     };
     window.onSignEOSSuccessful=success;
     window.onSignEOSError=failure;
-    const message=JSON.stringify({type:'pushTransaction',id,data:JSON.stringify({transaction:{actions}})});
-    Promise.resolve(channel.callHandler('FlutterChannel',message)).catch(error=>{if(!settled){settled=true;restore();reject(error)}});
+    const message=JSON.stringify({type:'pushTransaction',id,data:JSON.stringify({transaction})});
+    try{Promise.resolve(channel.callHandler('FlutterChannel',message)).catch(error=>failure(id,error?.message||String(error)))}catch(error){failure(id,error?.message||String(error))}
   });
 }
 
@@ -567,12 +569,13 @@ export async function authorizeHuFuSigning(session){
 export async function transact(session,actions,options={}){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
-  // FlutterChannel is registered when HuFu creates the WebView, while the
-  // newer injected `HuFu` handler is only registered after an asynchronous
-  // chain-switch flow. Use the always-ready native transaction channel so a
-  // restored FullOn session can open the signing sheet immediately.
-  const nativeTransaction=transactHuFuNativeChannel(authorized);
-  if(nativeTransaction)return nativeTransaction;
+  // Prefer the supported injected signer. The legacy Flutter route requires
+  // a complete transaction before its native JSON parser can open the sheet.
+  if(!window.HuFu?.transact&&typeof window.flutter_inappwebview?.callHandler==='function'){
+    const transaction=options.preparedTransaction||await prepareHuFuTransaction(authorized);
+    const serialized=await Promise.all(transaction.actions.map(async action=>({...action,data:typeof action.data==='string'?action.data:await serializeGovernanceAction(action.account,action.name,action.data)})));
+    return transactHuFuNativeChannel(serialized,{...transaction,actions:serialized});
+  }
   // HuFu hosts some DApps inside its own parent container. FullSwap uses this
   // parent transaction bridge first; it is the route that opens HuFu's native
   // transaction sheet. This does not create an iframe and is deliberately not
@@ -599,7 +602,15 @@ export async function transact(session,actions,options={}){
   }
   if(isHuFuApp())throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
   const info=await rpcInfo();assertFreshChainTime(info);
-  const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
+  const link=await getAnchorLink();
+  // HuFu keeps its ESR listener only while the scanned session is active.
+  // Browser storage alone cannot prove that the phone is still listening.
+  // A fresh identity handshake brings the wallet to the foreground and binds
+  // this transaction to a live channel, without replaying an earlier request.
+  const {session:anchorSession}=await link.login(appId());
+  assertChain(String(anchorSession.chainId));
+  if(anchorSession.auth.actor.toString()!==session.account||anchorSession.auth.permission.toString()!==session.permission)throw new Error('ACCOUNT_CHANGED');
+  save({...session,provider:'anchor'});
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
 }
 
