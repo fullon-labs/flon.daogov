@@ -282,7 +282,11 @@ export async function restoreWallet(){
 }
 export async function connectWallet(){
   const restored=await restoreWallet();if(restored)return restored;
-  const provider=isHuFuApp()?await prepareHuFu():window.HuFu;
+  // The public desktop Web flow always uses Anchor Link so the user gets the
+  // same scannable QR hand-off as admin.xchain.pro.  An installed HuFu browser
+  // extension must not steal this path.  Only HuFu's embedded mobile WebView
+  // is allowed to use the native bridge.
+  const provider=isHuFuApp()?await prepareHuFu():null;
   if(provider?.requestAccountsHuFu){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
     const account=normalizeAccount(response);
