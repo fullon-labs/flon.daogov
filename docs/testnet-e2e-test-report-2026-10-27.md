@@ -28,10 +28,10 @@
 - PASS：第三方 `govvoter1111` 代 `miner1111111` 调用 `claimrewards`，`73.48744293 FLON` 只转入 BP 账户。交易：`c8d48f00cbc5c95c5d39f4d09fae03bdab0065c637fc9e254cc0b340d237fac0`。
 - PASS：无待领奖励的 BP 调用返回 `all rewards claimed`，未发生付款。
 
-### 2.3 节点投票与 GLON 同步
+### 2.3 节点投票与内部数值治理权同步
 
-- PASS：`hellotoworld` 新增投票本金 `4,000 FLON`，自动铸造等额 GLON 并调用 `dao.gov::syncpower`。交易：`2453e830a51df4472001483267791a4344200311a233241e3c9de2b6a0443cff`。
-- PASS：治理总票权由 `6,799` 自动更新为 `10,799 GLON`，无需管理员手工同步。
+- PASS：`hellotoworld` 新增投票本金 `4,000 FLON`，系统自动增加等额内部数值治理权并调用 `dao.gov::syncpower`。交易：`2453e830a51df4472001483267791a4344200311a233241e3c9de2b6a0443cff`。
+- PASS：治理总票权由 `6,799` 自动更新为 `10,799 POWER`，无需管理员手工同步。
 - PASS：提交四个 BP 的非等额分配，总额 `9,300 FLON`；`pendingvote.activation_epoch=770`。交易：`e106f441a999cfc6dabd7b75759d35adcfe4770737e8874f80d7feaa067a0eea`。
 - FAIL（Epoch 770 封存后）：`rewardepoch.next_epoch_to_close=771` 且 `epochstats[770].closed=1`，但 `flon::pendingvote` 中 `hellotoworld` 的 `activation_epoch=770` 行仍未删除；`flon::voters` 仍显示旧的 `5300 FLON`，Active producer schedule 仍只有 `bpflowtest11/miner1111111/miner3333333` 三席。虽然 `flon::producers.total_votes` 已出现部分变动且四名 producer 的 `active=1`，但不能认定 pending vote 已被完整消费，需定位 Epoch 结算与 schedule 更新链路。
 - PASS：重复分配被拒绝：`producer vote allocations did not change`。
@@ -40,12 +40,12 @@
 
 ### 2.4 信号提案
 
-- PASS：低于 100 GLON 的账户创建提案被拒绝：`insufficient governance power to propose`。
+- PASS：内部数值治理权低于 `100 POWER` 的账户创建提案被拒绝：`insufficient governance power to propose`。
 - PASS：无附议提案激活被拒绝并由 proposer 取消。
 - PASS：提案 #2 完成 propose、setforum、endorse、permissionless activate、延迟后投票和 permissionless finalize。
 - PASS：重复附议被拒绝；附议期内激活被拒绝；投票延迟内 castvote 被拒绝。
-- PASS：激活快照冻结为 `10,799 GLON`、quorum `5%`、approval `50.01%`。
-- PASS：`hellotoworld` 的 `9,300 GLON` 赞成票计入，提案 #2 最终 `status=4`（通过）。finalize 交易：`55bf53c08d495976ae2962e0547bbe9027f9aaf26b5191fd0aa7f089a28b07f2`。
+- PASS：激活快照冻结为 `10,799 POWER`、quorum `5%`、approval `50.01%`。
+- PASS：`hellotoworld` 的 `9,300 POWER` 赞成票计入，提案 #2 最终 `status=4`（通过）。finalize 交易：`55bf53c08d495976ae2962e0547bbe9027f9aaf26b5191fd0aa7f089a28b07f2`。
 
 ### 2.5 可执行提案与 Treasury
 
@@ -53,8 +53,8 @@
 - PASS：非 `dao.gov` 直接调用 `dao.treasury::reserve` 被拒绝：`missing authority of dao.gov`。
 - PASS：Treasury 入金 `10 FLON`，账本为 liquid/received `10 FLON`、reserved/paid `0`。交易：`549fa3ce996b87395b9b5e4b62ddf10dc1c817f69803582dc7e48dd2fbbbefe4`。
 - PASS：L3 可执行提案 #3 冻结 `dao.treasury::reserve` 的 78-byte action data，金额 `1 FLON`，并由两个独立账户完成附议。
-- PASS：提案 #3 在附议期结束后由 `govvoter1111` permissionless activate，交易 `5a7afb3ca0558ab33f160d24b67d83ffc33310a29cab833c950570f04adedc1d`，区块 `21770734`，已不可逆。激活快照为 `10,799 GLON`，L3 quorum `25%`、approval `67%`；投票开始时间为 2026-10-27 13:13:26（北京时间），结束时间为 13:43:26。
-- PASS：投票延迟结束后，`hellotoworld` 使用快照票权投赞成票，交易 `bbd420396025e7776428076af53990c1d5432761fec42eef5d22ce79ef206013`，区块 `21770784`，已不可逆；链上 `for_votes=9,300 GLON`、against/abstain 均为 0。
+- PASS：提案 #3 在附议期结束后由 `govvoter1111` permissionless activate，交易 `5a7afb3ca0558ab33f160d24b67d83ffc33310a29cab833c950570f04adedc1d`，区块 `21770734`，已不可逆。激活快照为 `10,799 POWER`，L3 quorum `25%`、approval `67%`；投票开始时间为 2026-10-27 13:13:26（北京时间），结束时间为 13:43:26。
+- PASS：投票延迟结束后，`hellotoworld` 使用快照票权投赞成票，交易 `bbd420396025e7776428076af53990c1d5432761fec42eef5d22ce79ef206013`，区块 `21770784`，已不可逆；链上 `for_votes=9,300 POWER`、against/abstain 均为 0。
 - PASS：投票期结束后由 `govvoter1111` permissionless finalize，交易 `25ef28f6c2d378e58c42abc1f3358b595177723f07bc593a526b9f152cd2d31b`，已观察至 LIB `21772096`。
 - PASS：通过后的提案由 `govvoter1111` permissionless queue，交易 `7fde5683d806469668fd8a98bd2823b04a687fac81e79f13773939410cfc22c2`，已观察至 LIB `21772109`；链上状态为 `6`（queued）。
 - PASS：Timelock 时间窗冻结为 `2026-10-27T10:38:12Z` 至 `2026-10-29T10:38:12Z`；执行前 Treasury 为 liquid `10 FLON`、reserved `0`、grants 空。
@@ -86,10 +86,10 @@
 - 链 ID 每笔交易前均核对为 `18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f`；使用本地已解锁的 `flontest` 钱包，未读取私钥。迁移前备份：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/governance-power-immediately-before-migrate-20261029/`。
 - 临时 `dao.gov` 上链交易 `5deb7478165813987c6a7ff3e14c5725ed5f4cc84c5a040d74a75f87b14b066b`，区块 `21784028`；链上 WASM 哈希与一次性产物 `de0f6e963e6f6ebb40ee79bde66d96e3a3fa403b0ef40c7522ff64d4a950676f` 一致，后续 LIB 已超过该区块。
 - `flon.system` 上链交易 `62ab15d9d194912a0125a06a258961fb26a7482e76c3b522eb3046617f48df38`，区块 `21784061`；链上 WASM 哈希与构建产物 `037129e1f1c42e6a4fee5251c74aa9b476dcf0bd03306bddfc65eef1784d485e` 一致，后续 LIB 已超过该区块。
-- 一次性 `dao.gov::migrateunit` 交易 `f2c09a61ffcd6d7d7a5c5ba8df8ada01bb6a2b8fad07d73c53221de7f52f4fe0`，区块 `21784097`，后续 LIB 已超过该区块。迁移前后 16 组治理表逐字段比较通过：仅资产单位 `GLON → POWER`，4 个账户治理权合计仍为 `10,799`，3 个历史提案及其投票数保持不变。迁移后备份：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/governance-power-after-migrate-20261029/`。
+- 一次性 `dao.gov::migrateunit` 交易 `f2c09a61ffcd6d7d7a5c5ba8df8ada01bb6a2b8fad07d73c53221de7f52f4fe0`，区块 `21784097`，后续 LIB 已超过该区块。迁移前后 16 组治理表逐字段比较通过：已废除的 token 化旧单位迁移为内部数值治理权 `POWER`，4 个账户治理权合计仍为 `10,799`，3 个历史提案及其投票数保持不变。迁移后备份：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/governance-power-after-migrate-20261029/`。
 - 干净的 `dao.gov` 上链交易 `65065c548390ee53c792bc6e2295a064f945222df18327d5648e2239f7415eac`，区块 `21784131`；链上 WASM 哈希为 `b665f7670419ec676ea367771998d6f17da4925b6b65f39aca564a40b2ca507f`，ABI 不含 `syncpower` 或 `migrateunit`。后续 LIB 已超过该区块。
-- `hellotoworld@active` 调用 `flon::addvote` 增加 `0.00000001 FLON`，交易 `11791e9c55c873377b92f3b9b74e3bba9c0b1ed1b5e0f7ec9764725dce01f7b4`，区块 `21784169`，后续 LIB `21784173` 确认不可逆。账户治理权从 `9300` 精确增加到 `9300.00000001 POWER`；全网治理权从 `10799` 增至 `10799.00000001 POWER`，4 个账户之和守恒。待生效节点票进入 Epoch 815，需在自然封存后确认 `pendingvote` 被清理。旧测试网 GLON token 供给仍为 `10799`，未随新增投票而铸造；仅保留旧测试网 token 合约阻止历史 GLON 转账。
-- 测试网 DApp 在 app-host 构建并仅重建 `flon-daogov-testnet`。全量前端测试初次运行发现两条新增文案未覆盖全部语言，已补齐后 39 项全通过，再构建 `local/flon-daogov:power-20261029-r2`。公网 `https://daogov-t.flon.network/` 返回 HTTP 200，引用最终 JS `assets/index-akjyXKBN.js`，公开 JS 无 GLON 文案，`config.js` 链 ID 正确；测试网容器 healthy，主网 DApp 容器仍为 `local/flon-daogov:0c0f72c`。
+- `hellotoworld@active` 调用 `flon::addvote` 增加 `0.00000001 FLON`，交易 `11791e9c55c873377b92f3b9b74e3bba9c0b1ed1b5e0f7ec9764725dce01f7b4`，区块 `21784169`，后续 LIB `21784173` 确认不可逆。账户治理权从 `9300` 精确增加到 `9300.00000001 POWER`；全网治理权从 `10799` 增至 `10799.00000001 POWER`，4 个账户之和守恒。待生效节点票进入 Epoch 815，需在自然封存后确认 `pendingvote` 被清理。新增投票只增加合约内部数值治理权，不铸造或转移任何治理 token；旧测试 token 合约仅用于阻止历史资产转账。
+- 测试网 DApp 在 app-host 构建并仅重建 `flon-daogov-testnet`。全量前端测试初次运行发现两条新增文案未覆盖全部语言，已补齐后 39 项全通过，再构建 `local/flon-daogov:power-20261029-r2`。公网 `https://daogov-t.flon.network/` 返回 HTTP 200，引用最终 JS `assets/index-akjyXKBN.js`，公开 JS 仅展示内部数值治理权，`config.js` 链 ID 正确；测试网容器 healthy，主网 DApp 容器仍为 `local/flon-daogov:0c0f72c`。
 - 测试网 Keeper 容器在本轮只读检查时为 `unhealthy`：健康检查返回 HTTP 503，日志连续出现 BP claim 广播后 3 分钟确认超时。链上 LIB 本轮约需 5–6 分钟追上交易区块，可能使 Keeper 将最终成功的交易判为超时；需单独核对 Keeper 确认逻辑及奖励结算，未重启或改动 Keeper。
 
 ### 2026-10-29 Epoch 815 自然封存复测
@@ -123,7 +123,7 @@
 - PASS：`flon.system` 升级交易 `70601bd0e22755881eaef362dfe3d07dfa1554785dadc2d28fac5562fc67b7c1` 在区块 `21785034` 执行成功，并由 LIB `21785034` 确认不可逆。部署 WASM SHA-256 为 `88bf9110d6fa2e138434e0d11ca484c006be961c066a7ab2480b29cbeab340cf`。
 - PASS：链上 ABI 的 `regproducer` 与 `producer_info` 均新增尾部可选字段 `status_url:string$`，旧客户端与旧表行保持可解码。升级前后 `producers` 均为 26 行；owner、票数、签名公钥、active、官网 URL、location、producer authority、分成比例及 revision 等核心字段逐行一致。ABI 与表快照见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/flon-system-status-url-get-abi-20261029.json` 和 `flon-system-status-url-producers-after-20261029.json`。
 - PASS：仅测试网 DApp 服务切换为 `local/flon-daogov:status-url-20261029-r1`，镜像 ID `sha256:0ec513389458b0642976dd38ec72b16fba8dd18bfef1fefecbe900fc90129394`；主网容器 ID 与镜像 `local/flon-daogov:0c0f72c` 保持不变。
-- PASS：公网 `https://daogov-t.flon.network/` 返回 HTTP 200，引用 `/assets/index-CGLA0pgo.js`。公网与容器内 JS SHA-256 均为 `0d1e824c85cde67b26669b393b76564591b2d1bc4c03491c44756f038ffd6149`；bundle 含 `status_url` 交易/展示逻辑且 `GLON` 出现次数为 0，公开 `config.js` 的测试网 chain ID 正确。
+- PASS：公网 `https://daogov-t.flon.network/` 返回 HTTP 200，引用 `/assets/index-CGLA0pgo.js`。公网与容器内 JS SHA-256 均为 `0d1e824c85cde67b26669b393b76564591b2d1bc4c03491c44756f038ffd6149`；bundle 含 `status_url` 交易/展示逻辑且仅展示内部数值治理权，公开 `config.js` 的测试网 chain ID 正确。
 
 ### 2026-10-29 BP 注销与 30 分钟全额 unstake
 
