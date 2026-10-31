@@ -24,7 +24,7 @@ test('connected wallet entry displays the account name instead of provider name'
 });
 
 test('app icon styles do not override the wallet transport QR code',()=>{
-  assert.match(styles,/#app-frame svg\{width:24px;height:24px/);
+  assert.match(styles,/:where\(#app-frame\) svg\{width:24px;height:24px/);
   assert.doesNotMatch(styles,/(?:^|})svg\{width:24px;height:24px/);
 });
 

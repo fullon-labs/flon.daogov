@@ -150,8 +150,8 @@ test('HuFu signing matches FullSwap by preferring the existing HuFu parent bridg
   assert.match(branch,/provider\.transact\(\{transaction\}\)/);
 });
 
-test('HuFu WebView signing ABI-serializes actions for the native Flutter channel',()=>{
-  const helperStart=walletSource.indexOf('async function serializeHuFuNativeActions(actions)');
+test('HuFu WebView signing uses the always-registered native Flutter channel',()=>{
+  const helperStart=walletSource.indexOf('function transactHuFuNativeChannel(actions,');
   const helperEnd=walletSource.indexOf('function normalizeAccount',helperStart);
   const helper=walletSource.slice(helperStart,helperEnd);
   const transactStart=walletSource.indexOf('export async function transact(session,actions,options={})');
@@ -159,16 +159,15 @@ test('HuFu WebView signing ABI-serializes actions for the native Flutter channel
   const branch=walletSource.slice(transactStart,transactEnd);
 
   assert.ok(helperStart>=0&&helperEnd>helperStart,'native HuFu channel helper was not found');
-  assert.match(helper,/abi_json_to_bin/);
-  assert.match(helper,/return \{\.\.\.action,data:binargs\}/);
   assert.match(helper,/callHandler\('FlutterChannel',message\)/);
   assert.match(helper,/type:'pushTransaction'/);
   assert.match(helper,/data:JSON\.stringify\(\{transaction\}\)/);
   assert.match(helper,/onSignEOSSuccessful/);
   assert.match(helper,/onSignEOSError/);
-  assert.match(branch,/const serialized=await serializeHuFuNativeActions\(authorized\)/);
-  assert.match(branch,/await prepareHuFuTransaction\(serialized\)/);
-  assert.match(branch,/return transactHuFuNativeChannel\(transaction\)/);
+  assert.match(branch,/await prepareHuFuTransaction\(authorized\)/);
+  assert.match(branch,/await serializeGovernanceAction\(action\.account,action\.name,action\.data\)/);
+  assert.match(branch,/return transactHuFuNativeChannel\(serialized,\{\.\.\.transaction,actions:serialized\}\)/);
+  assert.ok(branch.indexOf('return transactHuFuNativeChannel(serialized,')<branch.indexOf("const provider=window.HuFu"));
 });
 
 test('wallet restore migrates legacy iframe sessions to the injected provider',()=>{

@@ -21,23 +21,16 @@ let automaticConnection=null;
 let hufuFullOnRequested=false;
 let hufuParentClient=null;
 
-async function serializeHuFuNativeActions(actions){
-  return Promise.all(actions.map(async action=>{
-    const result=await rpcPost('/v1/chain/abi_json_to_bin',{code:action.account,action:action.name,args:action.data});
-    const binargs=String(result?.binargs||'');
-    if(!/^(?:[0-9a-f]{2})*$/i.test(binargs))throw new Error('INVALID_ABI_SERIALIZATION');
-    return {...action,data:binargs};
-  }));
-}
-
-function transactHuFuNativeChannel(transaction){
+function transactHuFuNativeChannel(actions,transaction={actions}){
   const channel=window.flutter_inappwebview;
   if(typeof channel?.callHandler!=='function')return null;
   const id=`daogov-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return new Promise((resolve,reject)=>{
     const previousSuccess=window.onSignEOSSuccessful,previousError=window.onSignEOSError;
     let settled=false;
+    const timer=window.setTimeout(()=>failure(id,'HUFU_TRANSACTION_TIMEOUT'),hufuTransactionTimeoutMilliseconds);
     const restore=()=>{
+      window.clearTimeout(timer);
       if(window.onSignEOSSuccessful===success)window.onSignEOSSuccessful=previousSuccess;
       if(window.onSignEOSError===failure)window.onSignEOSError=previousError;
     };
@@ -54,7 +47,7 @@ function transactHuFuNativeChannel(transaction){
     window.onSignEOSSuccessful=success;
     window.onSignEOSError=failure;
     const message=JSON.stringify({type:'pushTransaction',id,data:JSON.stringify({transaction})});
-    Promise.resolve(channel.callHandler('FlutterChannel',message)).catch(error=>{if(!settled){settled=true;restore();reject(error)}});
+    try{Promise.resolve(channel.callHandler('FlutterChannel',message)).catch(error=>failure(id,error?.message||String(error)))}catch(error){failure(id,error?.message||String(error))}
   });
 }
 
@@ -417,18 +410,20 @@ export async function loadVotingAccount(account){
   const [powerRows,flonBalances,voterRows,pendingRows,allocationRows,pendingAllocationRows,rewardRows,epochRows,refundRows,abi,chainInfo,globalRows,rewardConfigRows]=await Promise.all([
     rpcPost('/v1/chain/get_table_rows',{json:true,code:governance,scope:governance,table:'powers',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_currency_balance',{code:'flon.token',account,symbol:'FLON'}).catch(()=>[]),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendingvote',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voteallocs',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendallocs',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voters',lower_bound:account,upper_bound:account,limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendingvote',lower_bound:account,upper_bound:account,limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'voteallocs',lower_bound:account,upper_bound:account,limit:1}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'pendallocs',lower_bound:account,upper_bound:account,limit:1}),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'voter.reward',scope:'voter.reward',table:'voters',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
-    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}).catch(()=>({rows:[]})),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardepoch',limit:1}),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:account,table:'voterefund',lower_bound:account,upper_bound:account,limit:1}).catch(()=>({rows:[]})),
     rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>({abi:{actions:[]}})),
     rpcInfo(),
     rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}).catch(()=>({rows:[]})),
     loadRewardPlans(),
   ]);
+  // Never turn an incomplete vote snapshot into an empty allocation.
+  if([voterRows,pendingRows,allocationRows,pendingAllocationRows,epochRows].some(result=>!Array.isArray(result?.rows)))throw new Error('INVALID_VOTE_STATE_RESPONSE');
   const voter=voterRows.rows?.find(row=>row.owner===account)||null;
   const pending=pendingRows.rows?.find(row=>row.voter===account)||null;
   const effectiveAllocation=allocationRows.rows?.find(row=>row.voter===account)||null;
@@ -442,10 +437,10 @@ export async function loadVotingAccount(account){
   const pendingActivationEpoch=Number(pendingAllocation?.activation_epoch??pending?.activation_epoch);
   const nextEpoch=Number(epochRows.rows?.[0]?.next_epoch_to_close||0);
   // Pending rows are materialized lazily by the voter actions. Once the epoch
-  // cursor has advanced past activation_epoch, their vote deltas are already
+  // cursor has reached activation_epoch, their vote deltas are already
   // effective even if the per-voter pending row still exists.
   const hasUnsettledVote=Boolean(pendingAllocation||pending)&&
-    Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>=nextEpoch;
+    Number.isInteger(pendingActivationEpoch)&&pendingActivationEpoch>nextEpoch;
   return {
     account,governancePower,flon,nodeVoteStake:formatAssetUnits(nodeVoteUnits,'FLON'),voter,pending,effectiveAllocation,pendingAllocation,rewards,refund,
     stakeSupported:actions.has('addvote')&&actions.has('subvote')&&actions.has('voterefund'),
@@ -590,14 +585,13 @@ export async function authorizeHuFuSigning(session){
 export async function transact(session,actions,options={}){
   assertChain(session.chainId);
   const authorized=actions.map(action=>({...action,authorization:action.authorization||[{actor:session.account,permission:session.permission}]}));
-  // FlutterChannel is registered when HuFu creates the WebView, while the
-  // newer injected `HuFu` handler is only registered after an asynchronous
-  // chain-switch flow. Use the always-ready native transaction channel so a
-  // restored FullOn session can open the signing sheet immediately.
+  // FlutterChannel is registered at WebView creation. The injected HuFu
+  // object does not prove its asynchronously registered handler is ready.
+  // This native route requires a complete transaction and binary action data.
   if(typeof window.flutter_inappwebview?.callHandler==='function'){
-    const serialized=await serializeHuFuNativeActions(authorized);
-    const transaction=options.preparedTransaction||await prepareHuFuTransaction(serialized);
-    return transactHuFuNativeChannel(transaction);
+    const transaction=options.preparedTransaction||await prepareHuFuTransaction(authorized);
+    const serialized=await Promise.all(transaction.actions.map(async action=>({...action,data:typeof action.data==='string'?action.data:await serializeGovernanceAction(action.account,action.name,action.data)})));
+    return transactHuFuNativeChannel(serialized,{...transaction,actions:serialized});
   }
   // HuFu hosts some DApps inside its own parent container. FullSwap uses this
   // parent transaction bridge first; it is the route that opens HuFu's native
@@ -625,7 +619,15 @@ export async function transact(session,actions,options={}){
   }
   if(isHuFuApp())throw new Error('HUFU_TRANSACTION_UNAVAILABLE');
   const info=await rpcInfo();assertFreshChainTime(info);
-  const anchorSession=await (await getAnchorLink()).restoreSession(appId());if(!anchorSession)throw new Error('SESSION_EXPIRED');
+  const link=await getAnchorLink();
+  // HuFu keeps its ESR listener only while the scanned session is active.
+  // Browser storage alone cannot prove that the phone is still listening.
+  // A fresh identity handshake brings the wallet to the foreground and binds
+  // this transaction to a live channel, without replaying an earlier request.
+  const {session:anchorSession}=await link.login(appId(),anchorDappInfo());
+  assertChain(String(anchorSession.chainId));
+  if(anchorSession.auth.actor.toString()!==session.account||anchorSession.auth.permission.toString()!==session.permission)throw new Error('ACCOUNT_CHANGED');
+  save({...session,provider:'anchor'});
   return anchorSession.transact({actions:authorized},{broadcast:true,...transactionOptions});
 }
 
