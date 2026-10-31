@@ -18,6 +18,11 @@ test('desktop wallet entry stays hidden below the desktop breakpoint',()=>{
   assert.match(styles,/@media\(min-width:900px\)[\s\S]*\.desktop-wallet-button\{display:flex/);
 });
 
+test('connected wallet entry displays the account name instead of provider name',()=>{
+  assert.match(app,/label=walletSession\?\.account\|\|'连接钱包'/);
+  assert.doesNotMatch(app,/label=walletSession\?walletProviderName/);
+});
+
 test('app icon styles do not override the wallet transport QR code',()=>{
   assert.match(styles,/#app-frame svg\{width:24px;height:24px/);
   assert.doesNotMatch(styles,/(?:^|})svg\{width:24px;height:24px/);
