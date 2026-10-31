@@ -7,10 +7,10 @@ const app=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
 const wallet=fs.readFileSync(new URL('./wallet.js',import.meta.url),'utf8');
 const styles=fs.readFileSync(new URL('./styles.css',import.meta.url),'utf8');
 
-test('desktop wallet entry opens the wallet transport directly',()=>{
+test('desktop wallet entry opens QR directly only without a local extension',()=>{
   assert.match(html,/data-action="account" data-desktop-wallet-connect/);
-  assert.match(app,/target\.hasAttribute\('data-desktop-wallet-connect'\)&&!walletSession\)await requestWalletConnection\(target\)/);
-  assert.match(app,/walletSession=await connectWallet\(\)/);
+  assert.match(app,/target\.hasAttribute\('data-desktop-wallet-connect'\)&&!walletSession&&!hasHuFuExtension\(\)\)await requestWalletConnection\(target,'anchor'\)/);
+  assert.match(app,/walletSession=await connectWallet\(providerChoice\)/);
 });
 
 test('desktop wallet entry stays hidden below the desktop breakpoint',()=>{
@@ -23,12 +23,14 @@ test('app icon styles do not override the wallet transport QR code',()=>{
   assert.doesNotMatch(styles,/(?:^|})svg\{width:24px;height:24px/);
 });
 
-test('desktop Web always opens Anchor QR even when the HuFu extension is installed',()=>{
-  const start=wallet.indexOf('export async function connectWallet()');
+test('desktop Web lets users choose an installed extension or Anchor QR',()=>{
+  const start=wallet.indexOf('export async function connectWallet');
   const end=wallet.indexOf('export function autoConnectHuFuWallet()',start);
   const branch=wallet.slice(start,end);
 
-  assert.match(branch,/const provider=isHuFuApp\(\)\?await prepareHuFu\(\):null/);
-  assert.doesNotMatch(branch,/window\.HuFu/);
+  assert.match(wallet,/export function hasHuFuExtension\(\)/);
+  assert.match(app,/data-action="connect-wallet-hufu"/);
+  assert.match(app,/data-action="connect-wallet-qr"/);
+  assert.match(branch,/providerChoice==='hufu'/);
   assert.match(branch,/link\.login\(appId\(\)\)/);
 });

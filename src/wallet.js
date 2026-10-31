@@ -181,9 +181,10 @@ function assertFreshChainTime(info,now=Date.now()){
   if(!Number.isFinite(chainTime)||now-chainTime>90000||chainTime-now>30000)throw new Error('CHAIN_TIME_STALE');
 }
 function assertChain(chainId){if(chainId&&String(chainId)!==config().chainId)throw new Error('WALLET_CHAIN_ID_MISMATCH')}
-export function isHuFuApp(){
-  return navigator.userAgent.toLowerCase().includes('hufu')||
-    Boolean(window.HuFu||window.HuFuJSProvider);
+function isHuFuEmbeddedApp(){return navigator.userAgent.toLowerCase().includes('hufu')||Boolean(window.HuFuJSProvider||window.flutter_inappwebview)}
+export function isHuFuApp(){return isHuFuEmbeddedApp()||Boolean(window.HuFu)}
+export function hasHuFuExtension(){
+  return Boolean(window.HuFu)&&!isHuFuEmbeddedApp();
 }
 async function captureHuFuChainInfo(bridge){
   if(!bridge)return;
@@ -200,6 +201,7 @@ async function captureHuFuChainInfo(bridge){
 }
 async function prepareHuFu(){
   if(!isHuFuApp())return window.HuFu||null;
+  if(hasHuFuExtension())return window.HuFu;
   for(let count=0;count<30&&!window.HuFuJSProvider;count++)await wait(100);
   const bridge=window.HuFuJSProvider;
   if(bridge?.HuFuSwitchChain&&!hufuFullOnRequested){
@@ -271,7 +273,7 @@ export async function restoreWallet(){
       // An Anchor session cached by a normal browser must never be reused by
       // HuFu's embedded browser. It bypasses the native bridge and leaves the
       // user waiting for a signing surface that cannot open in this context.
-      if(isHuFuApp()){forget();return null}
+      if(isHuFuEmbeddedApp()){forget();return null}
       await rpcInfo();
       const session=await (await getAnchorLink()).restoreSession(appId());
       if(!session||session.auth.actor.toString()!==stored.account)throw new Error('SESSION_EXPIRED');
@@ -280,13 +282,12 @@ export async function restoreWallet(){
     return stored;
   }catch{forget();return null}
 }
-export async function connectWallet(){
+export async function connectWallet(providerChoice='auto'){
   const restored=await restoreWallet();if(restored)return restored;
-  // The public desktop Web flow always uses Anchor Link so the user gets the
-  // same scannable QR hand-off as admin.xchain.pro.  An installed HuFu browser
-  // extension must not steal this path.  Only HuFu's embedded mobile WebView
-  // is allowed to use the native bridge.
-  const provider=isHuFuApp()?await prepareHuFu():null;
+  // Desktop callers explicitly choose an installed HuFu extension or the
+  // Anchor QR hand-off. HuFu's embedded WebView keeps its native default.
+  const useHuFu=providerChoice==='hufu'||(providerChoice==='auto'&&isHuFuApp());
+  const provider=useHuFu?await prepareHuFu():null;
   if(provider?.requestAccountsHuFu){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
     const account=normalizeAccount(response);
@@ -296,7 +297,7 @@ export async function connectWallet(){
     await assertAccountOnChain(account.account);
     return save({...account,chainId,provider:'hufu'});
   }
-  if(isHuFuApp())throw new Error('HUFU_PROVIDER_UNAVAILABLE');
+  if(useHuFu)throw new Error('HUFU_PROVIDER_UNAVAILABLE');
   await rpcInfo();
   const link=await getAnchorLink(),identity=await link.login(appId()),session=identity.session;
   assertChain(String(session.chainId));

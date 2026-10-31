@@ -173,7 +173,7 @@ test('HuFu WebView signing ABI-serializes actions for the native Flutter channel
 
 test('wallet restore migrates legacy iframe sessions to the injected provider',()=>{
   const start=walletSource.indexOf('export async function restoreWallet()');
-  const end=walletSource.indexOf('export async function connectWallet()',start);
+  const end=walletSource.indexOf('export async function connectWallet',start);
   const branch=walletSource.slice(start,end);
 
   assert.ok(start>=0&&end>start,'wallet restore branch was not found');
@@ -184,15 +184,15 @@ test('wallet restore migrates legacy iframe sessions to the injected provider',(
 
 test('HuFu discards a cached Anchor session before reconnecting natively',()=>{
   const start=walletSource.indexOf('export async function restoreWallet()');
-  const end=walletSource.indexOf('export async function connectWallet()',start);
+  const end=walletSource.indexOf('export async function connectWallet',start);
   const branch=walletSource.slice(start,end);
 
-  assert.match(branch,/if\(stored\.provider==='anchor'\)[\s\S]*if\(isHuFuApp\(\)\)\{forget\(\);return null\}/);
+  assert.match(branch,/if\(stored\.provider==='anchor'\)[\s\S]*if\(isHuFuEmbeddedApp\(\)\)\{forget\(\);return null\}/);
 });
 
 test('a cached injected session restores silently without account selection',()=>{
   const restoreStart=walletSource.indexOf('export async function restoreWallet()');
-  const restoreEnd=walletSource.indexOf('export async function connectWallet()',restoreStart);
+  const restoreEnd=walletSource.indexOf('export async function connectWallet',restoreStart);
   const restore=walletSource.slice(restoreStart,restoreEnd);
   const autoStart=walletSource.indexOf('export function autoConnectHuFuWallet()');
   const autoEnd=walletSource.indexOf('export async function disconnectWallet()',autoStart);

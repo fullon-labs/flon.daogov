@@ -22,10 +22,18 @@ const governanceListTerms={
   'zh-TW':{'Community sentiment is for discussion only and does not replace on-chain governance voting.':'社區表態僅用於討論，不代替鏈上治理投票。','Load more':'載入更多'}
 };
 
+const walletProviderTerms={
+  fr:{'Choose a connection method':'Choisissez une méthode de connexion','HuFu browser extension':'Extension de navigateur HuFu','Use the wallet installed in this browser':'Utiliser le portefeuille installé dans ce navigateur','Connect with QR code':'Connexion par code QR','Scan with the HuFu mobile wallet':'Scanner avec le portefeuille mobile HuFu'},
+  ja:{'Choose a connection method':'接続方法を選択','HuFu browser extension':'HuFu ブラウザ拡張機能','Use the wallet installed in this browser':'このブラウザにインストールされたウォレットを使用','Connect with QR code':'QRコードで接続','Scan with the HuFu mobile wallet':'HuFu モバイルウォレットでスキャン'},
+  ko:{'Choose a connection method':'연결 방법 선택','HuFu browser extension':'HuFu 브라우저 확장 프로그램','Use the wallet installed in this browser':'이 브라우저에 설치된 지갑 사용','Connect with QR code':'QR 코드로 연결','Scan with the HuFu mobile wallet':'HuFu 모바일 지갑으로 스캔'},
+  es:{'Choose a connection method':'Elige un método de conexión','HuFu browser extension':'Extensión de navegador HuFu','Use the wallet installed in this browser':'Usar la cartera instalada en este navegador','Connect with QR code':'Conectar con código QR','Scan with the HuFu mobile wallet':'Escanear con la cartera móvil HuFu'},
+  'zh-TW':{'Choose a connection method':'選擇連接方式','HuFu browser extension':'HuFu 瀏覽器擴充套件','Use the wallet installed in this browser':'使用此瀏覽器已安裝的錢包','Connect with QR code':'使用二維碼連接','Scan with the HuFu mobile wallet':'使用 HuFu 手機錢包掃碼'}
+};
+
 export const generatedLocaleTerms={
-  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr},
-  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja},
-  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko},
-  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es},
-  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW']}
+  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr,...walletProviderTerms.fr},
+  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja,...walletProviderTerms.ja},
+  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko,...walletProviderTerms.ko},
+  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es,...walletProviderTerms.es},
+  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW'],...walletProviderTerms['zh-TW']}
 };
