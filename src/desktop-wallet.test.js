@@ -18,6 +18,11 @@ test('desktop wallet entry stays hidden below the desktop breakpoint',()=>{
   assert.match(styles,/@media\(min-width:900px\)[\s\S]*\.desktop-wallet-button\{display:flex/);
 });
 
+test('app icon styles do not override the wallet transport QR code',()=>{
+  assert.match(styles,/#app-frame svg\{width:24px;height:24px/);
+  assert.doesNotMatch(styles,/(?:^|})svg\{width:24px;height:24px/);
+});
+
 test('desktop Web always opens Anchor QR even when the HuFu extension is installed',()=>{
   const start=wallet.indexOf('export async function connectWallet()');
   const end=wallet.indexOf('export function autoConnectHuFuWallet()',start);
