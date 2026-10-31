@@ -8,5 +8,8 @@
   },
   "engines": {
     "node": ">=24"
+  },
+  "dependencies": {
+    "@noble/curves": "2.4.0"
   }
 }
