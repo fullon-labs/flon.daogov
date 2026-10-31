@@ -10,7 +10,7 @@
 | Core | `v0.9.2` |
 | 钱包 | 本地 `fuwal` / `flontest`，未导出私钥 |
 | 证据目录 | `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/` |
-| 当前结论 | **核心发布门禁全部通过，具备主网发布条件（本次不启用 Savanna）** |
+| 当前结论 | **核心发布门禁全部通过，Savanna 已启用，具备主网发布条件** |
 
 ## 2. 已验证结果
 
@@ -201,7 +201,7 @@
 
 ## 5. 发布门禁
 
-**PASS：具备主网发布条件（本次明确不启用 Savanna）。**
+**PASS：Savanna 已启用，具备主网发布条件。**
 
 - Core `v0.9.2` 全量 1,115 项单测通过；已激活 protocol feature 的兼容镜像已重建并发布。
 - 7 台测试节点逐台返回指定测试链 ID 和 `v0.9.2`，容器全部运行、零重启，Head/LIB 同步；证据见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v092-node-inventory-20261031T1603+0800/summary.md`。
