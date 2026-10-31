@@ -101,3 +101,31 @@ DAO Gov 的 BP 详情中提供紧凑版 Epoch 卡片（最新链上 Epoch、实�
 第三方专属节点必须使用同一个字面 IP 的 RPC 与 P2P，并独占该 IP；不同端口、IPv6 展开写法和 IPv4-mapped IPv6 不能绕过重复检查。IP 约束覆盖本服务已接入的专属节点记录，不能识别尚未登记的其他服务，也不能证明节点处在独立物理机。公共参考 RPC 仍是观察来源，不取得专属节点资格。
 
 白名单基金会账号经本机管理员绑定端点后，仍需从可信网络 RPC 确认 BP 有效注册，并核对绑定 RPC 的 Chain ID，才能取得长期观察资格。此为早期基金会节点的管理员核验例外；第三方仍需原有端点归属证据，不能因账号出现在排班中自动升级。未通过核验的目标继续受 30 分钟上限约束。已到期的普通试用不续期；后续有独立核验依据的真实 BP 可以被正式接入，不按试用重新计时。
+
+## Finalizer readiness
+
+`/finalizers?network=testnet`（或 mainnet）提供账户、公钥登记、active/pending policy 身份、最后 QC 投票区块与区块时间，以及限时在线证明。页面入口位于状态站顶部。数据来自对应网络的 `flon::finkeys`、`flon::finalizers`、`get_finalizer_info`，先核对 Chain ID，policy 身份按当前登记公钥匹配，不按 description 猜测。
+
+- **仅准备公钥**：登记公钥不证明节点持有私钥、在线或已进入 policy。
+- **QC 投票证据**：节点 RPC 从已接受区块 QC 中追踪的投票，本服务再核对对应区块 ID、高度和区块时间。服务不独立验整份 QC 聚合签名，接口标记 `independently_verified_signature=false`；观察过的记录持久化，不把“缓存为空”判成离线，也不将最后区块时间冒充签名时间。RPC 必须是运营方配置的可信节点；公开接口不接受自报投票作为证据。
+- **有时效的在线证明**：只证明此密钥在响应挑战时可用，并在挑战有效期内展示；不证明具体 IP、持续在线或整台节点完整就绪。默认有效期 5 分钟，到期、密钥轮换或链状态无法核对时撤下 ready。该服务不接收、保存或代管私钥。
+
+机器接口：
+
+- `GET /api/finalizers.json?network=testnet`
+- `POST /api/finalizers/challenge`，JSON 为 `{"network":"testnet","account":"BP_ACCOUNT"}`。
+- `POST /api/finalizers/proof`，JSON 只能含 `challenge_id` 和 `signature`。
+- `GET /api/finalizers/proof.json?network=testnet&account=BP_ACCOUNT`。
+
+挑战采用 UTF-8 消息 `FULLON_FINALIZER_READINESS_V1\n` 加服务器给出的 canonical JSON。消息绑定 domain、audience、network、chain_id、account、当前登记 public_key、LIB block_num/block_id、issued_at、expires_at 和随机 nonce；不要自行重排或重建字段。服务器只接受自己签发、未到期且未消费的挑战，提交时重新核对公钥与链状态。挑战成功验签后原子消费，拒绝重放；失败签名不会发布结果。challenge 与 proof 持久化在私有 `data/finalizer.sqlite`，公开的签名、原文及验证时间可供第三方复核。
+
+在**持钥节点本地**保存下载的 challenge.json，运行：
+
+```sh
+cd status
+node sign-readiness.mjs --challenge challenge.json --key-file /private/finalizer-key-file
+```
+
+密钥文件仅含一行 `PVT_BLS_...`，必须保留在持钥节点，不要上传到管理页、浏览器或 Git。工具输出仅包含 challenge_id 与 SIG_BLS 签名。HTTP 验证端只读取登记的公钥，不开放签名功能；对 proof/challenge 写请求采用全局每分钟 30 次限流、8 KiB 请求体上限，最多保留 200 个未过期挑战。部署时仍应配置反向代理限流。
+
+BLS 使用锁定版本的 `@noble/curves`，采用原生链的 Basic G2 NUL ciphersuite。`PUB_BLS_` / `SIG_BLS_` 解析遵循原生 affine little-endian + RIPEMD160 四字节校验；拒绝无穷点、越界坐标和非子群点。`bls-native-vector.json` 是用链内 C++ bls12-381 库及公开测试标量 1 生成的互操作向量，不含真实节点私钥。新增依赖通过 status/pnpm-lock.yaml 固定，Docker 使用锁文件安装。

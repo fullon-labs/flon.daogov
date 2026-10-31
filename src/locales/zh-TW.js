@@ -604,4 +604,9 @@ export default {
   "The current account does not belong to this network": "目前帳戶不屬於此網路",
   "Switch to a FullOn Testnet account in HuFu, then disconnect and reconnect the wallet.": "請在 HuFu 切換到 FullOn 測試網帳戶，然後中斷並重新連接錢包。",
   "Reconnect wallet": "重新連接錢包",
+  "Confirm proposal transaction": "確認提案交易",
+  "The transaction has been checked. The next step opens the HuFu signer directly.": "交易內容已檢查完成，下一步將直接開啟 HuFu 簽名視窗。",
+  "Account": "帳戶", "Execution actions": "執行 actions", "Argument size": "參數大小",
+  "Verify the account, contract, action, and arguments again in HuFu.": "請在 HuFu 簽名頁再次核對帳戶、合約、action 和參數。",
+  "Cancel": "取消", "Sign in HuFu": "在 HuFu 中簽名",
 };

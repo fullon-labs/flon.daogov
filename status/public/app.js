@@ -56,6 +56,7 @@ function renderDirectory({fromUrl=false}={}){
  if(!registry)return;
  const roles={active:'Active',standby:'Standby',unknown:'待确认'};
  const visible=registry.bps.filter(b=>b.network===selectedNetwork);
+ $('finalizer-link').href='/finalizers?network='+selectedNetwork;
  document.querySelectorAll('[data-network]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.network===selectedNetwork)));
  const groups=['active','standby','unknown'].map(role=>({role,bps:visible.filter(b=>b.role===role)})).filter(g=>g.bps.length);
  $('bp-select').innerHTML=groups.map(g=>`<optgroup label="${roles[g.role]} (${g.bps.length})">${g.bps.map(b=>`<option value="${esc(b.id)}">${esc(b.label)} · ${roles[g.role]}${b.stale?' · 数据过期':''}</option>`).join('')}</optgroup>`).join('');

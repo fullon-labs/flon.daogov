@@ -75,8 +75,7 @@ flon.daogov/
 
 ## 钱包连接
 
-- HuFu 内嵌 iframe：使用 `@fullon/flonjs` Client 读取当前账户
-- HuFu App/WebView：使用注入的 `window.HuFu` Provider 请求账户
+- HuFu App/WebView：统一使用注入的 `window.HuFu` Provider 请求账户与签名，不使用 iframe Client
 - 普通浏览器：使用 Anchor Link 和 HuFu 转发服务展示二维码
 - 会话按主网、测试网分别存储，恢复时校验 Chain ID
 - 断开连接会清除本地会话；DApp 不读取或保存私钥

@@ -136,6 +136,8 @@ sum(producer.allocated_rewards)
 - `max_steps` 较小时允许分批继续，不得跳过或重复 Epoch。
 - 无奖励、重复领取、重放交易不会重复付款。
 - claim 前后同时记录账户余额、`unclaimed_rewards`、`prodclaims`、`gasclaims`、voter claimed/unclaimed。
+- Keeper 在快照窗口内自动 claim 时，不再要求重做无 claim 窗口；必须保存对应不可逆 block trace，核对 `claimrewards` 为 executed、所有 transfer 收款人绑定正确 BP，并用 `after prodclaims - before prodclaims + 窗口内不可逆基础奖励付款` 重建本 Epoch 应计奖励。
+- 所有 `last_claim_time` 发生变化的 BP 必须逐一存在 trace；trace 区块必须落在 before/after 快照区间，trace 总付款必须与 BP 实际账户入账精确一致。漏 trace、错误收款人、未达 LIB或余额不符均为 FAIL。
 - Keeper 下线时，用户自行触发仍可完成领取。
 
 ## 6. 通过标准与证据
@@ -149,7 +151,7 @@ sum(producer.allocated_rewards)
 - 每个 BP 的 gross、绩效系数、自留、voter share、forfeited 和 `prodclaims` 精确到 `10^-8 FLON`。
 - GAS pool、Active/Standby 子池、节点 allocated 及 claims 精确守恒。
 - voter reward 的 global、producer、voter 三层账目精确守恒。
-- 若 before/after 跨越多个 Epoch、有其他 claim/转账干扰，结果标记 Blocked 并重新选择单 Epoch 窗口，不得推断通过。
+- 若 before/after 跨越多个 Epoch，结果标记 Blocked 并重新选择单 Epoch 窗口。单 Epoch 内发生 claim 时，只有完成 `prodclaims + 不可逆 trace + 账户入账` 重建且无其他无法解释的转账，才可判定通过。
 - DAO power/policy 在激活时冻结，之后 add/sub vote 不追溯改变该提案权重。
 - action bytes、风险等级和权限冻结；执行结果严格等于冻结内容。
 - 负向用例断言具体合约错误，不只判断非零退出码。

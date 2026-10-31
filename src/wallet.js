@@ -174,9 +174,10 @@ function assertFreshChainTime(info,now=Date.now()){
   if(!Number.isFinite(chainTime)||now-chainTime>90000||chainTime-now>30000)throw new Error('CHAIN_TIME_STALE');
 }
 function assertChain(chainId){if(chainId&&String(chainId)!==config().chainId)throw new Error('WALLET_CHAIN_ID_MISMATCH')}
-export function isHuFuApp(){
-  return navigator.userAgent.toLowerCase().includes('hufu')||
-    Boolean(window.HuFu||window.HuFuJSProvider);
+function isHuFuEmbeddedApp(){return navigator.userAgent.toLowerCase().includes('hufu')||Boolean(window.HuFuJSProvider||window.flutter_inappwebview)}
+export function isHuFuApp(){return isHuFuEmbeddedApp()||Boolean(window.HuFu)}
+export function hasHuFuExtension(){
+  return Boolean(window.HuFu)&&!isHuFuEmbeddedApp();
 }
 async function captureHuFuChainInfo(bridge){
   if(!bridge)return;
@@ -193,6 +194,7 @@ async function captureHuFuChainInfo(bridge){
 }
 async function prepareHuFu(){
   if(!isHuFuApp())return window.HuFu||null;
+  if(hasHuFuExtension())return window.HuFu;
   for(let count=0;count<30&&!window.HuFuJSProvider;count++)await wait(100);
   const bridge=window.HuFuJSProvider;
   if(bridge?.HuFuSwitchChain&&!hufuFullOnRequested){
@@ -244,6 +246,12 @@ async function getAnchorLink(){
   anchorLink=new AnchorLink({transport:new AnchorLinkBrowserTransport(),service:config().anchorService,chains:[{chainId:config().chainId,nodeUrl:rpcUrl()}]});
   return anchorLink;
 }
+function anchorDappInfo(){
+  const pageUrl=new URL(window.location.href);
+  pageUrl.search='';pageUrl.hash='';
+  const icon=document.querySelector('link[rel~="icon"]')?.href||'';
+  return [document.title,icon,pageUrl.href];
+}
 export async function restoreWallet(){
   const stored=load();if(!stored)return null;
   try{
@@ -264,7 +272,7 @@ export async function restoreWallet(){
       // An Anchor session cached by a normal browser must never be reused by
       // HuFu's embedded browser. It bypasses the native bridge and leaves the
       // user waiting for a signing surface that cannot open in this context.
-      if(isHuFuApp()){forget();return null}
+      if(isHuFuEmbeddedApp()){forget();return null}
       await rpcInfo();
       const session=await (await getAnchorLink()).restoreSession(appId());
       if(!session||session.auth.actor.toString()!==stored.account)throw new Error('SESSION_EXPIRED');
@@ -273,9 +281,12 @@ export async function restoreWallet(){
     return stored;
   }catch{forget();return null}
 }
-export async function connectWallet(){
+export async function connectWallet(providerChoice='auto'){
   const restored=await restoreWallet();if(restored)return restored;
-  const provider=isHuFuApp()?await prepareHuFu():window.HuFu;
+  // Desktop callers explicitly choose an installed HuFu extension or the
+  // Anchor QR hand-off. HuFu's embedded WebView keeps its native default.
+  const useHuFu=providerChoice==='hufu'||(providerChoice==='auto'&&isHuFuApp());
+  const provider=useHuFu?await prepareHuFu():null;
   if(provider?.requestAccountsHuFu){
     const response=await timeout(Promise.resolve(provider.requestAccountsHuFu()),30000,'HUFU_ACCOUNT_TIMEOUT');
     const account=normalizeAccount(response);
@@ -285,9 +296,14 @@ export async function connectWallet(){
     await assertAccountOnChain(account.account);
     return save({...account,chainId,provider:'hufu'});
   }
-  if(isHuFuApp())throw new Error('HUFU_PROVIDER_UNAVAILABLE');
+  if(useHuFu)throw new Error('HUFU_PROVIDER_UNAVAILABLE');
   await rpcInfo();
-  const link=await getAnchorLink(),identity=await link.login(appId()),session=identity.session;
+  // Anchor Link defaults to embedding the complete current location in the
+  // identity request. A wallet callback can leave a long opaque query/hash in
+  // that location, inflating the QR to version 40 and making it unscannable.
+  // Pass stable DApp metadata explicitly so transient callback data never
+  // becomes part of the next QR request.
+  const link=await getAnchorLink(),identity=await link.login(appId(),anchorDappInfo()),session=identity.session;
   assertChain(String(session.chainId));
   await assertAccountOnChain(session.auth.actor.toString());
   return save({account:session.auth.actor.toString(),permission:session.auth.permission.toString(),chainId:config().chainId,provider:'anchor'});
@@ -608,7 +624,7 @@ export async function transact(session,actions,options={}){
   // Browser storage alone cannot prove that the phone is still listening.
   // A fresh identity handshake brings the wallet to the foreground and binds
   // this transaction to a live channel, without replaying an earlier request.
-  const {session:anchorSession}=await link.login(appId());
+  const {session:anchorSession}=await link.login(appId(),anchorDappInfo());
   assertChain(String(anchorSession.chainId));
   if(anchorSession.auth.actor.toString()!==session.account||anchorSession.auth.permission.toString()!==session.permission)throw new Error('ACCOUNT_CHANGED');
   save({...session,provider:'anchor'});

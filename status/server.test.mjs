@@ -41,3 +41,24 @@ test('expired trial is removed before startup collection and cannot be returned 
  const check=await openStore(data);assert.equal(check.configs().length,0);assert.equal(check.history('expired').length,0);check.close();
  }finally{child.kill();await once(child,'exit');await rm(temp,{recursive:true,force:true})}
 });
+
+test('readiness HTTP endpoints serve the page and reject private-key fields and cross-origin writes',async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'finalizer-http-'));
+ const fixture=http.createServer(async(req,res)=>{let raw='';for await(const p of req)raw+=p;const b=JSON.parse(raw||'{}');let d;
+  if(req.url.endsWith('get_info'))d={chain_id:'test-chain',head_block_num:100,head_block_time:new Date().toISOString().replace('Z',''),last_irreversible_block_num:95};
+  else if(req.url.endsWith('get_producer_schedule'))d={active:{version:1,producers:[]}};
+  else if(req.url.endsWith('get_finalizer_info'))d={active_finalizer_policy:null,pending_finalizer_policy:null,last_tracked_votes:[]};
+  else d={rows:b.table==='producers'?[{owner:'einstein',is_active:true}]:[],more:false};res.setHeader('content-type','application/json');res.end(JSON.stringify(d));
+ });await new Promise(r=>fixture.listen(0,'127.0.0.1',r));
+ const probe=netServer();await new Promise(r=>probe.listen(0,'127.0.0.1',r));const port=probe.address().port;await new Promise(r=>probe.close(r));
+ await writeFile(path.join(temp,'config.json'),JSON.stringify({bps:[],discovery:[{network:'testnet',chainId:'test-chain',rpc:'http://127.0.0.1:'+fixture.address().port}]}));
+ const child=spawn(process.execPath,[new URL('./server.mjs',import.meta.url).pathname],{env:{...process.env,PORT:String(port),STATUS_ADMIN_PORT:'off',STATUS_CONFIG:path.join(temp,'config.json'),STATUS_DATA:path.join(temp,'data')},stdio:['ignore','pipe','pipe']});
+ try{await Promise.race([once(child.stdout,'data'),new Promise((_,reject)=>{const t=setTimeout(()=>reject(Error('startup timeout')),10000);t.unref()})]);const base='http://127.0.0.1:'+port;
+  assert.equal((await fetch(base+'/finalizers')).status,200);assert.equal((await fetch(base+'/finalizers.js')).status,200);
+  const d=await (await fetch(base+'/api/finalizers.json?network=testnet')).json();assert.equal(d.finalizers[0].account,'einstein');assert.equal(d.finalizers[0].readiness,'unknown');
+  const post=(body,origin=base)=>fetch(base+'/api/finalizers/challenge',{method:'POST',headers:{'content-type':'application/json',origin},body:JSON.stringify(body)});
+  assert.equal((await post({network:'testnet',account:'einstein'},'https://evil.invalid')).status,403);
+  const bad=await post({network:'testnet',account:'einstein',private_key:'TEST_DO_NOT_ACCEPT'});assert.equal(bad.status,400);assert.equal((await bad.json()).error,'UNEXPECTED_FIELDS_NO_PRIVATE_KEYS');
+  assert.equal((await post({network:'testnet',account:'einstein'})).status,400);
+ }finally{child.kill();await once(child,'exit');await new Promise(r=>fixture.close(r));await rm(temp,{recursive:true,force:true})}
+});
