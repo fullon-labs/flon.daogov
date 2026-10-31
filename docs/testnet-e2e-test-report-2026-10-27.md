@@ -1,4 +1,4 @@
-# FLON 测试网端到端测试报告（执行中）
+# FLON 测试网端到端测试报告（核心门禁完成）
 
 ## 1. 执行信息
 
@@ -7,10 +7,10 @@
 | Run ID | `testnet-e2e-20261027T033545Z` |
 | 测试网 RPC | `https://t4.flon.network` |
 | Chain ID | `18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f` |
-| Core | `v0.9.0` |
+| Core | `v0.9.2` |
 | 钱包 | 本地 `fuwal` / `flontest`，未导出私钥 |
 | 证据目录 | `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/` |
-| 当前结论 | **执行中，尚不能批准主网发布** |
+| 当前结论 | **核心发布门禁全部通过，具备主网发布条件（本次不启用 Savanna）** |
 
 ## 2. 已验证结果
 
@@ -160,6 +160,33 @@
 - PASS：历史空 slot 的 proposer-policy 生效边界为 slot `1693287397`（v7 区块 `21792038`）；该区块头独立携带 `new_producer_schedule.version=8` 及精确 21 席 policy，并非根据 `bpstats` 循环反推。它比首个 v8 已提交区块 slot `1693287445` 早 48 slots。空 slot 按该 policy 边界解析、produced slot 按已提交区块头 producer 解析后，22 名 producer 的 `expected/produced/missed/idle_skipped` 全部逐行精确匹配，score 0。Epoch 798 的“真实 produced 少记一块并转成他人 miss”未复现，slot resolver 发布阻断项解除。
 - 证据：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v091-active-standby-restore-20261030/` 与 `v091-epoch840-slot-recompute-20261030/`。
 
+### 2026-10-31 普通 flon-node v0.9.2 镜像修复与重建
+
+- PASS（根因修复）：Core 修复提交 `2188e4f94a1e9fe564a31c33e497b464556f3650` 恢复已激活 `ACTION_DATA_TO_JSON` 的共识兼容 description hash，并新增精确 builtin digest 回归断言；全量 1,115 项单测通过。
+- PASS（纯净构建）：以固定 Core revision、`linux/amd64`、普通 `core` profile 完成 Release 构建。Docker 构建并发已改为可配置且默认 `BUILD_JOBS=1`，Docker 仓库提交 `47d8684` 已推送至 `main`；解决大型链编译单元并发导致的 OOM。
+- PASS（镜像验证）：本地镜像 ID 为 `sha256:177935f5747e4c59aaf3be6837a8ef30aef68fe4f14d7502590bc5b6aa638ace`，完整版本为 `v0.9.2-2188e4f94a1e9fe564a31c33e497b464556f3650`。隔离临时节点启动至 head/LIB 1，`ACTION_DATA_TO_JSON` 摘要精确为测试链已激活值 `cd51c8e771fd38930275c515795748d7ecbbadd6eb48b86f08ad71ca9e89b667`；验证后临时容器已删除。
+- PASS（发布镜像）：`ghcr.io/fullon-labs/floncore/flon-node:v0.9.2` 已更新，远端 manifest digest 为 `sha256:b430eac5afec9992cb64e775ed07531beb695275dfbfb9d682c09c2a834e6586`，替换旧坏 digest `sha256:42327766e4c314231569a49c8f1dab5ce2e2f646e0033360db6c39de78950a67`。
+- 证据：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v092-node-upgrade-20261030T2142+0800/ordinary-image-rebuild-20261031.md`。
+
+### 2026-10-31 v0.9.2 升级后自然 Epoch 867 检查点
+
+- PASS（只读前置核对）：测试链 ID 精确为 `18b4d5837d83a8f7203ea57cb7ab37b9cef59547ea307e70b1bf1103cb06043f`，RPC 返回版本 `v0.9.2`；最后采样 Head/LIB 为 `21807145/21807143`，链持续推进且 LIB 仅落后 2 块。
+- PASS（实时统计不变量）：Active schedule version 11 为 19 席、无 pending/proposed schedule。Epoch 867 为完整样本，`active_bp_count=19`、`failed_bp_count=0`、`network_incident=0`；19 行合计 `3418 expected = 3418 produced + 0 missed`，另有 `3782 idle_skipped`，逐行均满足 `expected=produced+missed`。
+- WAIT（自然封存中）：Epoch 867 边界后 `rewardseal` 无需外部交易即从 phase 1/stage 2 推进至 phase 2/stage 2，证明 v0.9.2 `onblock` 有界状态机正在工作；但最后检查点仍为 `next_epoch_to_close=867`、`closed=0`。当前网络空 slot 较多，封存只能随实际出块逐步推进。不得在 `closed=1` 前宣告升级后奖励严格守恒门禁通过。
+- SAFE STOP：本轮未广播交易，未调用 `closeepoch`，未修改 Keeper、节点、合约或 Epoch/治理配置。后续在 Epoch 867 自然封存后继续执行不可逆区块头/onblock/`bpstats` 逐 slot 三方核算及 claim-aware 奖励守恒。
+- PASS（自然封存完成）：后续只读检查确认 `rewardseal.phase=3`、Epoch 867 `closed=1`，`flon::rewardepoch` 与 `voter.reward::epochstate` 的 `next_epoch_to_close` 均推进至 868。链上生成 19 条 Epoch 867 `prodclaims`，合计精确 `2709.60172501 FLON`。
+- PASS（Keeper 可自动领取）：测试网 Keeper 容器 `flon-daogov-keeper-testnet` 当前 Docker health 为 `healthy`，运行镜像 `ghcr.io/fullon-labs/flon.daogov-keeper:0.2.0`，配置为指定测试链 ID、`broadcast=true`、专用 `claimer` permission、每小时扫描。此前 3 分钟超时未复现，最近一轮逐 BP 交易均在约 24–27 秒内由 LIB 确认。
+- INFO：Keeper 的一小时等待从整轮顺序领取结束后开始；上一轮结束于 `2026-10-31T06:18:59Z`，所以下一轮预计约 `07:18:59Z`（北京时间 15:18:59）扫描，而不是 Epoch 封存后立即触发。继续保存本轮 19 笔交易 ID、区块与 LIB 证据，再完成 claim-aware 奖励守恒。
+- PASS（授权加速领取）：经用户明确授权，仅重启测试网 Keeper 容器一次；启动后立即识别精确 19 个待领取 BP 并顺序广播。19 笔交易区块为 `21807253..21807307`，全部 block receipt 为 `executed`，最后检查时均已不高于 LIB `21807308`，未发生失败、重复拒绝或 3 分钟确认超时。
+- PASS（领取后账本）：Epoch 867 的 19 条 `prodclaims` 已全部删除，所有 producer `unclaimed_rewards` 均归零，19 名受益 BP 的 `last_claim_time` 均在本次窗口内更新；删除前 claim 合计与 producer unclaimed 合计精确相等，均为 `2709.60172501 FLON`。Keeper 领取后恢复 running/healthy。
+- 证据：19 笔完整交易 ID、金额、区块及执行/LIB 结果见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v092-post-upgrade-epoch867-20261031T0642Z/keeper-claim-20261031T0707Z.md`。
+- 证据：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v092-post-upgrade-epoch867-20261031T0642Z/summary.md`。
+- PASS（不可逆区块头）：Epoch 867 的 7200 个 slot 为 `[1693480038,1693487237]`；不可逆实际区块精确为 `21803664..21807081` 共 3418 个。最终核算时 LIB 已达 `21807424`，覆盖验证最后一个 Epoch 区块所需的后继 trace 区块 `21807082`。
+- PASS（隐式 `onblock` trace）：对每个实际区块 `N` 读取不可逆 trace 区块 `N+1` 中唯一的隐式 `flon::onblock`，逐项比对 header ID 链接、slot、producer 与 previous block ID；3418/3418 全部一致，0 mismatch。
+- PASS（历史排班独立重算）：按链上 `prodconf.idle_block_interval_ms=12000`（24 slots）及历史 proposer policy 独立逐 slot 重算。Epoch 内已纳入区块 `21803752`/slot `1693480126` 的 v9→v10（移除 `lovelace/maxwell`）和区块 `21807066`/slot `1693486890` 的 v10→v11（插入 `mendel`）两次边界。
+- PASS（`bpstats` 三方核算）：不可逆 header/隐式 `onblock`/链上 `bpstats` 三方闭合；19/19 producer 行的 `expected/produced/missed/idle_skipped` 与独立结果逐项精确相等。总计 `3418 expected = 3418 produced + 0 missed`，另有 `3782 idle_skipped`，并满足 `3418 + 0 + 3782 = 7200` 全 Epoch slot 守恒。
+- 证据：`artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v092-epoch867-slot-recompute-20261031/summary.md`、`summary.json`、`recompute_epoch867.py`。
+
 ### 2026-10-28 18:00 UTC 只读复查
 
 - 测试链 ID 核对通过；head/LIB 为 `21782084/21782054`。快照见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/live-check-20261028T1800Z/`。
@@ -174,4 +201,13 @@
 
 ## 5. 发布门禁
 
-当前不得宣告“可发布主网”。只有第 4 节的核心治理执行闭环、Epoch 奖励核算及 voter refund 完成且无账务差异，才可给出主网发布建议。
+**PASS：具备主网发布条件（本次明确不启用 Savanna）。**
+
+- Core `v0.9.2` 全量 1,115 项单测通过；已激活 protocol feature 的兼容镜像已重建并发布。
+- 7 台测试节点逐台返回指定测试链 ID 和 `v0.9.2`，容器全部运行、零重启，Head/LIB 同步；证据见 `artifacts/testnet-e2e/testnet-e2e-20261027T033545Z/v092-node-inventory-20261031T1603+0800/summary.md`。
+- BP 竞选、节点投票、撤票退款、Active/Standby 切换、治理提案、Treasury、BP 注销与自质押退款闭环均已通过。
+- Epoch 867 在 v0.9.2 上自然封存；不可逆区块头、隐式 `onblock`、链上 `bpstats` 三方逐 slot 独立核算精确闭合。
+- Epoch 867 的 claim-aware 奖励守恒通过；Keeper 19 笔领取均执行成功并由 LIB 确认，领取后账本归零且金额守恒。
+- 主网与测试网 DApp 已发布提交 `7880b48`，钱包二维码与未选框显示修复的 60 项前端测试、生产构建、公网资源和运行时链配置均核对通过。
+
+历史 FAIL/WAIT 条目保留用于审计，均已由后续明确标记的 PASS 复测解除，不再构成当前发布阻断。
