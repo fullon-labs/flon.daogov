@@ -28,6 +28,11 @@ test('app icon styles do not override the wallet transport QR code',()=>{
   assert.doesNotMatch(styles,/(?:^|})svg\{width:24px;height:24px/);
 });
 
+test('unchecked BP vote controls do not display a checkmark',()=>{
+  assert.match(styles,/\.check svg\{width:15px;opacity:0\}/);
+  assert.match(styles,/\.check-control>input:checked\+\.check svg\{opacity:1\}/);
+});
+
 test('desktop Web lets users choose an installed extension or Anchor QR',()=>{
   const start=wallet.indexOf('export async function connectWallet');
   const end=wallet.indexOf('export function autoConnectHuFuWallet()',start);
@@ -37,5 +42,11 @@ test('desktop Web lets users choose an installed extension or Anchor QR',()=>{
   assert.match(app,/data-action="connect-wallet-hufu"/);
   assert.match(app,/data-action="connect-wallet-qr"/);
   assert.match(branch,/providerChoice==='hufu'/);
-  assert.match(branch,/link\.login\(appId\(\)\)/);
+  assert.match(branch,/link\.login\(appId\(\),anchorDappInfo\(\)\)/);
+});
+
+test('Anchor QR metadata excludes transient query and callback fragments',()=>{
+  assert.match(wallet,/function anchorDappInfo\(\)/);
+  assert.match(wallet,/pageUrl\.search='';pageUrl\.hash=''/);
+  assert.match(wallet,/return \[document\.title,icon,pageUrl\.href\]/);
 });

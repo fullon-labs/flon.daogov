@@ -253,6 +253,12 @@ async function getAnchorLink(){
   anchorLink=new AnchorLink({transport:new AnchorLinkBrowserTransport(),service:config().anchorService,chains:[{chainId:config().chainId,nodeUrl:rpcUrl()}]});
   return anchorLink;
 }
+function anchorDappInfo(){
+  const pageUrl=new URL(window.location.href);
+  pageUrl.search='';pageUrl.hash='';
+  const icon=document.querySelector('link[rel~="icon"]')?.href||'';
+  return [document.title,icon,pageUrl.href];
+}
 export async function restoreWallet(){
   const stored=load();if(!stored)return null;
   try{
@@ -299,7 +305,12 @@ export async function connectWallet(providerChoice='auto'){
   }
   if(useHuFu)throw new Error('HUFU_PROVIDER_UNAVAILABLE');
   await rpcInfo();
-  const link=await getAnchorLink(),identity=await link.login(appId()),session=identity.session;
+  // Anchor Link defaults to embedding the complete current location in the
+  // identity request. A wallet callback can leave a long opaque query/hash in
+  // that location, inflating the QR to version 40 and making it unscannable.
+  // Pass stable DApp metadata explicitly so transient callback data never
+  // becomes part of the next QR request.
+  const link=await getAnchorLink(),identity=await link.login(appId(),anchorDappInfo()),session=identity.session;
   assertChain(String(session.chainId));
   await assertAccountOnChain(session.auth.actor.toString());
   return save({account:session.auth.actor.toString(),permission:session.auth.permission.toString(),chainId:config().chainId,provider:'anchor'});
