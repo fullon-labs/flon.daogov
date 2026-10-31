@@ -33,6 +33,24 @@ test('unchecked BP vote controls do not display a checkmark',()=>{
   assert.match(styles,/\.check-control>input:checked\+\.check svg\{opacity:1\}/);
 });
 
+test('BP directory filters display live category and selection counts',()=>{
+  assert.equal((html.match(/data-node-filter-count/g)||[]).length,4);
+  assert.match(html,/data-node-filter="suspended">已暂停/);
+  assert.match(html,/data-node-selected-count/);
+  assert.match(app,/function updateNodeFilterCounts\(\)/);
+  assert.match(app,/counts=\{all:rows\.length,active:/);
+  assert.match(app,/suspended:rows\.filter\(row=>row\.dataset\.status==='suspended'\)\.length/);
+  assert.match(app,/selected\.textContent=String\(selectedCount\(\)\)/);
+  assert.match(styles,/\[data-node-filter-count\][^{]*,\.node-directory-toolbar \.tabs \[data-node-selected-count\]/);
+});
+
+test('suspended BPs remain visible in a dedicated filter',()=>{
+  assert.doesNotMatch(app,/\.filter\(producer=>producer\.status!==['"]suspended['"]\)/);
+  assert.match(app,/selectList\.innerHTML=electionState\.producers\.map/);
+  assert.match(styles,/\.select-node\.status-suspended\{border-color:/);
+  assert.match(styles,/\.select-node\.status-suspended \.node-main b\{color:var\(--danger\)\}/);
+});
+
 test('desktop Web lets users choose an installed extension or Anchor QR',()=>{
   const start=wallet.indexOf('export async function connectWallet');
   const end=wallet.indexOf('export function autoConnectHuFuWallet()',start);
