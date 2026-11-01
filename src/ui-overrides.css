@@ -3,7 +3,7 @@
 .proposal-type-picker legend{grid-column:1}
 
 /* Keep mobile navigation compact; wallet chrome supplies its own back action. */
-.header-wallet,.mobile-bp-apply{display:none}
+.mobile-bp-apply{display:none}
 .profile-help{display:flex;justify-content:flex-end;margin:12px 0}
 .profile-help button{color:var(--brand);font-size:12px;min-height:44px}
 @media(max-width:899px){
@@ -18,8 +18,7 @@
   .top-title .network span::after{content:'Mainnet';font-size:9px;padding:3px 5px;border-radius:5px;background:var(--soft);color:var(--muted)}
   html[data-network="testnet"] .top-title .network span::after{content:'Testnet'}
   .top-actions{gap:4px}
-  .header-wallet{display:block;max-width:100px;min-height:44px;padding:0 6px;font-size:11px;color:var(--deep)}
-  .header-wallet span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .header-wallet{display:none}
   .language-trigger{min-width:40px;padding:8px}
   .language-trigger [data-language-label],.language-trigger b{display:none}
   .node-page-heading{display:none}

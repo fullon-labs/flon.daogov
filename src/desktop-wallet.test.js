@@ -6,6 +6,7 @@ const html=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
 const app=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
 const wallet=fs.readFileSync(new URL('./wallet.js',import.meta.url),'utf8');
 const styles=fs.readFileSync(new URL('./styles.css',import.meta.url),'utf8');
+const overrides=fs.readFileSync(new URL('./ui-overrides.css',import.meta.url),'utf8');
 
 test('desktop wallet entry opens QR directly only without a local extension',()=>{
   assert.match(html,/data-action="account" data-desktop-wallet-connect/);
@@ -16,6 +17,8 @@ test('desktop wallet entry opens QR directly only without a local extension',()=
 test('desktop wallet entry stays hidden below the desktop breakpoint',()=>{
   assert.match(styles,/\.desktop-wallet-button\{display:none\}/);
   assert.match(styles,/@media\(min-width:900px\)[\s\S]*\.desktop-wallet-button\{display:flex/);
+  assert.match(overrides,/@media\(max-width:899px\)\{[\s\S]*?\.header-wallet\{display:none\}/);
+  assert.doesNotMatch(overrides,/^\.header-wallet[^\n]*display:none/m);
 });
 
 test('connected wallet entry displays the account name instead of provider name',()=>{
