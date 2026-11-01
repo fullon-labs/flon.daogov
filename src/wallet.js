@@ -1,6 +1,6 @@
 import {loadProducerEpochs} from './producer-status.js';
 import {Client} from '@fullon/flonjs';
-import {latestCompleteEpoch,summarizeBPProduction} from './production.js';
+import {latestCompleteEpoch,rewardEpochsEnabled,summarizeBPProduction} from './production.js';
 import {summarizeNetworkEconomics} from './network-summary.js';
 import {readTablePages} from './table-pages.js';
 
@@ -489,9 +489,11 @@ export async function loadElection(){
   return {producers,activeTarget,activeCount:active.size,...summarizeNetworkEconomics(producers,stakeRows.rows||[],governanceRows.rows?.[0])};
 }
 export async function loadNetworkProduction(){
-  const epochRows=await rpcPost('/v1/chain/get_table_rows',{
-    json:true,code:'flon',scope:'flon',table:'epochstats',reverse:true,limit:24,
-  });
+  const [epochRows,globalRows]=await Promise.all([
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'epochstats',reverse:true,limit:24}),
+    rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'global',limit:1}),
+  ]);
+  if(!rewardEpochsEnabled(globalRows.rows?.[0]))return {available:false,reason:'rewards_disabled'};
   const epoch=latestCompleteEpoch(epochRows.rows||[]);
   if(!epoch)return {available:false,reason:'awaiting'};
   const statsRows=await rpcPost('/v1/chain/get_table_rows',{

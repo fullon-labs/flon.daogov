@@ -9,6 +9,12 @@ export function latestCompleteEpoch(rows=[]){
     .reduce((latest,row)=>Number(row.epoch_id)>Number(latest?.epoch_id??-1)?row:latest,null);
 }
 
+export function rewardEpochsEnabled(globalRow){
+  const value=String(globalRow?.reward_started_time||'');
+  const timestamp=Date.parse(/[zZ]|[+-]\d\d:\d\d$/.test(value)?value:`${value}Z`);
+  return Number.isFinite(timestamp)&&timestamp>=Date.UTC(2000,0,1);
+}
+
 export function summarizeBPProduction(rows=[]){
   const totals=rows.reduce((result,row)=>({
     expected:result.expected+blockCount(row?.expected_blocks),
