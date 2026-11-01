@@ -50,7 +50,7 @@ scripts/testnet-e2e.sh bp-claim-refund --env /tmp/flon-testnet-e2e.env --broadca
 | ID | 场景 | 预期 |
 |---|---|---|
 | VOTE-01 | addvote 超余额 | 拒绝 |
-| VOTE-02 | 正常 `addvote` | FLON 托管、铸造等额 GLON、DAO power 自动同步 |
+| VOTE-02 | 正常 `addvote` | FLON 托管、等额内部 POWER 自动同步至 DAO |
 | VOTE-03 | A=20、B=30、C=50 | `votealloc` 成功，合计等于 locked stake |
 | VOTE-04 | allocations 总额不等 | 拒绝 |
 | VOTE-05 | 重复或未按账户名排序 | 拒绝 |
@@ -58,7 +58,7 @@ scripts/testnet-e2e.sh bp-claim-refund --env /tmp/flon-testnet-e2e.env --broadca
 | VOTE-07 | 未注册或 inactive producer | 拒绝 |
 | VOTE-08 | 重复相同分配 | no-op 拒绝 |
 | VOTE-09 | 下一自然 Epoch | pending 被消费，allocations/producer votes 精确更新 |
-| VOTE-10 | 部分 `subvote` | 等额 GLON 销毁、power 降低、生成 refund |
+| VOTE-10 | 部分 `subvote` | 等额内部 POWER 扣减、生成 refund |
 | VOTE-11 | 第二笔未结退款 | 再次 subvote 拒绝 |
 | VOTE-12 | 72 小时前 `voterefund` | 拒绝 |
 | VOTE-13 | 到期赎回 | FLON 返回 owner，退款记录删除 |
@@ -66,7 +66,7 @@ scripts/testnet-e2e.sh bp-claim-refund --env /tmp/flon-testnet-e2e.env --broadca
 | VOTE-15 | 四 BP 改回三 BP | 被移除 BP 的增量精确扣除，其余 BP 按新值更新 |
 | VOTE-16 | Epoch 前多次修改 | 只应用最终版本，不叠加中间版本，不重复加票或减票 |
 | VOTE-17 | 分配后增加本金 | 必须重新提交总额等于新 locked stake 的完整 allocation |
-| VOTE-18 | 部分撤票后重分配 | GLON/DAO power、locked stake、allocation 总额同步降低且历史奖励不追溯 |
+| VOTE-18 | 部分撤票后重分配 | DAO POWER、locked stake、allocation 总额同步降低且历史奖励不追溯 |
 | VOTE-19 | Epoch 边界原子性 | pending 消费、voter/allocations/producer totals 同批生效，不暴露半更新状态 |
 | VOTE-20 | 连续两 Epoch 稳定性 | 无新投票时不重复消费，不再次改变 producer totals |
 
@@ -135,7 +135,7 @@ scripts/testnet-e2e.sh dao-propose-action --env /tmp/flon-testnet-e2e.env --broa
 | TR-09 | closegrant | 仅合法终态/过期成功，重复关闭拒绝 |
 | TR-10 | 总账守恒 | liquid、reserved、paid、累计入金和 token balance 一致 |
 
-`reserve/pay/release` 当前是 L3，而现有总治理权低于 L3 的 10,000 GLON 门槛。必须通过正常 `addvote` 增加真实 GLON power，不得用管理员临时 `setpower` 绕过。
+`reserve/pay/release` 当前是 L3，而现有总治理权低于 L3 的 10,000 POWER 门槛。必须通过正常 `addvote` 增加真实内部 POWER，不得用管理员临时 `setpower` 绕过。
 
 ## G. 共享测试网禁止自动执行
 

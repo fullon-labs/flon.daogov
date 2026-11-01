@@ -79,7 +79,7 @@
 | 资产/账户 | 开始 | 结束 | 预期变化 | 实际变化 |
 |---|---:|---:|---:|---:|
 | Voter FLON | | | | |
-| Voter GLON | | | | |
+| Voter internal POWER | | | | |
 | BP self-stake/refund | | | | |
 | Treasury liquid/reserved/paid | | | | |
 

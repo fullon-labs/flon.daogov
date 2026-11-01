@@ -6,7 +6,7 @@
 
 治理中心把两类相关但权限不同的治理统一到一个入口：
 
-1. **网络治理**：BP 候选人注册、节点排名、选民质押 FLON、获得 GLON、选择或调整 BP、领取投票奖励。
+1. **网络治理**：BP 候选人注册、节点排名、选民锁定 FLON、获得内部 POWER、选择或调整 BP、领取投票奖励。
 2. **DAO 治理**：创建提案、社区附议、正式投票、等待执行、链上执行和结果审计。
 
 统一入口不等于合并合约。网络治理由 `flon.system`、`voter.reward` 和 `flon.token` 承担；DAO 治理由独立治理合约承担。前端只负责读取、解释、构造交易和调用 HuFu 钱包签名，不能代替链上判断结果。
@@ -16,8 +16,8 @@
 - 统一使用 **Block Producer（BP）** 这一 DPoS/Antelope 社区通用术语。
 - 所有影响资产、票权或执行权限的动作都由 HuFu 钱包明确展示后签名。
 - 排名、票权、奖励、提案状态和执行结果以链上状态为准；索引服务只加速查询。
-- GLON 是不可转让的治理凭证，不是可交易资产，也不承诺固定收益。
-- 节点投票使用锁定的 FLON 作为排名权重；锁定 FLON 后生成的 GLON 仅作为 DAO 治理凭证。两者不能混用，也不能默认为同一次授权或同一套快照。
+- POWER 是 `dao.gov` 内部记录的数值治理权，不是 Token、不可转让或支付，也不承诺固定收益。
+- 节点投票使用锁定的 FLON 作为排名权重；锁定 FLON 后由系统同步等额内部 POWER。两者用途不同，不能把 BP 排名票与 DAO 快照混为同一次授权。
 - 每个关键状态展示生效 epoch、截止时间、区块号和交易 ID，避免“已提交”与“已生效”混淆。
 
 ## 2. HuFu 内的入口与形态
@@ -49,7 +49,7 @@
 
 - 当前网络：测试网或主网，使用明显不同的颜色和标签
 - 当前账户名和本地钱包昵称
-- FLON 可用余额、已投票 FLON、GLON 余额
+- FLON 可用余额、已投票 FLON、内部 POWER
 - 待领取奖励
 - 网络同步状态和数据对应区块高度
 
@@ -59,7 +59,7 @@
 
 | 区域 | 内容 | 主要动作 |
 | --- | --- | --- |
-| 我的治理权 | FLON、已质押 FLON、GLON、当前选择的 BP 数量 | 增加投票、调整节点、撤票 |
+| 我的治理权 | FLON、已锁定投票本金、内部 POWER、当前选择的 BP 数量 | 增加投票、调整节点、撤票 |
 | 网络状态 | Active BP 数量、30 个 Standby、当前 epoch、下次换届时间 | 查看完整排名 |
 | 奖励 | 已结算、待结算、最近结算 epoch | 领取奖励、查看明细 |
 | 治理任务 | 待附议、投票中、待执行、我发起的提案 | 继续处理 |
@@ -98,7 +98,7 @@
 
 申请分为四步：
 
-1. **资格检查**：账户、最低自质押、GLON/FLON 条件、未处于处罚期。
+1. **资格检查**：账户、最低自质押、POWER/FLON 条件、未处于处罚期。
 2. **节点信息**：显示名称、网站、X、地区、技术联系人、状态页、隐私政策。
 3. **技术信息**：BP 公钥或 authority、P2P/API 地址、监控证明。
 4. **确认签名**：完整展示链、账户、自质押、奖励分享比例和注册 action。
@@ -132,18 +132,18 @@
 
 ### 5.1 投票模型
 
-- 用户用 FLON 增加投票本金，链上生成等额 GLON。
+- 用户用 FLON 增加投票本金，系统向 `dao.gov` 同步等额内部 POWER。
 - 一个账户最多选择 30 个 BP，并为每个 BP 指定 FLON 票数；所有分配之和不得超过该账户已锁定的投票本金。
-- 例如锁定 100 FLON，可分配为 BP A 20、BP B 30、BP C 50。未分配余额不计入任何 BP 排名，任何情况下都不能把同一份本金复制给多个 BP。锁定操作同时生成等额 GLON，但 GLON 仅参与 DAO 治理。
+- 例如锁定 100 FLON，可分配为 BP A 20、BP B 30、BP C 50。未分配余额不计入任何 BP 排名，任何情况下都不能把同一份本金复制给多个 BP。锁定操作同时在 `dao.gov` 记录等额 POWER，但 POWER 仅参与 DAO 治理。
 - 用户可随时修改 BP 列表；新分配从下一 epoch 生效。
-- `subvote` 时对应 GLON立即交回 issuer 并销毁/retire，不能继续参与新 DAO 提案；BP 排名和奖励票权在下一个 epoch 边界移除。
+- `subvote` 时对应内部 POWER 立即扣减，不能继续参与新 DAO 提案；BP 排名和奖励票权在下一个 epoch 边界移除。
 - 六小时为一个奖励 epoch。页面必须分别显示“当前配置”和“下个 epoch 生效配置”。
 
 ### 5.2 投票页面
 
 ```text
 ┌ 当前票权 ─────────────────┐
-│ 1,200 GLON   已选 6 / 30   │
+│ 1,200 POWER  已选 6 / 30   │
 │ 本 epoch：每节点 200        │
 │ 待生效：每节点 171.428...   │
 └───────────────────────────┘
@@ -163,9 +163,9 @@
 
 | 用户目的 | 链上动作 | 生效说明 |
 | --- | --- | --- |
-| 增加本金 | `flon.system::addvote(voter, vote_staked)` | FLON 锁定、GLON生成；排名/奖励权重下一 epoch 生效 |
+| 增加本金 | `flon.system::addvote(voter, vote_staked)` | FLON 锁定、内部 POWER 同步；排名/奖励权重下一 epoch 生效 |
 | 调整节点 | `flon.system::voteproducer(voter, producers[])` | 不改变本金；新分配下一 epoch 生效 |
-| 撤回本金 | `flon.system::subvote(voter, vote_staked)` | GLON立即退出治理；排名/奖励权重下一 epoch 移除，FLON按退款规则返回 |
+| 撤回本金 | `flon.system::subvote(voter, vote_staked)` | 内部 POWER 立即退出治理；排名/奖励权重下一 epoch 移除，FLON按退款规则返回 |
 
 如果用户一次同时增加本金并选择节点，HuFu 可以构造一笔含多个 action 的原子交易；签名页仍需逐项展示含义。
 
@@ -184,17 +184,17 @@
 
 ## 6. DAO 治理
 
-### 6.1 GLON 在 DAO 中的角色
+### 6.1 内部 POWER 在 DAO 中的角色
 
-GLON 表示锁定 FLON 所形成的治理权。DAO 合约应读取确定性快照，而不是直接读取用户点击投票时的实时余额。
+POWER 表示锁定 FLON 所形成、由 `dao.gov` 内部记录的数值治理权。DAO 合约读取确定性快照，而不是直接读取用户点击投票时的实时余额。
 
 建议规则：
 
 - 提案进入正式投票时记录 `snapshot_epoch` 或快照根。
-- 只有快照时已生效的 GLON 参与该提案。
-- 快照后新增 GLON不能参与当前提案，避免临界时刻买票。
-- `subvote` 立即销毁 GLON后，用户不能参与新提案；对已经投出的历史选票是否保留，由合约在提案创建时固定规则，不能由前端决定。
-- GLON禁止用户间转账；否则节点投票本金所有权、赎回权和 DAO 票权会分离。
+- 只有快照时已生效的 POWER 参与该提案。
+- 快照后新增 POWER 不能参与当前提案，避免临界时刻增加票权。
+- `subvote` 立即扣减 POWER 后，用户不能用已退出的治理权参与新提案；历史提案按已冻结快照结算。
+- POWER 不存在用户间转账接口，避免节点投票本金所有权、赎回权和 DAO 票权分离。
 
 ### 6.2 提案生命周期
 
@@ -268,7 +268,7 @@ GLON 表示锁定 FLON 所形成的治理权。DAO 合约应读取确定性快�
 | `createprop` | 创建草稿，保存正文 URI/hash、类型和执行计划 |
 | `submitprop` | 进入附议期并冻结提案版本 |
 | `endorse` | 按快照前置规则附议，一账户一条记录 |
-| `startvote` | 达门槛后创建 GLON 快照并进入正式投票 |
+| `startvote` | 达门槛后创建 POWER 快照并进入正式投票 |
 | `castvote` | 赞成、反对或弃权；是否允许改票必须由参数固定 |
 | `finalize` | 截止后确定 quorum 与结果，进入 Timelock 或失败状态 |
 | `execute` | Timelock 到期后执行白名单 action；任何账户均可触发 |
@@ -279,7 +279,7 @@ GLON 表示锁定 FLON 所形成的治理权。DAO 合约应读取确定性快�
 
 - 提案版本冻结与正文哈希
 - 附议记录和防重复
-- GLON 快照/历史票权读取
+- POWER 快照/历史票权读取
 - `proposal_id + voter` 唯一投票记录
 - quorum、通过率和 Timelock 的提案级快照
 - action 白名单、资产限额和目标账户限制
@@ -301,9 +301,9 @@ HuFu App
         │
         ├── flon.system      BP 注册、节点投票、BP 奖励、epoch
         ├── voter.reward     投票人历史票权与奖励
-        ├── flon.token       FLON 与不可转让 GLON
+        ├── flon.token       FLON 资产
         ├── bp.registry      BP 扩展资料（建议新增）
-        ├── dao.gov          提案、附议、GLON 快照、投票、Timelock、白名单执行
+        ├── dao.gov          内部 POWER、提案、附议、快照、投票、Timelock、白名单执行
         └── dao.treasury     资产白名单、预算预留、分期付款、释放与到期关闭
 
 Read-only Indexer
@@ -316,7 +316,7 @@ Read-only Indexer
 
 | 数据 | 权威来源 | 索引服务职责 |
 | --- | --- | --- |
-| FLON/GLON 余额 | 链上 token tables | 聚合展示，不得覆盖链上值 |
+| FLON 余额 / 内部 POWER | `flon.token` / `dao.gov::powers` | 聚合展示，不得覆盖链上值 |
 | 当前与待生效节点选择 | `flon.system` / `voter.reward` tables | 快速查询和历史展示 |
 | BP 排名与奖励 | 链上 tables + epoch 记录 | 统计、分页、曲线 |
 | 在线率 | 链上出块统计 | 按 24h/7d 聚合 |
@@ -331,7 +331,7 @@ Read-only Indexer
 - 网络和 chain ID
 - 发起账户与 permission
 - 合约、action 和人类可读说明
-- FLON/GLON 数量变化
+- FLON / 内部 POWER 数量变化
 - 节点列表或提案 ID
 - 当前 epoch、预计生效 epoch或快照 epoch
 - 费用/资源消耗
@@ -363,7 +363,7 @@ Read-only Indexer
 - 治理合约只可执行白名单目标/action；升级白名单本身也必须走高门槛治理。
 - 资金提案使用单笔、周期和总预算上限。
 - 合约升级、权限修改和大额资金设置更高 quorum、更高通过率和更长 Timelock。
-- 治理采用 L1–L4 action 风险分级，并同时检查最低全网 GLON 总票权、quorum、
+- 治理采用 L1–L4 action 风险分级，并同时检查最低全网 POWER、quorum、
   通过率和绝对赞成票；BP 席位、治理权限、金库控制和关键升级属于 L4。
 - `riskconfigs` 保存等级规则，`actpolicies` 保存 action 分类，`policysnaps`
   在 `activate` 时冻结提案安全参数；多 action 提案采用最高等级。
@@ -379,7 +379,7 @@ Read-only Indexer
 
 - 概览、Active/Standby/Candidate 列表
 - BP 详情、排名、链上在线率
-- 我的 FLON/GLON、当前/待生效投票、奖励明细
+- 我的 FLON/POWER、当前/待生效投票、奖励明细
 - DAO 提案列表和详情
 
 ### Phase 2：节点交易闭环
@@ -406,7 +406,7 @@ Read-only Indexer
 - 用户可在 HuFu 内完成 BP 注册、加票、换票、撤票和奖励领取，不接触私钥。
 - UI 能同时正确展示当前票权和下个 epoch 待生效票权。
 - 选择 1–30 个 BP 时，各 BP 指定分配合计不超过锁定本金，总有效票权守恒。
-- `subvote` 后 GLON立即退出可用于新提案的余额。
+- `subvote` 后内部 POWER 立即退出可用于新提案的余额。
 - 奖励明细使用奖励产生期间的历史票权，不使用领取时的当前票权。
 - 提案能完整经历草稿、附议、投票、Timelock 和执行，并可由交易 ID 审计。
 - 执行型提案在签名前展示 ABI 解码后的实际动作与资产变化。
@@ -415,9 +415,9 @@ Read-only Indexer
 ## 14. 上线前仍需确认
 
 - FullOn 主网和测试网最终 chain ID、RPC 与索引 API。
-- `voter.reward`、GLON 和新版 `flon.system` 的实际部署状态与 ABI。
+- `voter.reward`、`dao.gov` 内部 POWER 和新版 `flon.system` 的实际部署状态与 ABI。
 - Active BP quorum、Standby 数量、最低自质押、奖励比例等最终治理参数。
-- GLON DAO 快照的具体存储方式和历史查询接口。
+- POWER 快照的具体存储方式和历史查询接口。
 - Governance V2 是升级现有 mDAO 还是新部署兼容合约。
 - BP registry 的合约账户、资料 schema 和验证流程。
 - HuFu 主 App 当前插件 API、主题 token、路由和发布流程。

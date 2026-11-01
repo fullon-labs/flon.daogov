@@ -16,19 +16,19 @@
 |---|---|
 | RPC | `https://t4.flon.network` |
 | BP 最低自质押 / 解锁期 | `500,000 FLON` / 21 天 |
-| 提案 / 附议门槛 | `100 GLON` / `1 GLON` |
+| 提案 / 附议门槛 | `100 POWER` / `1 POWER` |
 | 附议期 / 投票延迟 / 投票期 | 5 分钟 / 1 分钟 / 5 分钟 |
 | 默认 quorum / 通过门槛 | 10% / 50% |
 | Timelock / 执行宽限期 | 5 分钟 / 24 小时 |
 | action 限制 | 最多 10 个；单个 4096 bytes；合计 16384 bytes |
-| 治理总票权 | `10,799 GLON` |
+| 治理总票权 | `10,799 POWER` |
 
-执行提案还要应用 L1–L4 风险策略，混合 actions 取最高风险。L3/L4 当前最低总票权为 10,000/50,000 GLON；当前 `10,799 GLON` 已满足 L3 总票权门槛，但仍不足以激活 L4 提案。
+执行提案还要应用 L1–L4 风险策略，混合 actions 取最高风险。L3/L4 当前最低总票权为 10,000/50,000 POWER；当前 `10,799 POWER` 已满足 L3 总票权门槛，但仍不足以激活 L4 提案。
 
 ## 3. 测试角色
 
 - BP candidate：拥有最低自质押 FLON 和独立 block signing public key。
-- Voter：拥有投票本金；`addvote` 后获得等额不可转让 GLON。
+- Voter：拥有投票本金；`addvote` 后在 `dao.gov` 获得等额内部 POWER。
 - Proposer、Endorser、DAO voters：分别满足风险策略门槛，投票账户覆盖 for/against/abstain。
 - Executor：任意测试账户，用于证明生命周期 action permissionless。
 - Treasury recipient：接收最小额测试付款。
@@ -43,7 +43,7 @@ BP block signing key 不得用作账户 owner/active key。建议使用可丢弃
 4. **T3 BP Performance before**：在目标 Reward/GAS Epoch 封存前保存完整出块、奖励、claim、余额和 voter reward 快照。
 5. **T4 自然封存与奖励对账**：不加速 Epoch，等待 Keeper 自然封存；保存 after 快照并完成区块奖励、BP/voter 分成、GAS 池及节点分配核算。
 6. **T5 奖励领取与退出**：分别验证 BP 本人、Keeper/第三方、分批 `max_steps`、重复领取；再执行 unregister、unstake、取消退款、重新 unstake 和到期领取。
-7. **T6 Voter 撤票**：减少本金、销毁 GLON、重新分配、到期退款，并验证 voter reward 跨 Epoch 归属。
+7. **T6 Voter 撤票**：减少本金、扣减内部 POWER、重新分配、到期退款，并验证 voter reward 跨 Epoch 归属。
 8. **T7 信号提案**：提案、论坛、附议、激活、快照、投票、结算、取消。
 9. **T8 可执行提案**：ABI 编码、白名单/风险、action 冻结、queue、Timelock、permissionless execute、expire。
 10. **T9 Treasury**：入金、reserve、pay、release、closegrant 与账务守恒。
@@ -145,7 +145,7 @@ sum(producer.allocated_rewards)
 每个写交易保存 action/actor、transaction ID、包含区块、LIB 时间、执行前后快照和精确错误。满足以下条件才算通过：
 
 - 交易达到 LIB；仅返回 submitted 不算完成。
-- FLON/GLON、BP stake/refund、treasury liquid/reserved/paid 守恒。
+- FLON / 内部 POWER、BP stake/refund、treasury liquid/reserved/paid 守恒。
 - Epoch 边界前后 `pendingvote/votedeltas/voteallocs/producers` 一致。
 - 完整 Reward Epoch 满足 `expected = produced + missed`，`idle_skipped` 不污染 missed 和出块率。
 - 每个 BP 的 gross、绩效系数、自留、voter share、forfeited 和 `prodclaims` 精确到 `10^-8 FLON`。
