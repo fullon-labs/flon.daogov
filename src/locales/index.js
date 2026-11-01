@@ -39,11 +39,11 @@ const bpStatusTerms={
 };
 
 const epochTimingTerms={
-  fr:{'Reward epochs are not enabled yet':'Les epochs de récompense ne sont pas encore activées','Vote changes will take effect in the first epoch after rewards start':'Les changements de vote prendront effet lors de la première epoch après le démarrage des récompenses','Time remaining':'Temps restant'},
-  ja:{'Reward epochs are not enabled yet':'報酬Epochはまだ有効になっていません','Vote changes will take effect in the first epoch after rewards start':'投票の変更は報酬開始後の最初のEpochで有効になります','Time remaining':'残り時間'},
-  ko:{'Reward epochs are not enabled yet':'보상 Epoch가 아직 활성화되지 않았습니다','Vote changes will take effect in the first epoch after rewards start':'투표 변경은 보상 시작 후 첫 Epoch에 적용됩니다','Time remaining':'남은 시간'},
-  es:{'Reward epochs are not enabled yet':'Las epochs de recompensa aún no están habilitadas','Vote changes will take effect in the first epoch after rewards start':'Los cambios de voto se aplicarán en la primera epoch después de iniciar las recompensas','Time remaining':'Tiempo restante'},
-  'zh-TW':{'Reward epochs are not enabled yet':'獎勵 Epoch 尚未啟用','Vote changes will take effect in the first epoch after rewards start':'正式獎勵啟動後，投票變更將在首個 Epoch 生效','Time remaining':'剩餘時間'}
+  fr:{'Reward epochs are not enabled yet':'Les epochs de récompense ne sont pas encore activées','Vote changes will take effect in the first epoch after rewards start':'Les changements de vote prendront effet lors de la première epoch après le démarrage des récompenses','Time remaining':'Temps restant','Formal rewards have not started; no finalized production rate is available':'Les récompenses officielles n’ont pas commencé ; aucun taux de production finalisé n’est disponible'},
+  ja:{'Reward epochs are not enabled yet':'報酬Epochはまだ有効になっていません','Vote changes will take effect in the first epoch after rewards start':'投票の変更は報酬開始後の最初のEpochで有効になります','Time remaining':'残り時間','Formal rewards have not started; no finalized production rate is available':'正式報酬はまだ開始されていないため、確定済み出ブロック率はありません'},
+  ko:{'Reward epochs are not enabled yet':'보상 Epoch가 아직 활성화되지 않았습니다','Vote changes will take effect in the first epoch after rewards start':'투표 변경은 보상 시작 후 첫 Epoch에 적용됩니다','Time remaining':'남은 시간','Formal rewards have not started; no finalized production rate is available':'정식 보상이 시작되지 않아 확정된 블록 생성률이 없습니다'},
+  es:{'Reward epochs are not enabled yet':'Las epochs de recompensa aún no están habilitadas','Vote changes will take effect in the first epoch after rewards start':'Los cambios de voto se aplicarán en la primera epoch después de iniciar las recompensas','Time remaining':'Tiempo restante','Formal rewards have not started; no finalized production rate is available':'Las recompensas oficiales no han comenzado; no hay una tasa de producción finalizada disponible'},
+  'zh-TW':{'Reward epochs are not enabled yet':'獎勵 Epoch 尚未啟用','Vote changes will take effect in the first epoch after rewards start':'正式獎勵啟動後，投票變更將在首個 Epoch 生效','Time remaining':'剩餘時間','Formal rewards have not started; no finalized production rate is available':'正式獎勵尚未啟動，暫無封存出塊率'}
 };
 
 export const generatedLocaleTerms={
