@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 const source=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
+test('formats epoch countdowns with readable localized units',()=>{
+  const start=source.indexOf('function formatCountdown('),end=source.indexOf('function refreshAfterEpochBoundary()',start);
+  const format=language=>new Function(`let currentLanguage=${JSON.stringify(language)};${source.slice(start,end)};return formatCountdown`)();
+  const duration=((2*86400)+(1*3600)+(42*60)+9)*1000;
+  assert.equal(format('zh-CN')(duration),'2 天 01 小时 42 分 09 秒');
+  assert.equal(format('en')(duration),'2d 01h 42m 09s');
+  assert.equal(format('ja')(duration),'2日 01時間 42分 09秒');
+});
 test('epoch refresh keeps selections made while the request is pending, including blank amounts',async()=>{
   const start=source.indexOf('function refreshAfterEpochBoundary(){');
   const end=source.indexOf('function updateEpochCountdown()',start);

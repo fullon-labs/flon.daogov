@@ -49,3 +49,13 @@ html[lang="zh-CN"].vote-account-loading .select-list::before{content:'正在读�
 .app-release{display:flex;align-items:center;justify-content:center;gap:6px;padding:18px 16px 24px;color:var(--muted);font-size:10px;letter-spacing:.02em}
 .app-release b{padding:3px 7px;border:1px solid var(--divider);border-radius:999px;background:rgba(255,255,255,.72);color:var(--deep);font-size:9px;font-weight:600}
 @media(max-width:899px){.app-release{padding-bottom:calc(82px + env(safe-area-inset-bottom))}}
+
+/* Keep epoch status and countdown legible on narrow voting cards. */
+.epoch-inline{align-items:flex-start;gap:10px;padding:12px}
+.epoch-inline>span{min-width:0}
+.epoch-inline svg{width:19px;margin-top:2px}
+.epoch-inline strong{font-size:11px;line-height:1.35}
+.epoch-inline small,.epoch-inline small span,.epoch-inline b{display:block}
+.epoch-inline small{margin-top:4px;line-height:1.45}
+.epoch-inline b{margin:3px 0 0;font-size:10px;line-height:1.4;letter-spacing:.01em;white-space:normal}
+.epoch-inline.is-inactive{background:var(--soft);color:var(--muted)}

@@ -154,7 +154,9 @@ export function epochTiming(chainInfo,globalRow,rewardPlans=[],nextEpochToClose=
   const pendingEpoch=Number(activationEpoch);
   const hasChainEpoch=nextEpochToClose!==null&&nextEpochToClose!==undefined&&Number.isSafeInteger(chainEpoch)&&chainEpoch>=0;
   const hasActivationEpoch=activationEpoch!==null&&activationEpoch!==undefined&&Number.isSafeInteger(pendingEpoch)&&pendingEpoch>0;
-  if(!Number.isFinite(chainHeadMs)||!Number.isFinite(rewardStartMs)||rewardStartMs<blockTimestampEpochMilliseconds||chainHeadMs<rewardStartMs||(!hasChainEpoch&&!hasActivationEpoch))return null;
+  if(!Number.isFinite(chainHeadMs)||!Number.isFinite(rewardStartMs))return null;
+  if(rewardStartMs<blockTimestampEpochMilliseconds)return {available:false,reason:'rewards_disabled',chainHeadMs};
+  if(chainHeadMs<rewardStartMs||(!hasChainEpoch&&!hasActivationEpoch))return null;
   const headSlot=Math.floor((chainHeadMs-blockTimestampEpochMilliseconds)/500);
   const plans=normalizeRewardPlans(rewardPlans);
   const currentEpoch=hasChainEpoch?chainEpoch:pendingEpoch-1;
@@ -163,7 +165,7 @@ export function epochTiming(chainInfo,globalRow,rewardPlans=[],nextEpochToClose=
   const boundaryMs=epochPlan
     ? blockTimestampEpochMilliseconds+(epochPlan.startSlot+(targetEpoch-epochPlan.firstEpoch)*epochPlan.epochSlots)*500
     : rewardStartMs+targetEpoch*rewardEpochMilliseconds;
-  return {chainHeadMs,rewardStartMs,currentEpoch,targetEpoch,boundaryMs,nextEpochToClose:hasChainEpoch?chainEpoch:null};
+  return {available:true,chainHeadMs,rewardStartMs,currentEpoch,targetEpoch,boundaryMs,nextEpochToClose:hasChainEpoch?chainEpoch:null};
 }
 export async function loadEpochTiming(activationEpoch=null){
   const [chainInfo,globalRows,configRows,epochRows]=await Promise.all([
