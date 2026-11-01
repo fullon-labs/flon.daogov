@@ -30,10 +30,18 @@ const walletProviderTerms={
   'zh-TW':{'Choose a connection method':'選擇連接方式','HuFu browser extension':'HuFu 瀏覽器擴充套件','Use the wallet installed in this browser':'使用此瀏覽器已安裝的錢包','Connect with QR code':'使用二維碼連接','Scan with the HuFu mobile wallet':'使用 HuFu 手機錢包掃碼'}
 };
 
+const bpStatusTerms={
+  fr:{Active:'Actifs',Standby:'En attente'},
+  ja:{Active:'稼働中',Standby:'待機中'},
+  ko:{Active:'활성',Standby:'대기'},
+  es:{Active:'Activos',Standby:'En espera'},
+  'zh-TW':{Active:'活躍',Standby:'候補'}
+};
+
 export const generatedLocaleTerms={
-  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr,...walletProviderTerms.fr},
-  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja,...walletProviderTerms.ja},
-  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko,...walletProviderTerms.ko},
-  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es,...walletProviderTerms.es},
-  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW'],...walletProviderTerms['zh-TW']}
+  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr,...walletProviderTerms.fr,...bpStatusTerms.fr},
+  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja,...walletProviderTerms.ja,...bpStatusTerms.ja},
+  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko,...walletProviderTerms.ko,...bpStatusTerms.ko},
+  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es,...walletProviderTerms.es,...bpStatusTerms.es},
+  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW'],...walletProviderTerms['zh-TW'],...bpStatusTerms['zh-TW']}
 };

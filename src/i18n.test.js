@@ -63,6 +63,22 @@ test('Traditional Chinese overview uses native product terminology',()=>{
   assert.equal(terms['FullOn Mainnet'],'FullOn 主網');
 });
 
+test('BP election status filters are localized in every supported locale',()=>{
+  const expected={
+    fr:{Active:'Actifs',Standby:'En attente'},
+    ja:{Active:'稼働中',Standby:'待機中'},
+    ko:{Active:'활성',Standby:'대기'},
+    es:{Active:'Activos',Standby:'En espera'},
+    'zh-TW':{Active:'活躍',Standby:'候補'}
+  };
+  assert.match(htmlSource,/data-node-filter="active">活跃/);
+  assert.match(htmlSource,/data-node-filter="standby">候补/);
+  for(const [locale,terms] of Object.entries(expected)){
+    assert.equal(generatedLocaleTerms[locale].Active,terms.Active);
+    assert.equal(generatedLocaleTerms[locale].Standby,terms.Standby);
+  }
+});
+
 test('help center copy is localized in every supported non-English locale',()=>{
   const helpKeys=[
     'Governance Help Center',
