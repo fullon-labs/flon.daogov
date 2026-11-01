@@ -135,11 +135,17 @@ function normalizeRewardPlans(value){
   })).filter(row=>Number.isSafeInteger(row.firstEpoch)&&Number.isSafeInteger(row.startSlot)&&Number.isSafeInteger(row.epochSlots)&&row.epochSlots>0)
     .sort((left,right)=>left.firstEpoch-right.firstEpoch);
 }
+export function rewardPlanTableNames(abi){
+  const tables=new Set((abi?.tables||[]).map(table=>String(table?.name||'')));
+  return ['rewardplans','rewardcfgv2'].filter(name=>tables.has(name));
+}
 async function loadRewardPlans(){
-  const canonical=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardplans',limit:100}).catch(()=>({rows:[]}));
-  if(canonical.rows?.length)return canonical.rows;
-  const legacy=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table:'rewardcfgv2',limit:1}).catch(()=>({rows:[]}));
-  return legacy.rows||[];
+  const abi=await rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>null);
+  for(const table of rewardPlanTableNames(abi?.abi)){
+    const result=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table,limit:table==='rewardplans'?100:1}).catch(()=>({rows:[]}));
+    if(result.rows?.length)return result.rows;
+  }
+  return [];
 }
 export function epochTiming(chainInfo,globalRow,rewardPlans=[],nextEpochToClose=null,activationEpoch=null){
   const chainHeadMs=utcMilliseconds(chainInfo?.head_block_time);
