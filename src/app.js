@@ -111,7 +111,7 @@ const translations=new Map([
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['连接钱包后读取链上已结算余额','Connect wallet to load the settled on-chain balance'],['提案、附议、投票与 Timelock','Proposals, endorsement, voting, and Timelock'],['当前尚未配置可验证的治理合约数据源；本页不会构造或广播模拟治理交易。','No verified governance contract data source is configured. This page does not construct or broadcast simulated governance transactions.'],['待接入','Pending integration'],['候选','Candidates'],
-  ['连接钱包后读取','Connect wallet to load'],['链上选举状态','On-chain election status'],['实时 RPC','Live RPC'],['链上候选排名','On-chain candidate ranking'],['正在读取链上封存 Epoch…','Loading finalized on-chain epoch…'],['链上统计','On-chain statistics'],['等待完整 Epoch 封存','Awaiting a complete finalized epoch'],['链上出块统计暂不可用','On-chain production statistics unavailable'],['正在读取链上 BP 排名…','Loading on-chain BP ranking…'],['正在读取候选 BP…','Loading candidate BPs…'],['链上 BP 数据读取失败，请稍后刷新。','Failed to load on-chain BP data. Please try again later.'],['链上 BP 数据尚未就绪','On-chain BP data is not ready yet'],['投票分配在下一 Epoch 生效','Vote allocation takes effect next epoch'],['待生效状态以 flon::pendingvote 链上记录为准','Pending state is read from flon::pendingvote'],['正在读取链上时间…','Loading chain time…'],['距离下一 Epoch','Until next epoch'],['距离 Epoch 生效','Until epoch activation'],['等待 Epoch 结算','Awaiting epoch settlement'],['Epoch 时间不可用','Epoch timing unavailable'],['DAO 提案功能待接入','DAO proposal integration pending'],['治理合约 ABI 与部署地址确认后开放','Available after the governance ABI and deployment are verified'],['说明','Details'],['读取链上状态','Load on-chain status'],['待领取奖励','Claimable rewards'],['存在下一 Epoch 待生效修改','A change is pending for the next epoch'],['链上已结算','Settled on-chain'],['DAO Governance 尚未启用','DAO Governance is not enabled'],['当前站点未配置可验证的治理合约 ABI 与部署地址','This site has no verified governance contract ABI or deployment configured'],['提案、附议、正式投票、Timelock 和执行按钮已保持只读，不会请求钱包签名，也不会广播模拟交易。','Proposal, endorsement, formal voting, Timelock, and execution remain read-only; they neither request a wallet signature nor broadcast simulated transactions.'],['调整投票本金尚未启用','Voting stake adjustment is not enabled'],['需要先确认 addvote / subvote 的主网 ABI 与资产精度','The production addvote/subvote ABI and asset precision must be verified first'],['当前版本不会根据示例余额构造质押或撤票交易。节点选择与投票奖励领取已使用真实链上状态。','This version does not construct stake or unstake transactions from sample balances. BP selection and voter reward claims use real on-chain state.']
+  ['连接钱包后读取','Connect wallet to load'],['链上选举状态','On-chain election status'],['实时 RPC','Live RPC'],['链上候选排名','On-chain candidate ranking'],['正在读取链上封存 Epoch…','Loading finalized on-chain epoch…'],['链上统计','On-chain statistics'],['等待完整 Epoch 封存','Awaiting a complete finalized epoch'],['链上出块统计暂不可用','On-chain production statistics unavailable'],['正在读取链上 BP 排名…','Loading on-chain BP ranking…'],['正在读取候选 BP…','Loading candidate BPs…'],['链上 BP 数据读取失败，请稍后刷新。','Failed to load on-chain BP data. Please try again later.'],['链上 BP 数据尚未就绪','On-chain BP data is not ready yet'],['投票分配在下一 Epoch 生效','Vote allocation takes effect next epoch'],['待生效状态以 flon::pendingvote 链上记录为准','Pending state is read from flon::pendingvote'],['正在读取链上时间…','Loading chain time…'],['距离下一 Epoch','Until next epoch'],['距离 Epoch 生效','Until epoch activation'],['等待 Epoch 结算','Awaiting epoch settlement'],['Epoch 时间不可用','Epoch timing unavailable'],['奖励 Epoch 尚未启用','Reward epochs are not enabled yet'],['正式奖励启动后，投票变更将在首个 Epoch 生效','Vote changes will take effect in the first epoch after rewards start'],['剩余时间','Time remaining'],['DAO 提案功能待接入','DAO proposal integration pending'],['治理合约 ABI 与部署地址确认后开放','Available after the governance ABI and deployment are verified'],['说明','Details'],['读取链上状态','Load on-chain status'],['待领取奖励','Claimable rewards'],['存在下一 Epoch 待生效修改','A change is pending for the next epoch'],['链上已结算','Settled on-chain'],['DAO Governance 尚未启用','DAO Governance is not enabled'],['当前站点未配置可验证的治理合约 ABI 与部署地址','This site has no verified governance contract ABI or deployment configured'],['提案、附议、正式投票、Timelock 和执行按钮已保持只读，不会请求钱包签名，也不会广播模拟交易。','Proposal, endorsement, formal voting, Timelock, and execution remain read-only; they neither request a wallet signature nor broadcast simulated transactions.'],['调整投票本金尚未启用','Voting stake adjustment is not enabled'],['需要先确认 addvote / subvote 的主网 ABI 与资产精度','The production addvote/subvote ABI and asset precision must be verified first'],['当前版本不会根据示例余额构造质押或撤票交易。节点选择与投票奖励领取已使用真实链上状态。','This version does not construct stake or unstake transactions from sample balances. BP selection and voter reward claims use real on-chain state.']
 ].forEach(([zh,en])=>translations.set(zh,en));
 [
   ['投票本金与退款','Voting stake & refund'],['本金与退款','Stake & refund'],['增加、撤回或领取','Add, unstake, or claim'],['撤票退款处理中','Vote refund pending'],['退款已可领取','Refund ready to claim'],['全部撤票并申请退款','Unstake all and request refund'],['确认退出节点投票','Confirm exit from node voting'],['全部 BP 分配将在下一 Epoch 清零','All BP allocations will become zero in the next epoch'],['退款冷却期','Refund cooldown'],['72 小时','72 hours'],['申请退款','Request refund'],['领取解锁 FLON','Claim unlocked FLON'],['解锁倒计时','Unlock countdown'],['预计可领取时间','Estimated claim time'],['等待退款成熟','Waiting for refund maturity'],['退出交易已广播','Exit transaction broadcast'],['FLON 已进入 72 小时退款冷却期','FLON entered the 72-hour refund cooldown'],['撤回投票本金并申请退款','Unstake voting principal and request refund'],['立即销毁等量凭证','Burn the same amount of receipts immediately']
@@ -725,8 +725,14 @@ async function submitDaoAction(target,name,id,data={}){
 function setText(selector,value){document.querySelectorAll(selector).forEach(node=>node.textContent=value)}
 function formatCountdown(milliseconds){
   const seconds=Math.max(0,Math.ceil(milliseconds/1000));
-  const hours=Math.floor(seconds/3600),minutes=Math.floor((seconds%3600)/60),remaining=seconds%60;
-  return [hours,minutes,remaining].map(value=>String(value).padStart(2,'0')).join(':');
+  const days=Math.floor(seconds/86400),hours=Math.floor((seconds%86400)/3600),minutes=Math.floor((seconds%3600)/60),remaining=seconds%60;
+  const values=[hours,minutes,remaining].map(value=>String(value).padStart(2,'0'));
+  const prefix=days?`${days}${currentLanguage==='ja'?'日':currentLanguage==='ko'?'일':currentLanguage.startsWith('zh')?' 天':'d'} `:'';
+  if(currentLanguage==='zh-CN')return `${prefix}${values[0]} 小时 ${values[1]} 分 ${values[2]} 秒`;
+  if(currentLanguage==='zh-TW')return `${prefix}${values[0]} 小時 ${values[1]} 分 ${values[2]} 秒`;
+  if(currentLanguage==='ja')return `${prefix}${values[0]}時間 ${values[1]}分 ${values[2]}秒`;
+  if(currentLanguage==='ko')return `${prefix}${values[0]}시간 ${values[1]}분 ${values[2]}초`;
+  return `${prefix}${values[0]}h ${values[1]}m ${values[2]}s`;
 }
 function refreshAfterEpochBoundary(){
   const now=Date.now();
@@ -738,10 +744,17 @@ function refreshAfterEpochBoundary(){
     .finally(()=>{epochBoundaryRefreshPromise=null});
 }
 function updateEpochCountdown(){
-  const title=document.querySelector('[data-vote-epoch-title]'),label=document.querySelector('[data-vote-epoch-label]'),value=document.querySelector('[data-vote-epoch-countdown]');
+  const title=document.querySelector('[data-vote-epoch-title]'),label=document.querySelector('[data-vote-epoch-label]'),value=document.querySelector('[data-vote-epoch-countdown]'),card=title?.closest('.epoch-inline');
   if(!title||!label||!value)return;
   const timing=epochCountdownAnchor;
-  if(!timing){title.textContent=translateText('下一 Epoch 生效');label.textContent=currentLanguage==='zh-CN'?'Epoch 时间不可用':'Epoch timing unavailable';value.textContent='--:--:--';return}
+  card?.classList.toggle('is-inactive',!timing?.available);
+  if(timing?.reason==='rewards_disabled'){
+    title.textContent=translateText('奖励 Epoch 尚未启用');
+    label.textContent=translateText('正式奖励启动后，投票变更将在首个 Epoch 生效');
+    value.textContent='';
+    return;
+  }
+  if(!timing){title.textContent=translateText('下一 Epoch 生效');label.textContent=translateText('Epoch 时间不可用');value.textContent='';return}
   title.textContent=currentLanguage==='zh-CN'?`Epoch ${timing.targetEpoch} 生效`:`${translateText('下一 Epoch 生效')} · ${timing.targetEpoch}`;
   const estimatedChainNow=timing.chainHeadMs+(Date.now()-timing.observedAt);
   const remaining=timing.boundaryMs-estimatedChainNow;
@@ -751,7 +764,7 @@ function updateEpochCountdown(){
     refreshAfterEpochBoundary();
     return;
   }
-  label.textContent=timing.hasPendingVote?`${currentLanguage==='zh-CN'?'距离 Epoch 生效':'Until epoch activation'} ${timing.targetEpoch}`:`${currentLanguage==='zh-CN'?'距离下一 Epoch':'Until next epoch'} ${timing.targetEpoch}`;
+  label.textContent=timing.hasPendingVote?`${translateText('距离 Epoch 生效')} ${timing.targetEpoch}`:`${translateText('剩余时间')} · Epoch ${timing.targetEpoch}`;
   value.textContent=formatCountdown(remaining);
 }
 function startEpochCountdown(timing,hasPendingVote){

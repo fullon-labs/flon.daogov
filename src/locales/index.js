@@ -38,10 +38,18 @@ const bpStatusTerms={
   'zh-TW':{Active:'活躍',Standby:'候補'}
 };
 
+const epochTimingTerms={
+  fr:{'Reward epochs are not enabled yet':'Les epochs de récompense ne sont pas encore activées','Vote changes will take effect in the first epoch after rewards start':'Les changements de vote prendront effet lors de la première epoch après le démarrage des récompenses','Time remaining':'Temps restant'},
+  ja:{'Reward epochs are not enabled yet':'報酬Epochはまだ有効になっていません','Vote changes will take effect in the first epoch after rewards start':'投票の変更は報酬開始後の最初のEpochで有効になります','Time remaining':'残り時間'},
+  ko:{'Reward epochs are not enabled yet':'보상 Epoch가 아직 활성화되지 않았습니다','Vote changes will take effect in the first epoch after rewards start':'투표 변경은 보상 시작 후 첫 Epoch에 적용됩니다','Time remaining':'남은 시간'},
+  es:{'Reward epochs are not enabled yet':'Las epochs de recompensa aún no están habilitadas','Vote changes will take effect in the first epoch after rewards start':'Los cambios de voto se aplicarán en la primera epoch después de iniciar las recompensas','Time remaining':'Tiempo restante'},
+  'zh-TW':{'Reward epochs are not enabled yet':'獎勵 Epoch 尚未啟用','Vote changes will take effect in the first epoch after rewards start':'正式獎勵啟動後，投票變更將在首個 Epoch 生效','Time remaining':'剩餘時間'}
+};
+
 export const generatedLocaleTerms={
-  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr,...walletProviderTerms.fr,...bpStatusTerms.fr},
-  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja,...walletProviderTerms.ja,...bpStatusTerms.ja},
-  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko,...walletProviderTerms.ko,...bpStatusTerms.ko},
-  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es,...walletProviderTerms.es,...bpStatusTerms.es},
-  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW'],...walletProviderTerms['zh-TW'],...bpStatusTerms['zh-TW']}
+  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr,...walletProviderTerms.fr,...bpStatusTerms.fr,...epochTimingTerms.fr},
+  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja,...walletProviderTerms.ja,...bpStatusTerms.ja,...epochTimingTerms.ja},
+  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko,...walletProviderTerms.ko,...bpStatusTerms.ko,...epochTimingTerms.ko},
+  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es,...walletProviderTerms.es,...bpStatusTerms.es,...epochTimingTerms.es},
+  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW'],...walletProviderTerms['zh-TW'],...bpStatusTerms['zh-TW'],...epochTimingTerms['zh-TW']}
 };

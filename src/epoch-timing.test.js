@@ -10,7 +10,9 @@ test('does not invent an epoch while rewards are disabled',()=>{
     null,
     null,
   );
-  assert.equal(timing,null);
+  assert.equal(timing.available,false);
+  assert.equal(timing.reason,'rewards_disabled');
+  assert.equal(timing.targetEpoch,undefined);
 });
 
 test('uses contract epoch ids instead of deriving them from wall clock time',()=>{
@@ -21,6 +23,7 @@ test('uses contract epoch ids instead of deriving them from wall clock time',()=
     7,
     null,
   );
+  assert.equal(timing.available,true);
   assert.equal(timing.currentEpoch,7);
   assert.equal(timing.targetEpoch,8);
 });
