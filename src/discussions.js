@@ -1,4 +1,20 @@
+import {accountExplorerUrl} from './explorer.js';
+
 function apiBase(value){return String(value||'').trim().replace(/\/$/,'')}
+
+const escapeHtml=value=>String(value??'').replace(/[&<>'"]/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+const attributionPattern=/((?:Submitted|Replied) through FullOn DAO by )(?:FLON account )?`?([a-z1-5.]{1,12})`?(\.)/g;
+
+export function renderDiscussionBody(bodyText,network='testnet'){
+  const text=String(bodyText||'');let cursor=0,html='',match;
+  while((match=attributionPattern.exec(text))){
+    html+=escapeHtml(text.slice(cursor,match.index))+escapeHtml(match[1]);
+    const url=accountExplorerUrl(network,match[2]);
+    html+=url?`<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(match[2])}</a>`:escapeHtml(match[2]);
+    html+=escapeHtml(match[3]);cursor=match.index+match[0].length;
+  }
+  return `${html}${escapeHtml(text.slice(cursor))}`.replace(/\n/g,'<br>');
+}
 
 async function request(base,path,{fetchImpl=fetch,method='GET',body}={}){
   if(!apiBase(base))throw new Error('DISCUSSIONS_API_NOT_CONFIGURED');

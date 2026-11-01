@@ -8,6 +8,7 @@ const secret=(value,file)=>value||(file?readFileSync(file,'utf8').trim():'');
 const b64=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
 const accountPattern=/^[a-z1-5.]{1,12}$/;
 const reactionNames=new Set(['THUMBS_UP','THUMBS_DOWN','LAUGH','CONFUSED','HEART','HOORAY','ROCKET','EYES']);
+const explorerBase={mainnet:'https://flonscan.io',testnet:'https://testnet.flonscan.io'};
 
 export function createCommunityServer(options={}){
   const config={
@@ -41,6 +42,7 @@ export function createCommunityServer(options={}){
   function rateLimit(key){const now=config.now(),entry=rates.get(key)||[],current=entry.filter(time=>now-time<3600000);if(current.length>=5)throw Object.assign(new Error('Discussion creation rate limit exceeded'),{status:429});current.push(now);rates.set(key,current)}
   function actorFrom(body){const actor=String(body.actor||'').trim();if(!accountPattern.test(actor))throw Object.assign(new Error('A connected FLON account is required'),{status:422});return actor}
   const networkFrom=value=>{const network=String(value||'testnet').trim();if(!['testnet','mainnet'].includes(network))throw Object.assign(new Error('Unsupported network'),{status:422});return network};
+  const accountAttribution=(network,actor)=>`[${actor}](${explorerBase[network]}/account/${encodeURIComponent(actor)})`;
   function githubReactions(groups=[]){return Object.fromEntries(groups.map(group=>[group.content,Number(group.reactors?.totalCount||group.users?.totalCount||0)]))}
   function interaction(network,kind,id,actor,native={}){return {...config.store.summary(network,kind,id,actor),native}}
   async function repository(){return graph(`query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){id discussionCategories(first:50){nodes{id name}} discussions(first:30,orderBy:{field:UPDATED_AT,direction:DESC}){nodes{id number title bodyText url createdAt updatedAt upvoteCount reactionGroups{content viewerHasReacted reactors{totalCount}} author{login} comments{totalCount}}}}}`,{owner:config.owner,repo:config.repo})}
@@ -69,20 +71,20 @@ export function createCommunityServer(options={}){
       }
       const commentMatch=path.match(/^\/v1\/discussions\/(\d+)\/comments$/);
       if(req.method==='POST'&&commentMatch){
-        if(!originAllowed(req))return json(res,403,{error:'Origin not allowed'});const body=await readBody(req),actor=String(body.actor||'').trim(),commentBody=String(body.body||'').trim();
+        if(!originAllowed(req))return json(res,403,{error:'Origin not allowed'});const body=await readBody(req),actor=String(body.actor||'').trim(),commentBody=String(body.body||'').trim(),network=networkFrom(body.network);
         if(!accountPattern.test(actor))return json(res,422,{error:'A connected FLON account is required'});if(commentBody.length<2||commentBody.length>10000)return json(res,422,{error:'Reply must contain 2 to 10000 characters'});rateLimit(`${req.socket.remoteAddress||'unknown'}:${actor}`);
         const detail=await graph(`query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){discussion(number:$number){id}}}`,{owner:config.owner,repo:config.repo,number:Number(commentMatch[1])});if(!detail.repository?.discussion)return json(res,404,{error:'Discussion not found'});
-        const submittedBody=`${commentBody}\n\n---\nReplied through FullOn DAO by FLON account \`${actor}\`.`;
+        const submittedBody=`${commentBody}\n\n---\nReplied through FullOn DAO by ${accountAttribution(network,actor)}.`;
         const result=await graph(`mutation($discussionId:ID!,$body:String!){addDiscussionComment(input:{discussionId:$discussionId,body:$body}){comment{id bodyText createdAt updatedAt author{login}}}}`,{discussionId:detail.repository.discussion.id,body:submittedBody});const comment=result.addDiscussionComment.comment;console.info(JSON.stringify({event:'discussion.replied',actor,discussion:Number(commentMatch[1]),at:new Date(config.now()).toISOString()}));return json(res,201,{...comment,author:comment.author?.login||''});
       }
       if(req.method==='POST'&&path==='/v1/discussions'){
-        if(!originAllowed(req))return json(res,403,{error:'Origin not allowed'});const body=await readBody(req),title=String(body.title||'').trim(),discussionBody=String(body.body||'').trim(),actor=String(body.actor||'').trim();
+        if(!originAllowed(req))return json(res,403,{error:'Origin not allowed'});const body=await readBody(req),title=String(body.title||'').trim(),discussionBody=String(body.body||'').trim(),actor=String(body.actor||'').trim(),network=networkFrom(body.network);
         if(!accountPattern.test(actor))return json(res,422,{error:'A connected FLON account is required'});
         if(title.length<3||title.length>120)return json(res,422,{error:'Discussion title must contain 3 to 120 characters'});
         if(discussionBody.length<3||discussionBody.length>10000)return json(res,422,{error:'Discussion body must contain 3 to 10000 characters'});
         rateLimit(`${req.socket.remoteAddress||'unknown'}:${actor}`);
         const data=await repository(),category=data.repository.discussionCategories.nodes.find(item=>item.name.toLowerCase()===config.category.toLowerCase());if(!category)throw new Error(`GitHub discussion category not found: ${config.category}`);
-        const submittedBody=`${discussionBody}\n\n---\nSubmitted through FullOn DAO by FLON account \`${actor}\`.`;
+        const submittedBody=`${discussionBody}\n\n---\nSubmitted through FullOn DAO by ${accountAttribution(network,actor)}.`;
         const result=await graph(`mutation($repositoryId:ID!,$categoryId:ID!,$title:String!,$body:String!){createDiscussion(input:{repositoryId:$repositoryId,categoryId:$categoryId,title:$title,body:$body}){discussion{id number title bodyText url createdAt updatedAt author{login} comments{totalCount}}}}`,{repositoryId:data.repository.id,categoryId:category.id,title,body:submittedBody});const item=result.createDiscussion.discussion;console.info(JSON.stringify({event:'discussion.created',actor,discussion:item.number,at:new Date(config.now()).toISOString()}));return json(res,201,{...item,comments:item.comments.totalCount,author:item.author?.login||''});
       }
       return json(res,404,{error:'Not found'});

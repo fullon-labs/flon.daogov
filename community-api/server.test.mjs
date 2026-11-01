@@ -13,8 +13,8 @@ test('bot mode is ready without per-user GitHub authentication',()=>withServer(a
   const discussions=await fetch(`${base}/community-api/v1/discussions`).then(response=>response.json());assert.deepEqual(discussions,{items:[],mode:'dao-bot'});
 }));
 
-test('DAO bot publishes a discussion with the connected FLON account attribution',()=>withServer(async base=>{
-  const response=await fetch(`${base}/community-api/v1/discussions`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({actor:'hellotoworld',title:'Example topic',body:'A sufficiently long discussion body.'})});assert.equal(response.status,201);const item=await response.json();assert.match(item.bodyText,/FLON account `hellotoworld`/);
+test('DAO bot publishes a discussion with linked account attribution',()=>withServer(async base=>{
+  const response=await fetch(`${base}/community-api/v1/discussions`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({network:'mainnet',actor:'hellotoworld',title:'Example topic',body:'A sufficiently long discussion body.'})});assert.equal(response.status,201);const item=await response.json();assert.match(item.bodyText,/by \[hellotoworld\]\(https:\/\/flonscan\.io\/account\/hellotoworld\)\./);assert.doesNotMatch(item.bodyText,/FLON account/);
 }));
 
 test('discussion creation rejects missing or invalid FLON account attribution',()=>withServer(async base=>{
@@ -27,7 +27,7 @@ test('short but complete CJK discussion content is accepted',()=>withServer(asyn
 
 test('discussion detail and replies are available through the DAO API',()=>withServer(async base=>{
   const detail=await fetch(`${base}/community-api/v1/discussions/1`).then(response=>response.json());assert.equal(detail.title,'Example topic');assert.deepEqual(detail.comments,[]);
-  const response=await fetch(`${base}/community-api/v1/discussions/1/comments`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({actor:'hellotoworld',body:'支持进一步讨论'})});assert.equal(response.status,201);const comment=await response.json();assert.match(comment.bodyText,/FLON account `hellotoworld`/);
+  const response=await fetch(`${base}/community-api/v1/discussions/1/comments`,{method:'POST',headers:{origin:'https://daogov.flon.network','content-type':'application/json'},body:JSON.stringify({network:'mainnet',actor:'hellotoworld',body:'支持进一步讨论'})});assert.equal(response.status,201);const comment=await response.json();assert.match(comment.bodyText,/by \[hellotoworld\]\(https:\/\/flonscan\.io\/account\/hellotoworld\)\./);assert.doesNotMatch(comment.bodyText,/FLON account/);
 }));
 
 test('wallet community vote is mutually exclusive and removable',()=>withServer(async base=>{

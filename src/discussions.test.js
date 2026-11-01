@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFile} from 'node:fs/promises';
-import {createDiscussionsClient} from './discussions.js';
+import {createDiscussionsClient,renderDiscussionBody} from './discussions.js';
 
 test('lists discussions through the unified API with cookie credentials',async()=>{
   let request;
@@ -25,6 +25,14 @@ test('does not call the network when the API is not configured',async()=>{
   const client=createDiscussionsClient({baseUrl:'',fetchImpl:async()=>assert.fail('unexpected request')});
   assert.equal(client.configured,false);
   await assert.rejects(client.list(),/DISCUSSIONS_API_NOT_CONFIGURED/);
+});
+
+test('discussion attribution links old and new account labels to the selected explorer',()=>{
+  const old=renderDiscussionBody('Submitted through FullOn DAO by FLON account flonflonflon.','mainnet');
+  assert.match(old,/Submitted through FullOn DAO by <a href="https:\/\/flonscan\.io\/account\/flonflonflon"[^>]*>flonflonflon<\/a>\./);
+  assert.doesNotMatch(old,/FLON account/);
+  const reply=renderDiscussionBody('Replied through FullOn DAO by hellotoworld.','testnet');
+  assert.match(reply,/href="https:\/\/testnet\.flonscan\.io\/account\/hellotoworld"/);
 });
 
 test('governance view provides desktop columns and mobile discussion/proposal tabs',async()=>{
