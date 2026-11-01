@@ -36,6 +36,13 @@ test('unchecked BP vote controls do not display a checkmark',()=>{
   assert.match(styles,/\.check-control>input:checked\+\.check svg\{opacity:1\}/);
 });
 
+test('BP details action is placed inside the card upper-right corner',()=>{
+  assert.match(app,/<button class="node-detail-link"[^>]*data-action="producer-details"/);
+  assert.match(app,/<div class="node-votes"><strong/);
+  assert.match(styles,/\.node-detail-link\{position:absolute;top:9px;right:13px/);
+  assert.match(styles,/@media\(min-width:900px\)\{\.select-node\{padding-top:38px\}\}/);
+});
+
 test('BP directory filters display live category and selection counts',()=>{
   assert.equal((html.match(/data-node-filter-count/g)||[]).length,4);
   assert.match(html,/data-node-filter="suspended">已暂停/);
