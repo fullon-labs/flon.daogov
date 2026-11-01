@@ -44,3 +44,8 @@
 .vote-account-loading .select-list>.select-node{display:none}
 .vote-account-loading .select-list::before{content:'Loading voting account…';display:block;padding:24px;text-align:center;color:var(--muted);font-size:12px}
 html[lang="zh-CN"].vote-account-loading .select-list::before{content:'正在读取账户投票状态…'}
+
+/* Keep release identity visible but subordinate to governance actions. */
+.app-release{display:flex;align-items:center;justify-content:center;gap:6px;padding:18px 16px 24px;color:var(--muted);font-size:10px;letter-spacing:.02em}
+.app-release b{padding:3px 7px;border:1px solid var(--divider);border-radius:999px;background:rgba(255,255,255,.72);color:var(--deep);font-size:9px;font-weight:600}
+@media(max-width:899px){.app-release{padding-bottom:calc(82px + env(safe-area-inset-bottom))}}

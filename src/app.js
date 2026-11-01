@@ -9,8 +9,10 @@ import {generatedLocaleTerms} from './locales/index.js';
 import {formatOverviewAsset} from './network-summary.js';
 import {iso3166Regions,regionByNumeric,regionDisplayName} from './countries.js';
 import {createDiscussionsClient} from './discussions.js';
+import packageMetadata from '../package.json';
 
 document.documentElement.classList.toggle('hufu-app',isHuFuApp());
+document.querySelectorAll('[data-release-version]').forEach(node=>{node.textContent=`v${packageMetadata.version}`});
 
 const formatGovernancePower=value=>formatOverviewAsset(value).replace(/\s+POWER$/,'');
 
