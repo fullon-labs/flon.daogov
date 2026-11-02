@@ -104,7 +104,10 @@ http.createServer(async(req,res)=>{
  if(url.pathname==='/api/status.json'){
   const entries=directory(),id=url.searchParams.get('bp')||(entries.some(s=>s.id===config.defaultBp)?config.defaultBp:entries[0]?.id);
   const snapshot=entries.find(s=>s.id===id)||discovery.snapshots().find(s=>s.id===id);
-  return snapshot?json(snapshot):json({error:'unknown_bp'},404);
+  if(!snapshot)return json({error:'unknown_bp'},404);
+  let finalizer=null;
+  try{const result=await finalizers.list(snapshot.network);finalizer=result.finalizers.find(f=>f.account===snapshot.producer)||null}catch{}
+  return json({...snapshot,finalizer,finalizer_status:finalizer?.stale?'unknown':finalizer?.policy_status||'unknown'});
  }
  const files={'/':'index.html','/finalizers':'finalizers.html','/finalizers.html':'finalizers.html','/finalizers.js':'finalizers.js','/finalizers.css':'finalizers.css','/app.js':'app.js','/epoch-chart.js':'epoch-chart.js','/style.css':'style.css','/epoch-chart.css':'epoch-chart.css'};
  if(!files[url.pathname]){res.writeHead(404);return res.end('Not found');}
