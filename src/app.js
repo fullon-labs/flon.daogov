@@ -78,7 +78,7 @@ function candidateRegionOptions(query='',selected=candidateDraft.region){
 }
 
 const translations=new Map([
-  ['跳到主要内容','Skip to main content'],['返回 HuFu','Back to HuFu'],['治理中心','DAO Governance'],['治理通知','Governance notifications'],['语言','Language'],['未连接','Not connected'],['连接钱包','Connect wallet'],['断开连接','Disconnect'],['钱包连接','Wallet connection'],['选择连接方式','Choose a connection method'],['HuFu 浏览器插件','HuFu browser extension'],['使用本机已安装的钱包','Use the wallet installed in this browser'],['二维码连接','Connect with QR code'],['使用 HuFu 手机钱包扫码','Scan with the HuFu mobile wallet'],['使用 HuFu 钱包连接','Connect with HuFu Wallet'],['使用 HuFu 或 Anchor 钱包连接','Connect with HuFu or Anchor Wallet'],['普通浏览器将显示 Anchor 二维码；HuFu 内会直接请求当前账户。','A standard browser displays an Anchor QR code; HuFu requests the current account directly.'],['钱包只负责账户授权与交易签名，DApp 不接触私钥。','The wallet only authorizes the account and signs transactions. The DApp never accesses private keys.'],['连接中…','Connecting…'],['钱包已连接','Wallet connected'],['钱包已断开','Wallet disconnected'],
+  ['跳到主要内容','Skip to main content'],['返回上一页','Back'],['治理中心','DAO Governance'],['治理通知','Governance notifications'],['语言','Language'],['未连接','Not connected'],['连接钱包','Connect wallet'],['断开连接','Disconnect'],['钱包连接','Wallet connection'],['选择连接方式','Choose a connection method'],['HuFu 浏览器插件','HuFu browser extension'],['使用本机已安装的钱包','Use the wallet installed in this browser'],['二维码连接','Connect with QR code'],['使用 HuFu 手机钱包扫码','Scan with the HuFu mobile wallet'],['使用 HuFu 钱包连接','Connect with HuFu Wallet'],['使用 HuFu 或 Anchor 钱包连接','Connect with HuFu or Anchor Wallet'],['普通浏览器将显示 Anchor 二维码；HuFu 内会直接请求当前账户。','A standard browser displays an Anchor QR code; HuFu requests the current account directly.'],['钱包只负责账户授权与交易签名，DApp 不接触私钥。','The wallet only authorizes the account and signs transactions. The DApp never accesses private keys.'],['连接中…','Connecting…'],['钱包已连接','Wallet connected'],['钱包已断开','Wallet disconnected'],
   ['概览','Overview'],['网络与治理','Network & governance'],['投票','Vote'],['治理','Governance'],['社区治理','Governance'],['我的','Profile'],['当前治理账户','Governance account'],['日常钱包','Daily wallet'],['我的治理权','My governance power'],
   ['已投 FLON','Staked FLON'],['已选 BP','Selected BPs'],['待领取','Claimable'],['进行中','in progress'],['当前席位','Active seats'],['区块','Block'],['需要你处理','Action required'],['全部','All'],
   ['正式投票','Formal vote'],['剩余','Remaining'],['小时','hours'],['你有','You have'],['票权','voting power'],['去投票','Vote now'],['投票奖励已结算','Voter rewards settled'],['领取','Claim'],['个所投节点进入','voted node entered'],['建议检查节点状态与待生效排名','Review node status and pending ranking'],['查看','View'],
@@ -208,7 +208,11 @@ function setLanguage(language){currentLanguage=normalizeLanguage(language);local
 document.documentElement.dataset.network=runtimeConfig.network;
 renderNetworkNames();
 
-function showView(name){
+const viewHistory=[];
+function showView(name,recordHistory=true){
+  const current=views.find(view=>view.classList.contains('is-active'))?.dataset.view;
+  if(!views.some(view=>view.dataset.view===name))return;
+  if(recordHistory&&current&&current!==name)viewHistory.push(current);
   views.forEach(view=>{const active=view.dataset.view===name;view.hidden=!active;view.classList.toggle('is-active',active)});
   nav.forEach(button=>button.classList.toggle('is-active',button.dataset.viewTarget===name));
   window.scrollTo({top:0,behavior:'smooth'});
@@ -217,9 +221,11 @@ function showView(name){
   if(name==='dao')Promise.all([refreshGovernance(),refreshDiscussions()]);
 }
 function navigateBack(){
-  if(window.history.length>1){window.history.back();return}
+  if(!sheet.hidden){closeSheet();return}
+  const previous=viewHistory.pop();
+  if(previous){showView(previous,false);return}
   const current=views.find(view=>view.classList.contains('is-active'))?.dataset.view;
-  if(current&&current!=='overview'){showView('overview');return}
+  if(current&&current!=='overview'){showView('overview',false);return}
   showToast(currentLanguage==='zh-CN'?'没有可返回的上一页':'No previous page is available');
 }
 function setNodeMode(mode='directory'){
