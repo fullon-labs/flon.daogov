@@ -1,4 +1,11 @@
 export default {
+  "Confirm proposal transaction": "確認提案交易",
+  "The transaction has been checked. The next step opens the HuFu signer directly.": "交易內容已檢查完成，下一步將直接開啟 HuFu 簽名視窗。",
+  "Execution actions": "執行 actions",
+  "Argument size": "參數大小",
+  "Verify the account, contract, action, and arguments again in HuFu.": "請在 HuFu 簽名頁再次核對帳戶、合約、action 和參數。",
+  "Sign in HuFu": "在 HuFu 中簽名",
+
   "Voting records an equal amount of DAO governance power in the contract": "投票後由合約記錄等額 DAO 治理權",
   "DAO governance power": "DAO 治理權",
   "Governance power is recorded internally by dao.gov and does not count toward BP ranking.": "治理權由 dao.gov 合約內部記錄，不計入 BP 排名。",

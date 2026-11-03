@@ -182,7 +182,7 @@ function renderNetworkNames(){document.documentElement.dataset.network=runtimeCo
 
 [['无统计记录','No statistics recorded'],['无应出块','No expected blocks'],['查询失败','Query failed'],['数据无效','Invalid data'],['暂无 Epoch 记录','No epoch records yet'],['Epoch 出块率趋势','Epoch production rate trend'],['期记录','epochs recorded'],['柱高表示出块率，实出数量见提示；无统计记录不代表漏块。','Bar height shows production rate; counts appear in the tooltip. Missing records do not imply missed blocks.']].forEach(([zh,en])=>translations.set(zh,en));
 [['Epoch 表现','Epoch performance'],['完整节点状态','Full node status'],['实出 / 应出','produced / expected'],['统计不一致','Inconsistent statistics'],['最近 30 个 Epoch 出块率','Production rate for the last 30 epochs'],['已观测出块率','Observed production rate'],['未知 / 无应出块','Unknown / no expected blocks'],['无观测数据','No observations'],['已封存','Closed'],['未封存','Open'],['Idle skipped 不计入出块率','Idle skipped is excluded from the production rate']].forEach(([zh,en])=>translations.set(zh,en));
-function translateText(value){if(currentLanguage==='zh-CN')return value;let output=value;[...translations.entries()].sort((a,b)=>b[0].length-a[0].length).forEach(([zh,en])=>{output=output.split(zh).join(en)});const terms=localeTerms[currentLanguage];if(terms)Object.entries(terms).sort((a,b)=>b[0].length-a[0].length).forEach(([en,localized])=>{output=output.split(en).join(localized)});return output}
+function translateText(value){if(currentLanguage==='zh-CN')return value;let output=value;[...translations.entries()].sort((a,b)=>b[0].length-a[0].length).forEach(([zh,en])=>{output=output.split(zh).join(en)});const terms=localeTerms[currentLanguage];if(terms)Object.entries(terms).sort((a,b)=>b[0].length-a[0].length).forEach(([en,localized])=>{output=output.replace(new RegExp('(?<![A-Za-z])'+en.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![A-Za-z])','g'),()=>localized)});return output}
 function applyTranslations(root=document){
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
   while((node=walker.nextNode())){
@@ -674,17 +674,28 @@ async function submitProposal(target){
   const proposal_type=form.proposalType.value,title=form.title.value.trim(),summary=form.summary.value.trim(),metadata_uri=form.metadataUri.value.trim(),discussion_uri=form.discussionUri.value.trim();target.disabled=true;
   try{
     if(isHuFuApp())walletSession=await authorizeHuFuSigning(walletSession);
-    const actions=[];
+    const actions=[],reviews=[];
     if(proposal_type==='parameter')for(const row of form.querySelectorAll('.proposal-action-row')){
       const [contract,action_name]=row.querySelector('[name="targetAction"]').value.split('::'),args=proposalActionArgs(row);
-      const data=await serializeGovernanceAction(contract,action_name,args);actions.push({contract,action_name,data});
+      const data=await serializeGovernanceAction(contract,action_name,args);actions.push({contract,action_name,data});reviews.push({contract,action_name,args});
     }
+    if(proposal_type==='parameter'&&!actions.length)throw new Error(currentLanguage==='zh-CN'?'可执行提案至少需要一个 action':'At least one action is required');
+    const latest=await loadGovernance(walletSession.account);
+    let threshold=Number.parseFloat(latest.config?.proposal_threshold);
+    if(actions.length&&latest.riskSupported){
+      const levels=actions.map(action=>Number(latest.actionPolicies.find(row=>row.contract===action.contract&&row.action_name===action.action_name&&(row.enabled===true||Number(row.enabled)===1))?.risk_level));
+      const risk=latest.riskConfigs.find(row=>Number(row.risk_level)===Math.max(...levels)&&(row.enabled===true||Number(row.enabled)===1));
+      if(!risk)throw new Error(currentLanguage==='zh-CN'?'风险策略不可用':'Risk policy unavailable');
+      threshold=Number.parseFloat(risk.proposal_threshold);
+    }
+    if(!Number.isFinite(threshold)||Number.parseFloat(latest.power?.power||'0')<threshold)throw new Error(`${currentLanguage==='zh-CN'?'治理权不足':'Insufficient governance power'}: ${threshold} POWER`);
+    governanceState=latest;
     const bytes=actions.length?validateFrozenActions(actions,enabledAllowlist(governanceState.allowlist),governanceState.config):0;
     const content_hash=await sha256Hex(JSON.stringify({title,summary,metadata_uri,discussion_uri,actions}));
     const action={account:'dao.gov',name:'propose',data:{proposer:walletSession.account,proposal_type,title,summary,content_hash,metadata_uri,discussion_uri,actions}};
     pendingProposalTransaction={action,bytes};
     const actionParameterSize=actions.length?`${bytes} bytes`:(currentLanguage==='zh-CN'?'无执行参数':'No execution parameters');
-    openSheet(`<h2 id="sheet-title">确认提案交易</h2><p class="sheet-subtitle">交易内容已检查完成，下一步将直接打开 HuFu 签名窗口。</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>dao.gov::propose</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal_type)}</strong></div><div><span>标题</span><strong>${escapeHtml(title)}</strong></div><div><span>执行 actions</span><strong>${actions.length}</strong></div><div><span>参数大小</span><strong>${actionParameterSize}</strong></div></div><p class="sign-warning">请在 HuFu 签名页再次核对账户、合约、action 和参数。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-confirm">在 HuFu 中签名</button></div>`);
+    openSheet(`<h2 id="sheet-title">确认提案交易</h2><p class="sheet-subtitle">交易内容已检查完成，下一步将直接打开 HuFu 签名窗口。</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>dao.gov::propose</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal_type)}</strong></div><div><span>标题</span><strong>${escapeHtml(title)}</strong></div><div><span>执行 actions</span><strong>${actions.length}</strong></div><div><span>参数大小</span><strong>${actionParameterSize}</strong></div></div>${reviews.map(item=>`<div class="profile-review"><strong>${escapeHtml(item.contract)}::${escapeHtml(item.action_name)}</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(JSON.stringify(item.args,null,2))}</pre></div>`).join('')}<p class="sign-warning">请在 HuFu 签名页再次核对账户、合约、action 和参数。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-confirm">在 HuFu 中签名</button></div>`);
   }catch(error){target.disabled=false;const code=String(error?.message||error);showToast(code.includes('ACTION_ABI_NOT_READY')?'Action ABI 尚未加载完成':code.includes('INVALID_ABI_FIELD')||code.includes('REQUIRED_ABI_FIELD')?'请检查 action 参数':code.includes('ACTION_DATA_TOO_LARGE')||code.includes('TOTAL_ACTION_DATA_TOO_LARGE')?(currentLanguage==='zh-CN'?'Action 参数内容过长，请缩短后再提交。':'The action arguments are too long. Shorten them before submitting.'):walletErrorMessage(error))}
 }
 async function confirmProposal(target){

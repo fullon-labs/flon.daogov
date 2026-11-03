@@ -1,4 +1,11 @@
 export default {
+  "Confirm proposal transaction": "Confirmer la transaction de proposition",
+  "The transaction has been checked. The next step opens the HuFu signer directly.": "La transaction a été vérifiée. La prochaine étape ouvre directement la signature HuFu.",
+  "Execution actions": "Actions exécutables",
+  "Argument size": "Taille des paramètres",
+  "Verify the account, contract, action, and arguments again in HuFu.": "Vérifiez à nouveau le compte, le contrat, les actions et les paramètres dans HuFu.",
+  "Sign in HuFu": "Signer dans HuFu",
+
   "Voting records an equal amount of DAO governance power in the contract": "Le vote enregistre un pouvoir de gouvernance DAO équivalent dans le contrat",
   "DAO governance power": "Pouvoir de gouvernance DAO",
   "Governance power is recorded internally by dao.gov and does not count toward BP ranking.": "Le pouvoir de gouvernance est enregistré dans dao.gov et ne compte pas dans le classement des BP.",
