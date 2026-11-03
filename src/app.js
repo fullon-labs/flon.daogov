@@ -580,11 +580,25 @@ const governanceFieldLabels={
     unstake_delay_sec:['自质押解锁期（秒）','Self-stake unlock period (seconds)']
   }
 };
+function proposalIntegerRange(field,actionKey){
+  if(field.array||field.structured)return null;
+  if(actionKey==='flon::setbpquorum'&&field.name==='active_bp_quorum')return ['3','21'];
+  const match=field.baseType.match(/^(u?)int(8|16|32|64|128)$/);if(!match)return null;
+  const bits=BigInt(match[2]),unsigned=match[1]==='u';return [String(unsigned?0n:-(1n<<(bits-1n))),String((1n<<(unsigned?bits:bits-1n))-1n)];
+}
+function validateProposalInteger(input,field,key){
+  const range=proposalIntegerRange(field,key);if(!range)return true;
+  const raw=input.value.trim(),valid=(!raw&&field.optional)||(/^-?\d+$/.test(raw)&&BigInt(raw)>=BigInt(range[0])&&BigInt(raw)<=BigInt(range[1]));
+  const message=valid?'':(currentLanguage==='zh-CN'?`请输入 ${range[0]}～${range[1]} 范围内的整数`:`Enter an integer between ${range[0]} and ${range[1]}`);
+  input.setCustomValidity(message);input.setAttribute('aria-invalid',String(!valid));const error=input.parentElement.querySelector('[data-integer-error]');if(error){error.textContent=message;error.hidden=valid;}return valid;
+}
 function abiFieldControl(field,currentValue,actionKey=''){
   const required=field.optional?'':' required',labels=governanceFieldLabels[actionKey]?.[field.name],fieldLabel=labels?labels[currentLanguage==='zh-CN'?0:1]:field.name,label=`${escapeHtml(fieldLabel)} <small>${escapeHtml(field.type)}</small>`;
   if(field.baseType==='bool'&&!field.array)return `<label class="abi-bool-field"><span>${label}</span><input type="checkbox" data-abi-field="${escapeHtml(field.name)}"${currentValue===true||Number(currentValue)===1?' checked':''}></label>`;
   if(field.array||field.structured){const value=currentValue==null?'':JSON.stringify(currentValue);return `<label><span>${label}</span><textarea data-abi-field="${escapeHtml(field.name)}" rows="3" spellcheck="false" placeholder="${field.array?'[]':'{}'}"${required}>${escapeHtml(value)}</textarea></label>`}
   if(field.baseType==='time_point'||field.baseType==='time_point_sec')return `<label><span>${label}</span><input type="datetime-local" data-abi-field="${escapeHtml(field.name)}"${required}></label>`;
+  const range=proposalIntegerRange(field,actionKey);
+  if(range)return `<label><span>${label}</span><input type="text" inputmode="numeric" data-abi-field="${escapeHtml(field.name)}" value="${escapeHtml(String(currentValue??''))}"${required}><small class="field-note">${currentLanguage==='zh-CN'?'整数范围':'Integer range'}: ${range[0]}～${range[1]}</small><small class="inline-error" data-integer-error aria-live="polite" hidden></small></label>`;
   const inputmode=/^u?int|asset|float/.test(field.baseType)?' inputmode="decimal"':'',value=currentValue==null?'':` value="${escapeHtml(String(currentValue))}"`;
   return `<label><span>${label}</span><input type="text" data-abi-field="${escapeHtml(field.name)}" placeholder="${escapeHtml(field.baseType)}"${value}${inputmode}${required}></label>`;
 }
@@ -623,7 +637,7 @@ async function updateProposalActionSize(row){
 }
 function proposalActionArgs(row){
   if(!Array.isArray(row._abiFields))throw new Error('ACTION_ABI_NOT_READY');
-  return Object.fromEntries(row._abiFields.map(field=>{const input=[...row.querySelectorAll('[data-abi-field]')].find(element=>element.dataset.abiField===field.name);if(!input)throw new Error(`ACTION_ABI_FIELD_MISSING:${field.name}`);let raw=input.value;if((field.baseType==='time_point'||field.baseType==='time_point_sec')&&raw)raw=new Date(raw).toISOString().replace(/\.000Z$/,'');return[field.name,abiFieldValue(field,raw,input.checked)]}));
+  return Object.fromEntries(row._abiFields.map(field=>{const input=[...row.querySelectorAll('[data-abi-field]')].find(element=>element.dataset.abiField===field.name);if(!input)throw new Error(`ACTION_ABI_FIELD_MISSING:${field.name}`);if(!validateProposalInteger(input,field,row.querySelector('[name="targetAction"]').value)){throw new Error(`INVALID_ABI_FIELD:${field.name}`);}let raw=input.value;if((field.baseType==='time_point'||field.baseType==='time_point_sec')&&raw)raw=new Date(raw).toISOString().replace(/\.000Z$/,'');return[field.name,abiFieldValue(field,raw,input.checked)]}));
 }
 function syncProposalType(){
   const form=sheetContent.querySelector('[data-proposal-form]'),editor=form?.querySelector('[data-proposal-actions]'),list=form?.querySelector('[data-proposal-action-list]');if(!form||!editor||!list)return;
@@ -1080,7 +1094,7 @@ document.addEventListener('click',async event=>{
   if(action==='claim-vote-refund')await claimVoteRefund(target);
 });
 sheetContent.addEventListener('change',event=>{if(event.target?.name==='proposalType')syncProposalType();if(event.target?.name==='targetAction')void renderProposalActionFields(event.target.closest('.proposal-action-row'));if(event.target?.name==='operation'){const max=sheetContent.querySelector('[data-action="stake-max"]'),input=sheetContent.querySelector('[data-stake-form] [name="amount"]');if(max)max.hidden=event.target.value!=='sub';if(input)input.value=''}});
-sheetContent.addEventListener('input',event=>{const row=event.target.closest?.('.proposal-action-row');if(row)scheduleProposalActionSizeCheck(row);if(event.target.matches?.('[data-region-search]')){const select=sheetContent.querySelector('[name="region"]');if(select)select.innerHTML=candidateRegionOptions(event.target.value,'')}});
+sheetContent.addEventListener('input',event=>{const row=event.target.closest?.('.proposal-action-row');if(row){const field=row._abiFields?.find(field=>field.name===event.target.dataset.abiField);if(field)validateProposalInteger(event.target,field,row.querySelector('[name="targetAction"]').value);scheduleProposalActionSizeCheck(row);}if(event.target.matches?.('[data-region-search]')){const select=sheetContent.querySelector('[name="region"]');if(select)select.innerHTML=candidateRegionOptions(event.target.value,'')}});
 sheetContent.addEventListener('focusin',event=>{if(event.target.matches?.('input,textarea,select')){syncVisualViewport();keepFocusedFieldVisible(event.target)}});
 sheetContent.addEventListener('focusout',()=>window.setTimeout(syncVisualViewport,80));
 window.visualViewport?.addEventListener('resize',syncVisualViewport);

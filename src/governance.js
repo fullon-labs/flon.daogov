@@ -81,6 +81,8 @@ export function abiFieldValue(field,raw,checked=false){
   if(!value)throw new Error(`REQUIRED_ABI_FIELD:${field.name}`);
   if(/^uint(?:8|16|32|64|128)$/.test(field.baseType)&&!/^\d+$/.test(value))throw new Error(`INVALID_ABI_FIELD:${field.name}`);
   if(/^int(?:8|16|32|64|128)$/.test(field.baseType)&&!/^-?\d+$/.test(value))throw new Error(`INVALID_ABI_FIELD:${field.name}`);
+  const integer=field.baseType.match(/^(u?)int(8|16|32|64|128)$/);
+  if(integer){const bits=BigInt(integer[2]),unsigned=integer[1]==='u',min=unsigned?0n:-(1n<<(bits-1n)),max=(1n<<(unsigned?bits:bits-1n))-1n,n=BigInt(value);if(n<min||n>max)throw new Error(`INVALID_ABI_FIELD:${field.name}`);}
   return value;
 }
 
