@@ -53,3 +53,7 @@ export const generatedLocaleTerms={
   es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es,...walletProviderTerms.es,...bpStatusTerms.es,...epochTimingTerms.es},
   'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW'],...walletProviderTerms['zh-TW'],...bpStatusTerms['zh-TW'],...epochTimingTerms['zh-TW']}
 };
+
+for(const [locale,value] of Object.entries({fr:'Dernières statistiques complètes finalisées',ja:'直近の完全確定済み統計',ko:'최근 완전히 확정된 통계',es:'Últimas estadísticas completas finalizadas','zh-TW':'最近完整封存統計'})){
+  generatedLocaleTerms[locale]['Latest complete finalized statistics']=value;
+}
