@@ -241,7 +241,14 @@ function setMobileVoteTab(tab='directory'){
   if(mobile)window.scrollTo({top:0,behavior:'smooth'});
 }
 mobileVoteMedia.addEventListener?.('change',()=>setMobileVoteTab(mobileVoteTab));
-function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
+function showToast(message){
+  clearTimeout(toastTimer);
+  const feedback=sheet.querySelector('[data-sheet-feedback]');
+  if(!sheet.hidden&&feedback){toast.hidden=true;feedback.textContent=message;feedback.hidden=false;return}
+  toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200);
+}
+function clearSheetFeedback(){const feedback=sheet.querySelector('[data-sheet-feedback]');if(feedback){feedback.textContent='';feedback.hidden=true}}
+
 function isKeyboardField(element){return Boolean(element?.matches?.('textarea,input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])'))}
 function keepFocusedFieldVisible(element=document.activeElement){
   if(sheet.hidden||!isKeyboardField(element)||!sheet.contains(element))return;
@@ -258,8 +265,8 @@ function syncVisualViewport(){
   document.documentElement.style.setProperty('--visual-keyboard-inset',`${keyboardInset}px`);
   keepFocusedFieldVisible(active);
 }
-function openSheet(html){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetViewportBaseline=Math.max(window.innerHeight,window.visualViewport?.height||0);sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden';syncVisualViewport()}
-function closeSheet(){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;sheet.classList.remove('is-keyboard-open');document.body.style.overflow='';document.documentElement.style.setProperty('--visual-keyboard-inset','0px');document.documentElement.style.setProperty('--visual-viewport-height','100dvh')}
+function openSheet(html){clearSheetFeedback();if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetViewportBaseline=Math.max(window.innerHeight,window.visualViewport?.height||0);sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden';syncVisualViewport()}
+function closeSheet(){clearSheetFeedback();if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;sheet.classList.remove('is-keyboard-open');document.body.style.overflow='';document.documentElement.style.setProperty('--visual-keyboard-inset','0px');document.documentElement.style.setProperty('--visual-viewport-height','100dvh')}
 function walletProviderName(provider){return provider==='iframe'?'HuFu App':provider==='hufu'?'HuFu Wallet':'Anchor Wallet'}
 function renderWallet(){const nextAccount=walletSession?.account||null;if(nextAccount!==voteDraftAccount){voteDraftAccount=nextAccount;voteDraftDirty=false;votingState=null;document.documentElement.classList.add('vote-account-loading')} const account=walletSession?.account||'未连接',label=walletSession?.account||'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
 const bpStatusMeta={0:['未评估',''],1:['合格','qualified'],2:['降级',''],3:['警告',''],4:['暂停','suspended'],5:['样本不足',''],6:['网络事件',''],7:['试运行','probation']};
@@ -993,10 +1000,11 @@ async function submitClaimRewards(target){
   if(!walletSession)return;target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
   try{const result=await transact(walletSession,[{account:'voter.reward',name:'claimrewards',data:{caller:walletSession.account,voter:walletSession.account,max_steps:30}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">奖励领取交易已广播</h2><p>${escapeHtml(walletSession.account)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'确认签名':'Confirm signature';showToast(walletErrorMessage(error))}
 }
-async function openBPClaimSheet(producer=''){
+async function openBPClaimSheet(producer='',maxSteps=24){
   if(!walletSession){openWalletSheet();return}
   const value=String(producer||walletSession.account||'').trim();
   openSheet(`<h2 id="sheet-title">BP 奖励领取</h2><p class="sheet-subtitle">当前账户可为自己或任意 BP 触发领取</p><form class="wizard-form" data-bp-claim-form><label><span>BP 收款账户</span><input name="producer" maxlength="12" pattern="[a-z1-5.]{1,12}" value="${escapeHtml(value)}" required></label><label><span>本次最多处理</span><select name="maxSteps"><option value="24">24 Epoch</option><option value="48">48 Epoch</option><option value="12">12 Epoch</option><option value="1">1 Epoch</option></select></label><p class="field-note">可由任意钱包代为触发。奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。</p></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="bp-claim-check">检查奖励</button></div>`);
+  sheetContent.querySelector('[name="maxSteps"]').value=String([1,12,24,48].includes(Number(maxSteps))?Number(maxSteps):24);
 }
 async function checkBPClaim(target){
   if(!walletSession)return;
@@ -1006,7 +1014,7 @@ async function checkBPClaim(target){
   try{
     const rewards=await loadProducerRewards(producer);
     if(!rewards.supported)throw new Error('CLAIM_UNSUPPORTED');
-    openSheet(`<h2 id="sheet-title">确认代领</h2><p class="sheet-subtitle">flon::claimrewards</p><div class="sign-summary"><div><span>触发账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>BP 收款账户</span><strong>${escapeHtml(producer)}</strong></div><div><span>基础奖励</span><strong>${escapeHtml(rewards.baseUnclaimed)}</strong></div><div><span>基础待领取记录</span><strong>${rewards.baseRows}</strong></div><div><span>GAS 奖励</span><strong>${escapeHtml(rewards.gasUnclaimed)}</strong></div><div><span>GAS 待领取记录</span><strong>${rewards.gasRows}</strong></div><div><span>本次最多处理</span><strong>${maxSteps}</strong></div></div><p class="sign-warning">${rewards.hasClaimable?'奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。最终到账金额以交易执行结果为准。':'暂无可领取的 BP 奖励'}</p><div class="sheet-actions"><button class="secondary-button" data-action="bp-claim" data-producer="${escapeHtml(producer)}">返回</button><button class="primary-button" data-action="bp-claim-sign" data-producer="${escapeHtml(producer)}" data-max-steps="${maxSteps}" ${rewards.hasClaimable?'':'disabled'}>确认签名</button></div>`);
+    openSheet(`<h2 id="sheet-title">确认代领</h2><p class="sheet-subtitle">flon::claimrewards</p><div class="sign-summary"><div><span>触发账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>BP 收款账户</span><strong>${escapeHtml(producer)}</strong></div><div><span>基础奖励</span><strong>${escapeHtml(rewards.baseUnclaimed)}</strong></div><div><span>基础待领取记录</span><strong>${rewards.baseRows}</strong></div><div><span>GAS 奖励</span><strong>${escapeHtml(rewards.gasUnclaimed)}</strong></div><div><span>GAS 待领取记录</span><strong>${rewards.gasRows}</strong></div><div><span>本次最多处理</span><strong>${maxSteps}</strong></div></div><p class="sign-warning">${rewards.hasClaimable?'奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。最终到账金额以交易执行结果为准。':'暂无可领取的 BP 奖励'}</p><div class="sheet-actions"><button class="secondary-button" data-action="bp-claim" data-producer="${escapeHtml(producer)}" data-max-steps="${maxSteps}">返回</button><button class="primary-button" data-action="bp-claim-sign" data-producer="${escapeHtml(producer)}" data-max-steps="${maxSteps}" ${rewards.hasClaimable?'':'disabled'}>确认签名</button></div>`);
   }catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'检查奖励':'Check rewards';const code=String(error?.message||error);showToast(code.includes('BP_NOT_FOUND')?(currentLanguage==='zh-CN'?'未找到该 BP':'BP not found'):code.includes('CLAIM_UNSUPPORTED')?(currentLanguage==='zh-CN'?'当前合约尚未启用 BP 奖励领取':'BP reward claims are not enabled by the current contract'):code)}
 }
 async function submitBPClaim(target){
@@ -1079,7 +1087,7 @@ document.addEventListener('click',async event=>{
   if(action==='dao-advance')await submitDaoAction(target,target.dataset.governanceAction,target.dataset.proposalId);
   if(action==='claim')await confirmClaimRewards();
   if(action==='claim-sign')await submitClaimRewards(target);
-  if(action==='bp-claim')await openBPClaimSheet(target.dataset.producer);
+  if(action==='bp-claim')await openBPClaimSheet(target.dataset.producer,target.dataset.maxSteps);
   if(action==='bp-claim-check')await checkBPClaim(target);
   if(action==='bp-claim-sign')await submitBPClaim(target);
   if(action==='candidate')await prepareCandidate();
@@ -1115,7 +1123,7 @@ overlay.addEventListener('click',closeSheet);
 document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){voteDraftDirty=true;const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-votes]')){try{const units=decimalUnits(event.target.value||'0');if(units>0n)event.target.value=formatVoteInput(units)}catch{}}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
 document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]')){voteDraftDirty=true;updateAllocation()}});
 document.addEventListener('click',event=>{if(!event.target.closest('.top-language'))closeLanguageMenu()});
-document.addEventListener('keydown',event=>{if(event.key==='Escape')closeLanguageMenu()});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){const menu=document.querySelector('[data-language-menu]');if(menu?.hidden===false){closeLanguageMenu();return}if(!sheet.hidden){event.preventDefault();closeSheet()}}});
 
 function selectedCount(){return [...document.querySelectorAll('.select-node input[type="checkbox"]:checked')].length}
 function allocationTotal(){try{return draftVoteAllocations().reduce((sum,item)=>sum+item.votes,0n)}catch{return 0n}}

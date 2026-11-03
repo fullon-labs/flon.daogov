@@ -85,3 +85,13 @@
   .mobile-vote-dock[hidden]{display:none}
 }
 .bp-epoch-card{margin:16px 0;padding:16px;border:1px solid var(--divider);border-radius:12px;background:var(--card,#fff)}.bp-epoch-card header,.bp-epoch-card footer{display:flex;align-items:center;justify-content:space-between;gap:10px}.bp-epoch-card header strong{font-size:14px}.bp-epoch-card header span{font-size:11px;color:var(--muted)}.bp-epoch-card a{font-size:11px;color:var(--brand);text-decoration:none}.bp-epoch-rate{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px;margin-top:14px}.bp-epoch-rate>b{font-size:32px;line-height:1.15;letter-spacing:-1px;color:var(--text)}.bp-epoch-rate>span{font-size:11px;color:var(--muted)}.bp-epoch-counts{margin:7px 0 0;font-size:10px;color:var(--muted)}.bp-epoch-trend{display:flex;align-items:flex-end;gap:3px;height:44px;margin-top:16px}.bp-epoch-trend i{display:block;flex:1;min-width:0;height:max(3px,var(--epoch-rate));background:#61b48e;border-radius:3px 3px 0 0}.bp-epoch-trend i.is-unknown{height:3px;background:#dfe7e2}.bp-epoch-trend i.is-warning{background:#d5aa59}.bp-epoch-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;color:var(--muted);font-size:9px}.bp-epoch-card footer{margin-top:12px;padding-top:10px;border-top:1px solid var(--divider)}.bp-epoch-card footer small{font-size:9px;color:var(--muted)}
+
+/* Allow translated labels to wrap within the vote card and filter row. */
+.node-directory-toolbar .tabs{min-width:0;flex-wrap:wrap}
+.vote-summary-card{min-width:0;overflow-wrap:anywhere}
+.vote-summary-card .node-vote-actions{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)}
+.vote-summary-card .node-vote-actions button{min-width:0;height:auto;min-height:42px;white-space:normal;overflow-wrap:anywhere;padding:10px 8px}
+.vote-summary-card .epoch-inline{flex-wrap:wrap}
+.vote-summary-card .epoch-inline>div{min-width:0;flex:1}
+
+.sheet-feedback{margin:24px 0 14px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--soft);color:var(--text);overflow-wrap:anywhere}
