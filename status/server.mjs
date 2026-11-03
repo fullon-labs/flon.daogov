@@ -9,6 +9,8 @@ import {startAdmin} from './admin.mjs';
 import {verifyAdmission} from './admission.mjs';
 import {rm} from 'node:fs/promises';
 import {createDiscovery,discoverySources,mergeDirectory} from './discovery.mjs';
+import {openFinalizerStore} from './finalizer-store.mjs';
+import {createFinalizerService} from './finalizer-service.mjs';
 const root=path.dirname(fileURLToPath(import.meta.url));
 // An explicit configuration error must stop startup, never silently select another network.
 const raw=JSON.parse(await readFile(process.env.STATUS_CONFIG||path.join(root,'config.json'),'utf8').catch(error=>{
@@ -68,11 +70,33 @@ await discovery.refresh();
 setInterval(()=>discovery.refresh().catch(()=>{}),30000).unref();
 const directory=()=>mergeDirectory(discovery.snapshots(),[...collectors.values()].map(c=>c.status()).filter(s=>!s.admission?.expired));
 await startAdmin({root,store,config,install});
+const finalizerStore=await openFinalizerStore(path.join(data,'finalizer.sqlite'));
+const finalizers=createFinalizerService(discoverySources(raw),finalizerStore,{audience:config.publicOrigin});
+const proofRequests=[];
 http.createServer(async(req,res)=>{
  const url=new URL(req.url,'http://localhost');
  res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('Cache-Control','no-store');
  const json=(value,code=200)=>{res.writeHead(code,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(value))};
+ if(url.pathname.startsWith('/api/finalizers')){
+  try{
+   const network=url.searchParams.get('network')||'testnet';
+   if(req.method==='GET'&&url.pathname==='/api/finalizers.json')return json(await finalizers.list(network));
+   if(req.method==='GET'&&url.pathname==='/api/finalizers/proof.json'){
+    const list=await finalizers.list(network),entry=list.finalizers.find(f=>f.account===url.searchParams.get('account'));
+    return entry?json({account:entry.account,network,online_proof:entry.online_proof}):json({error:'UNKNOWN_ACCOUNT'},404);
+   }
+   if(req.method!=='POST'||!['/api/finalizers/challenge','/api/finalizers/proof'].includes(url.pathname))return json({error:'NOT_FOUND'},404);
+   if(req.headers['content-type']!=='application/json')return json({error:'JSON_REQUIRED'},415);
+   // Cross-origin requests cannot consume public challenge/verifier capacity.
+   if(req.headers.origin&&req.headers.origin!==new URL(config.publicOrigin).origin&&!['http://127.0.0.1:'+ (process.env.PORT||8787),'http://localhost:'+(process.env.PORT||8787)].includes(req.headers.origin))return json({error:'FORBIDDEN_ORIGIN'},403);
+   const now=Date.now();while(proofRequests.length&&proofRequests[0]<now-60000)proofRequests.shift();if(proofRequests.length>=30)return json({error:'RATE_LIMITED'},429);proofRequests.push(now);
+   let body='';for await(const chunk of req){body+=chunk;if(Buffer.byteLength(body)>8192)return json({error:'BODY_TOO_LARGE'},413)}
+   const input=JSON.parse(body),allowed=url.pathname.endsWith('/challenge')?['network','account']:['challenge_id','signature'];
+   if(!input||typeof input!=='object'||Object.keys(input).some(k=>!allowed.includes(k)))return json({error:'UNEXPECTED_FIELDS_NO_PRIVATE_KEYS'},400);
+   return json(url.pathname.endsWith('/challenge')?await finalizers.issue(input.network,input.account):await finalizers.submit(input.challenge_id,input.signature));
+  }catch(error){const message=/^[A-Z0-9_]+$/.test(error.message)?error.message:'FINALIZER_SERVICE_UNAVAILABLE';return json({error:message},/UNAVAILABLE|MISMATCH/.test(message)?503:400)}
+ }
  if(url.pathname==='/api/bps.json'){
   const entries=directory();
   return json({title:config.title,public_origin:config.publicOrigin,default_bp:entries.some(s=>s.id===config.defaultBp)?config.defaultBp:entries[0]?.id,discovery:discovery.health(),bps:entries.map(s=>({id:s.id,label:s.label,network:s.network,producer:s.producer,role:s.role,status:s.stale?'unknown':s.status,updated_at:s.updated_at,stale:s.stale,admission:s.admission,source:s.source||'node_monitor'}))});
@@ -82,7 +106,7 @@ http.createServer(async(req,res)=>{
   const snapshot=entries.find(s=>s.id===id)||discovery.snapshots().find(s=>s.id===id);
   return snapshot?json(snapshot):json({error:'unknown_bp'},404);
  }
- const files={'/':'index.html','/app.js':'app.js','/epoch-chart.js':'epoch-chart.js','/style.css':'style.css','/epoch-chart.css':'epoch-chart.css'};
+ const files={'/':'index.html','/finalizers':'finalizers.html','/finalizers.html':'finalizers.html','/finalizers.js':'finalizers.js','/finalizers.css':'finalizers.css','/app.js':'app.js','/epoch-chart.js':'epoch-chart.js','/style.css':'style.css','/epoch-chart.css':'epoch-chart.css'};
  if(!files[url.pathname]){res.writeHead(404);return res.end('Not found');}
  res.setHeader('Content-Type',url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.css')?'text/css':'text/html; charset=utf-8');
  res.end(await readFile(path.join(root,'public',files[url.pathname])));

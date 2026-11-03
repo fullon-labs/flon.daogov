@@ -22,10 +22,34 @@ const governanceListTerms={
   'zh-TW':{'Community sentiment is for discussion only and does not replace on-chain governance voting.':'社區表態僅用於討論，不代替鏈上治理投票。','Load more':'載入更多'}
 };
 
+const walletProviderTerms={
+  fr:{'Choose a connection method':'Choisissez une méthode de connexion','HuFu browser extension':'Extension de navigateur HuFu','Use the wallet installed in this browser':'Utiliser le portefeuille installé dans ce navigateur','Connect with QR code':'Connexion par code QR','Scan with the HuFu mobile wallet':'Scanner avec le portefeuille mobile HuFu'},
+  ja:{'Choose a connection method':'接続方法を選択','HuFu browser extension':'HuFu ブラウザ拡張機能','Use the wallet installed in this browser':'このブラウザにインストールされたウォレットを使用','Connect with QR code':'QRコードで接続','Scan with the HuFu mobile wallet':'HuFu モバイルウォレットでスキャン'},
+  ko:{'Choose a connection method':'연결 방법 선택','HuFu browser extension':'HuFu 브라우저 확장 프로그램','Use the wallet installed in this browser':'이 브라우저에 설치된 지갑 사용','Connect with QR code':'QR 코드로 연결','Scan with the HuFu mobile wallet':'HuFu 모바일 지갑으로 스캔'},
+  es:{'Choose a connection method':'Elige un método de conexión','HuFu browser extension':'Extensión de navegador HuFu','Use the wallet installed in this browser':'Usar la cartera instalada en este navegador','Connect with QR code':'Conectar con código QR','Scan with the HuFu mobile wallet':'Escanear con la cartera móvil HuFu'},
+  'zh-TW':{'Choose a connection method':'選擇連接方式','HuFu browser extension':'HuFu 瀏覽器擴充套件','Use the wallet installed in this browser':'使用此瀏覽器已安裝的錢包','Connect with QR code':'使用二維碼連接','Scan with the HuFu mobile wallet':'使用 HuFu 手機錢包掃碼'}
+};
+
+const bpStatusTerms={
+  fr:{Active:'Actifs',Standby:'En attente'},
+  ja:{Active:'稼働中',Standby:'待機中'},
+  ko:{Active:'활성',Standby:'대기'},
+  es:{Active:'Activos',Standby:'En espera'},
+  'zh-TW':{Active:'活躍',Standby:'候補'}
+};
+
+const epochTimingTerms={
+  fr:{'Reward epochs are not enabled yet':'Les epochs de récompense ne sont pas encore activées','Vote changes will take effect in the first epoch after rewards start':'Les changements de vote prendront effet lors de la première epoch après le démarrage des récompenses','Time remaining':'Temps restant','Formal rewards have not started; no finalized production rate is available':'Les récompenses officielles n’ont pas commencé ; aucun taux de production finalisé n’est disponible'},
+  ja:{'Reward epochs are not enabled yet':'報酬Epochはまだ有効になっていません','Vote changes will take effect in the first epoch after rewards start':'投票の変更は報酬開始後の最初のEpochで有効になります','Time remaining':'残り時間','Formal rewards have not started; no finalized production rate is available':'正式報酬はまだ開始されていないため、確定済み出ブロック率はありません'},
+  ko:{'Reward epochs are not enabled yet':'보상 Epoch가 아직 활성화되지 않았습니다','Vote changes will take effect in the first epoch after rewards start':'투표 변경은 보상 시작 후 첫 Epoch에 적용됩니다','Time remaining':'남은 시간','Formal rewards have not started; no finalized production rate is available':'정식 보상이 시작되지 않아 확정된 블록 생성률이 없습니다'},
+  es:{'Reward epochs are not enabled yet':'Las epochs de recompensa aún no están habilitadas','Vote changes will take effect in the first epoch after rewards start':'Los cambios de voto se aplicarán en la primera epoch después de iniciar las recompensas','Time remaining':'Tiempo restante','Formal rewards have not started; no finalized production rate is available':'Las recompensas oficiales no han comenzado; no hay una tasa de producción finalizada disponible'},
+  'zh-TW':{'Reward epochs are not enabled yet':'獎勵 Epoch 尚未啟用','Vote changes will take effect in the first epoch after rewards start':'正式獎勵啟動後，投票變更將在首個 Epoch 生效','Time remaining':'剩餘時間','Formal rewards have not started; no finalized production rate is available':'正式獎勵尚未啟動，暫無封存出塊率'}
+};
+
 export const generatedLocaleTerms={
-  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr},
-  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja},
-  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko},
-  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es},
-  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW']}
+  fr:{...fr,...helpCenterTerms.fr,...discussionTerms.fr,...discussionDetailTerms.fr,...governanceListTerms.fr,...walletProviderTerms.fr,...bpStatusTerms.fr,...epochTimingTerms.fr},
+  ja:{...ja,...helpCenterTerms.ja,...discussionTerms.ja,...discussionDetailTerms.ja,...governanceListTerms.ja,...walletProviderTerms.ja,...bpStatusTerms.ja,...epochTimingTerms.ja},
+  ko:{...ko,...helpCenterTerms.ko,...discussionTerms.ko,...discussionDetailTerms.ko,...governanceListTerms.ko,...walletProviderTerms.ko,...bpStatusTerms.ko,...epochTimingTerms.ko},
+  es:{...es,...helpCenterTerms.es,...discussionTerms.es,...discussionDetailTerms.es,...governanceListTerms.es,...walletProviderTerms.es,...bpStatusTerms.es,...epochTimingTerms.es},
+  'zh-TW':{...zhTW,...discussionTerms['zh-TW'],...discussionDetailTerms['zh-TW'],...governanceListTerms['zh-TW'],...walletProviderTerms['zh-TW'],...bpStatusTerms['zh-TW'],...epochTimingTerms['zh-TW']}
 };

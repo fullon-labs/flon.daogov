@@ -23,6 +23,8 @@ test('uses an explicit unavailable value when governance state cannot be read',(
 
 test('removes meaningless trailing zeroes while preserving real precision',()=>{
   assert.equal(formatOverviewAsset('2000000.00000000 FLON'),'2,000,000 FLON');
+  assert.equal(formatOverviewAsset('0.00000000 POWER'),'0 POWER');
+  assert.equal(formatOverviewAsset('100.00000000 POWER'),'100 POWER');
   assert.equal(formatOverviewAsset('6799.12000000 POWER'),'6,799.12 POWER');
   assert.equal(formatOverviewAsset('— POWER'),'— POWER');
 });

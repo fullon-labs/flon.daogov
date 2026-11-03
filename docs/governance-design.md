@@ -124,6 +124,8 @@
 
 启动期 Active BP 目标值通过 `flon.system::setbpquorum(active_bp_quorum)` 在 3–21 范围内配置。治理中心从 `electconfig` 读取目标值，不得写死 21；试运行连续漏块数优先读取 `bpstatus.probation_missed_streak`，该数值跨 epoch 延续。
 
+主网运营政策建议在 Genesis 阶段保持 21 个 Active BP，由基金会维护节点和经审核的外部节点共同组成，再通过同一 Epoch 投票窗口内的席位替换逐步释放基金会控制权。基金会 BP 产生的净奖励应归集至 DAO Treasury，而不是成为基金会可自由处置或循环巩固自身投票权的资产。完整原则、阶段建议和奖励处理见 [`mainnet-bp-bootstrap-policy.md`](./mainnet-bp-bootstrap-policy.md)。
+
 节点详情页必须展示 `suspension_count`、`suspended_until_epoch`、预计可申请恢复时间、`probation_started_epoch` 和当前连续漏块数。冷却期未结束时禁用“申请恢复”；交易成功只表示进入试运行，不能显示为“已恢复出块”。
 
 ## 5. 节点投票

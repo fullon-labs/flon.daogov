@@ -34,7 +34,7 @@ function desktop(signerAccount='alice'){
   const calls=[];
   const session={auth:{actor:{toString:()=>signerAccount},permission:{toString:()=> 'active'}},chainId:'chain',transact:async args=>{calls.push(['sign',args]);return {transaction_id:'signed'}}};
   const window={};window.parent=window;
-  const run=new Function('window','assertChain','isHuFuApp','rpcInfo','assertFreshChainTime','getAnchorLink','appId','save','transactionOptions',`${transactBody};return transact`)(window,id=>assert.equal(id,'chain'),()=>false,async()=>({}),()=>{},async()=>({login:async()=>{calls.push(['login']);return {session}}}),()=> 'test',()=>{},{});
+  const run=new Function('window','assertChain','isHuFuApp','rpcInfo','assertFreshChainTime','getAnchorLink','appId','anchorDappInfo','save','transactionOptions',`${transactBody};return transact`)(window,id=>assert.equal(id,'chain'),()=>false,async()=>({}),()=>{},async()=>({login:async()=>{calls.push(['login']);return {session}}}),()=> 'test',()=>['DAO','','https://dao.example/'],()=>{},{});
   return {calls,run};
 }
 test('desktop renews identity before sending transaction to a live session',async()=>{

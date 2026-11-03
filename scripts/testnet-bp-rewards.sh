@@ -274,6 +274,17 @@ compare() {
     echo
     echo '## After snapshot assertions'
     summarize "$AFTER_DIR" | sed -n '/## Assertions/,$p'
+    if [[ -n "${CLAIM_SUMMARY:-}" ]]; then
+      echo
+      echo '## Claim-aware strict reconciliation'
+      echo
+      local claim_out
+      claim_out="${CLAIM_RECONCILIATION_OUT:-$AFTER_DIR/claim-reconciliation.json}"
+      "${NODE_BIN:-node}" "$SCRIPT_DIR/reconcile-bp-claims.mjs" \
+        --before "$BEFORE_DIR" --after "$AFTER_DIR" --claims "$CLAIM_SUMMARY" \
+        --epoch "$epoch" --out "$claim_out"
+      jq -r '"- Result: \(if .pass then "PASS" else "FAIL" end)\n- Reconstructed base reward: \(.total_accrued_base_reward)\n- Irreversible claim traces: \(.traced_claim_count)\n- Evidence: `\($out)`"' --arg out "$claim_out" "$claim_out"
+    fi
   } > "$out"
   printf '%s\n' "$out"
 }
@@ -293,6 +304,9 @@ Optional environment:
   GAS_EPOCH_ID   GAS epoch to inspect; defaults to latest gasepochcfg epoch
   BP_ACCOUNTS    Comma-separated accounts; defaults to active producers
   SNAPSHOT_DIR   Explicit output directory
+  CLAIM_SUMMARY  Decoded irreversible claim trace summary used by compare
+  CLAIM_RECONCILIATION_OUT  Optional claim-aware JSON output path
+  NODE_BIN       Node.js executable used for claim-aware reconciliation
 
 This script is read-only and hard-locked to the FLON testnet chain ID.
 EOF

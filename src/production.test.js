@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { latestCompleteEpoch,summarizeBPProduction } from './production.js';
+import { latestCompleteEpoch,rewardEpochsEnabled,summarizeBPProduction } from './production.js';
+
+test('distinguishes disabled reward epochs from missing finalized samples',()=>{
+  assert.equal(rewardEpochsEnabled({reward_started_time:'1970-01-01T00:00:00.000'}),false);
+  assert.equal(rewardEpochsEnabled({reward_started_time:'2026-11-01T00:00:00.000'}),true);
+  assert.equal(rewardEpochsEnabled({}),false);
+});
 
 test('selects the newest closed epoch with a complete sample',()=>{
   const selected=latestCompleteEpoch([

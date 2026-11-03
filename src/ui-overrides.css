@@ -3,7 +3,7 @@
 .proposal-type-picker legend{grid-column:1}
 
 /* Keep mobile navigation compact; wallet chrome supplies its own back action. */
-.header-wallet,.mobile-bp-apply{display:none}
+.mobile-bp-apply{display:none}
 .profile-help{display:flex;justify-content:flex-end;margin:12px 0}
 .profile-help button{color:var(--brand);font-size:12px;min-height:44px}
 @media(max-width:899px){
@@ -18,8 +18,7 @@
   .top-title .network span::after{content:'Mainnet';font-size:9px;padding:3px 5px;border-radius:5px;background:var(--soft);color:var(--muted)}
   html[data-network="testnet"] .top-title .network span::after{content:'Testnet'}
   .top-actions{gap:4px}
-  .header-wallet{display:block;max-width:100px;min-height:44px;padding:0 6px;font-size:11px;color:var(--deep)}
-  .header-wallet span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .header-wallet{display:none}
   .language-trigger{min-width:40px;padding:8px}
   .language-trigger [data-language-label],.language-trigger b{display:none}
   .node-page-heading{display:none}
@@ -45,3 +44,18 @@
 .vote-account-loading .select-list>.select-node{display:none}
 .vote-account-loading .select-list::before{content:'Loading voting account…';display:block;padding:24px;text-align:center;color:var(--muted);font-size:12px}
 html[lang="zh-CN"].vote-account-loading .select-list::before{content:'正在读取账户投票状态…'}
+
+/* Keep release identity visible but subordinate to governance actions. */
+.app-release{display:flex;align-items:center;justify-content:center;gap:6px;padding:18px 16px 24px;color:var(--muted);font-size:10px;letter-spacing:.02em}
+.app-release b{padding:3px 7px;border:1px solid var(--divider);border-radius:999px;background:rgba(255,255,255,.72);color:var(--deep);font-size:9px;font-weight:600}
+@media(max-width:899px){.app-release{padding-bottom:calc(82px + env(safe-area-inset-bottom))}}
+
+/* Keep epoch status and countdown legible on narrow voting cards. */
+.epoch-inline{align-items:flex-start;gap:10px;padding:12px}
+.epoch-inline>span{min-width:0}
+.epoch-inline svg{width:19px;margin-top:2px}
+.epoch-inline strong{font-size:11px;line-height:1.35}
+.epoch-inline small,.epoch-inline small span,.epoch-inline b{display:block}
+.epoch-inline small{margin-top:4px;line-height:1.45}
+.epoch-inline b{margin:3px 0 0;font-size:10px;line-height:1.4;letter-spacing:.01em;white-space:normal}
+.epoch-inline.is-inactive{background:var(--soft);color:var(--muted)}
