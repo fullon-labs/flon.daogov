@@ -1,4 +1,11 @@
 export default {
+  "Confirm proposal transaction": "제안 트랜잭션 확인",
+  "The transaction has been checked. The next step opens the HuFu signer directly.": "확인이 완료되었습니다. 다음 단계에서 HuFu 서명 화면을 엽니다.",
+  "Execution actions": "실행 액션",
+  "Argument size": "매개변수 크기",
+  "Verify the account, contract, action, and arguments again in HuFu.": "HuFu에서 계정, 계약, 액션 및 매개변수를 다시 확인하세요.",
+  "Sign in HuFu": "HuFu에서 서명",
+
   "Voting records an equal amount of DAO governance power in the contract": "투표하면 동일한 DAO 거버넌스 권한이 컨트랙트 내부에 기록됩니다",
   "DAO governance power": "DAO 거버넌스 권한",
   "Governance power is recorded internally by dao.gov and does not count toward BP ranking.": "거버넌스 권한은 dao.gov 내부에 기록되며 BP 순위에는 포함되지 않습니다.",

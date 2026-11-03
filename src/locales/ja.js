@@ -1,4 +1,11 @@
 export default {
+  "Confirm proposal transaction": "提案トランザクションの確認",
+  "The transaction has been checked. The next step opens the HuFu signer directly.": "確認が完了しました。次に HuFu の署名画面を開きます。",
+  "Execution actions": "実行アクション",
+  "Argument size": "引数サイズ",
+  "Verify the account, contract, action, and arguments again in HuFu.": "HuFu でアカウント、コントラクト、アクション、引数を再確認してください。",
+  "Sign in HuFu": "HuFu で署名",
+
   "Voting records an equal amount of DAO governance power in the contract": "投票により、同量の DAO ガバナンス権がコントラクト内に記録されます",
   "DAO governance power": "DAO ガバナンス権",
   "Governance power is recorded internally by dao.gov and does not count toward BP ranking.": "ガバナンス権は dao.gov 内部に記録され、BP ランキングには算入されません。",

@@ -184,7 +184,7 @@ function renderNetworkNames(){document.documentElement.dataset.network=runtimeCo
 
 [['无统计记录','No statistics recorded'],['无应出块','No expected blocks'],['查询失败','Query failed'],['数据无效','Invalid data'],['暂无 Epoch 记录','No epoch records yet'],['Epoch 出块率趋势','Epoch production rate trend'],['期记录','epochs recorded'],['柱高表示出块率，实出数量见提示；无统计记录不代表漏块。','Bar height shows production rate; counts appear in the tooltip. Missing records do not imply missed blocks.']].forEach(([zh,en])=>translations.set(zh,en));
 [['Epoch 表现','Epoch performance'],['完整节点状态','Full node status'],['实出 / 应出','produced / expected'],['统计不一致','Inconsistent statistics'],['最近 30 个 Epoch 出块率','Production rate for the last 30 epochs'],['已观测出块率','Observed production rate'],['未知 / 无应出块','Unknown / no expected blocks'],['无观测数据','No observations'],['已封存','Closed'],['未封存','Open'],['Idle skipped 不计入出块率','Idle skipped is excluded from the production rate']].forEach(([zh,en])=>translations.set(zh,en));
-function translateText(value){if(currentLanguage==='zh-CN')return value;let output=value;[...translations.entries()].sort((a,b)=>b[0].length-a[0].length).forEach(([zh,en])=>{output=output.split(zh).join(en)});const terms=localeTerms[currentLanguage];if(terms)Object.entries(terms).sort((a,b)=>b[0].length-a[0].length).forEach(([en,localized])=>{output=output.split(en).join(localized)});return output}
+function translateText(value){if(currentLanguage==='zh-CN')return value;let output=value;[...translations.entries()].sort((a,b)=>b[0].length-a[0].length).forEach(([zh,en])=>{output=output.split(zh).join(en)});const terms=localeTerms[currentLanguage];if(terms)Object.entries(terms).sort((a,b)=>b[0].length-a[0].length).forEach(([en,localized])=>{output=output.replace(new RegExp('(?<![A-Za-z])'+en.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![A-Za-z])','g'),()=>localized)});return output}
 function applyTranslations(root=document){
   const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
   while((node=walker.nextNode())){
@@ -241,7 +241,14 @@ function setMobileVoteTab(tab='directory'){
   if(mobile)window.scrollTo({top:0,behavior:'smooth'});
 }
 mobileVoteMedia.addEventListener?.('change',()=>setMobileVoteTab(mobileVoteTab));
-function showToast(message){clearTimeout(toastTimer);toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200)}
+function showToast(message){
+  clearTimeout(toastTimer);
+  const feedback=sheet.querySelector('[data-sheet-feedback]');
+  if(!sheet.hidden&&feedback){toast.hidden=true;feedback.textContent=message;feedback.hidden=false;return}
+  toast.textContent=message;toast.hidden=false;toastTimer=setTimeout(()=>toast.hidden=true,2200);
+}
+function clearSheetFeedback(){const feedback=sheet.querySelector('[data-sheet-feedback]');if(feedback){feedback.textContent='';feedback.hidden=true}}
+
 function isKeyboardField(element){return Boolean(element?.matches?.('textarea,input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"])'))}
 function keepFocusedFieldVisible(element=document.activeElement){
   if(sheet.hidden||!isKeyboardField(element)||!sheet.contains(element))return;
@@ -258,8 +265,8 @@ function syncVisualViewport(){
   document.documentElement.style.setProperty('--visual-keyboard-inset',`${keyboardInset}px`);
   keepFocusedFieldVisible(active);
 }
-function openSheet(html){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetViewportBaseline=Math.max(window.innerHeight,window.visualViewport?.height||0);sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden';syncVisualViewport()}
-function closeSheet(){if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;sheet.classList.remove('is-keyboard-open');document.body.style.overflow='';document.documentElement.style.setProperty('--visual-keyboard-inset','0px');document.documentElement.style.setProperty('--visual-viewport-height','100dvh')}
+function openSheet(html){clearSheetFeedback();if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;sheetViewportBaseline=Math.max(window.innerHeight,window.visualViewport?.height||0);sheetContent.innerHTML=html;applyTranslations(sheetContent);overlay.hidden=false;sheet.hidden=false;document.body.style.overflow='hidden';syncVisualViewport()}
+function closeSheet(){clearSheetFeedback();if(refundCountdownTimer)window.clearInterval(refundCountdownTimer);refundCountdownTimer=null;pendingVoteAllocations=null;overlay.hidden=true;sheet.hidden=true;sheet.classList.remove('is-keyboard-open');document.body.style.overflow='';document.documentElement.style.setProperty('--visual-keyboard-inset','0px');document.documentElement.style.setProperty('--visual-viewport-height','100dvh')}
 function walletProviderName(provider){return provider==='iframe'?'HuFu App':provider==='hufu'?'HuFu Wallet':'Anchor Wallet'}
 function renderWallet(){const nextAccount=walletSession?.account||null;if(nextAccount!==voteDraftAccount){voteDraftAccount=nextAccount;voteDraftDirty=false;votingState=null;document.documentElement.classList.add('vote-account-loading')} const account=walletSession?.account||'未连接',label=walletSession?.account||'连接钱包';document.querySelectorAll('[data-wallet-account]').forEach(node=>node.textContent=account);document.querySelectorAll('[data-wallet-label]').forEach(node=>node.textContent=label);if(walletSession)candidateDraft.account=walletSession.account;applyTranslations();refreshBPRecovery()}
 const bpStatusMeta={0:['未评估',''],1:['合格','qualified'],2:['降级',''],3:['警告',''],4:['暂停','suspended'],5:['样本不足',''],6:['网络事件',''],7:['试运行','probation']};
@@ -694,17 +701,28 @@ async function submitProposal(target){
   try{
     if(!proposalPowerRequirement().sufficient)throw new Error('INSUFFICIENT_PROPOSAL_POWER');
     if(isHuFuApp())walletSession=await authorizeHuFuSigning(walletSession);
-    const actions=[];
+    const actions=[],reviews=[];
     if(proposal_type==='parameter')for(const row of form.querySelectorAll('.proposal-action-row')){
       const [contract,action_name]=row.querySelector('[name="targetAction"]').value.split('::'),args=proposalActionArgs(row);
-      const data=await serializeGovernanceAction(contract,action_name,args);actions.push({contract,action_name,data});
+      const data=await serializeGovernanceAction(contract,action_name,args);actions.push({contract,action_name,data});reviews.push({contract,action_name,args});
     }
+    if(proposal_type==='parameter'&&!actions.length)throw new Error(currentLanguage==='zh-CN'?'可执行提案至少需要一个 action':'At least one action is required');
+    const latest=await loadGovernance(walletSession.account);
+    let threshold=Number.parseFloat(latest.config?.proposal_threshold);
+    if(actions.length&&latest.riskSupported){
+      const levels=actions.map(action=>Number(latest.actionPolicies.find(row=>row.contract===action.contract&&row.action_name===action.action_name&&(row.enabled===true||Number(row.enabled)===1))?.risk_level));
+      const risk=latest.riskConfigs.find(row=>Number(row.risk_level)===Math.max(...levels)&&(row.enabled===true||Number(row.enabled)===1));
+      if(!risk)throw new Error(currentLanguage==='zh-CN'?'风险策略不可用':'Risk policy unavailable');
+      threshold=Number.parseFloat(risk.proposal_threshold);
+    }
+    if(!Number.isFinite(threshold)||Number.parseFloat(latest.power?.power||'0')<threshold)throw new Error(`${currentLanguage==='zh-CN'?'治理权不足':'Insufficient governance power'}: ${threshold} POWER`);
+    governanceState=latest;
     const bytes=actions.length?validateFrozenActions(actions,enabledAllowlist(governanceState.allowlist),governanceState.config):0;
     const content_hash=await sha256Hex(JSON.stringify({title,summary,metadata_uri,discussion_uri,actions}));
     const action={account:'dao.gov',name:'propose',data:{proposer:walletSession.account,proposal_type,title,summary,content_hash,metadata_uri,discussion_uri,actions}};
     pendingProposalTransaction={action,bytes};
     const actionParameterSize=actions.length?`${bytes} bytes`:(currentLanguage==='zh-CN'?'无执行参数':'No execution parameters');
-    openSheet(`<h2 id="sheet-title">确认提案交易</h2><p class="sheet-subtitle">交易内容已检查完成，下一步将直接打开 HuFu 签名窗口。</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>dao.gov::propose</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal_type)}</strong></div><div><span>标题</span><strong>${escapeHtml(title)}</strong></div><div><span>执行 actions</span><strong>${actions.length}</strong></div><div><span>参数大小</span><strong>${actionParameterSize}</strong></div></div><p class="sign-warning">请在 HuFu 签名页再次核对账户、合约、action 和参数。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-confirm">在 HuFu 中签名</button></div>`);
+    openSheet(`<h2 id="sheet-title">确认提案交易</h2><p class="sheet-subtitle">交易内容已检查完成，下一步将直接打开 HuFu 签名窗口。</p><div class="sign-summary"><div><span>网络</span><strong>${escapeHtml(networkName())}</strong></div><div><span>账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>Action</span><strong>dao.gov::propose</strong></div><div><span>提案类型</span><strong>${escapeHtml(proposal_type)}</strong></div><div><span>标题</span><strong>${escapeHtml(title)}</strong></div><div><span>执行 actions</span><strong>${actions.length}</strong></div><div><span>参数大小</span><strong>${actionParameterSize}</strong></div></div>${reviews.map(item=>`<div class="profile-review"><strong>${escapeHtml(item.contract)}::${escapeHtml(item.action_name)}</strong><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(JSON.stringify(item.args,null,2))}</pre></div>`).join('')}<p class="sign-warning">请在 HuFu 签名页再次核对账户、合约、action 和参数。</p><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="dao-propose-confirm">在 HuFu 中签名</button></div>`);
   }catch(error){target.disabled=false;const code=String(error?.message||error);showToast(code.includes('INSUFFICIENT_PROPOSAL_POWER')?proposalPowerMessage():code.includes('ACTION_ABI_NOT_READY')?'Action ABI 尚未加载完成':code.includes('INVALID_ABI_FIELD')||code.includes('REQUIRED_ABI_FIELD')?'请检查 action 参数':code.includes('ACTION_DATA_TOO_LARGE')||code.includes('TOTAL_ACTION_DATA_TOO_LARGE')?(currentLanguage==='zh-CN'?'Action 参数内容过长，请缩短后再提交。':'The action arguments are too long. Shorten them before submitting.'):walletErrorMessage(error))}
 }
 async function confirmProposal(target){
@@ -982,10 +1000,11 @@ async function submitClaimRewards(target){
   if(!walletSession)return;target.disabled=true;target.textContent=currentLanguage==='zh-CN'?'正在请求钱包签名…':'Requesting wallet signature…';
   try{const result=await transact(walletSession,[{account:'voter.reward',name:'claimrewards',data:{caller:walletSession.account,voter:walletSession.account,max_steps:30}}]),id=transactionId(result);openSheet(`<div class="success-result"><span>✓</span><h2 id="sheet-title">奖励领取交易已广播</h2><p>${escapeHtml(walletSession.account)}</p>${id?`<code>${escapeHtml(id)}</code>`:''}</div><div class="sheet-actions one"><button class="primary-button" data-action="close-sheet">完成</button></div>`);await refreshVotingAccount()}catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'确认签名':'Confirm signature';showToast(walletErrorMessage(error))}
 }
-async function openBPClaimSheet(producer=''){
+async function openBPClaimSheet(producer='',maxSteps=24){
   if(!walletSession){openWalletSheet();return}
   const value=String(producer||walletSession.account||'').trim();
   openSheet(`<h2 id="sheet-title">BP 奖励领取</h2><p class="sheet-subtitle">当前账户可为自己或任意 BP 触发领取</p><form class="wizard-form" data-bp-claim-form><label><span>BP 收款账户</span><input name="producer" maxlength="12" pattern="[a-z1-5.]{1,12}" value="${escapeHtml(value)}" required></label><label><span>本次最多处理</span><select name="maxSteps"><option value="24">24 Epoch</option><option value="48">48 Epoch</option><option value="12">12 Epoch</option><option value="1">1 Epoch</option></select></label><p class="field-note">可由任意钱包代为触发。奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。</p></form><div class="sheet-actions"><button class="secondary-button" data-action="close-sheet">取消</button><button class="primary-button" data-action="bp-claim-check">检查奖励</button></div>`);
+  sheetContent.querySelector('[name="maxSteps"]').value=String([1,12,24,48].includes(Number(maxSteps))?Number(maxSteps):24);
 }
 async function checkBPClaim(target){
   if(!walletSession)return;
@@ -995,7 +1014,7 @@ async function checkBPClaim(target){
   try{
     const rewards=await loadProducerRewards(producer);
     if(!rewards.supported)throw new Error('CLAIM_UNSUPPORTED');
-    openSheet(`<h2 id="sheet-title">确认代领</h2><p class="sheet-subtitle">flon::claimrewards</p><div class="sign-summary"><div><span>触发账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>BP 收款账户</span><strong>${escapeHtml(producer)}</strong></div><div><span>基础奖励</span><strong>${escapeHtml(rewards.baseUnclaimed)}</strong></div><div><span>基础待领取记录</span><strong>${rewards.baseRows}</strong></div><div><span>GAS 奖励</span><strong>${escapeHtml(rewards.gasUnclaimed)}</strong></div><div><span>GAS 待领取记录</span><strong>${rewards.gasRows}</strong></div><div><span>本次最多处理</span><strong>${maxSteps}</strong></div></div><p class="sign-warning">${rewards.hasClaimable?'奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。最终到账金额以交易执行结果为准。':'暂无可领取的 BP 奖励'}</p><div class="sheet-actions"><button class="secondary-button" data-action="bp-claim" data-producer="${escapeHtml(producer)}">返回</button><button class="primary-button" data-action="bp-claim-sign" data-producer="${escapeHtml(producer)}" data-max-steps="${maxSteps}" ${rewards.hasClaimable?'':'disabled'}>确认签名</button></div>`);
+    openSheet(`<h2 id="sheet-title">确认代领</h2><p class="sheet-subtitle">flon::claimrewards</p><div class="sign-summary"><div><span>触发账户</span><strong>${escapeHtml(walletSession.account)}@${escapeHtml(walletSession.permission)}</strong></div><div><span>BP 收款账户</span><strong>${escapeHtml(producer)}</strong></div><div><span>基础奖励</span><strong>${escapeHtml(rewards.baseUnclaimed)}</strong></div><div><span>基础待领取记录</span><strong>${rewards.baseRows}</strong></div><div><span>GAS 奖励</span><strong>${escapeHtml(rewards.gasUnclaimed)}</strong></div><div><span>GAS 待领取记录</span><strong>${rewards.gasRows}</strong></div><div><span>本次最多处理</span><strong>${maxSteps}</strong></div></div><p class="sign-warning">${rewards.hasClaimable?'奖励始终直接支付给 BP，代触发账户不能更改收款人，也不会获得奖励。最终到账金额以交易执行结果为准。':'暂无可领取的 BP 奖励'}</p><div class="sheet-actions"><button class="secondary-button" data-action="bp-claim" data-producer="${escapeHtml(producer)}" data-max-steps="${maxSteps}">返回</button><button class="primary-button" data-action="bp-claim-sign" data-producer="${escapeHtml(producer)}" data-max-steps="${maxSteps}" ${rewards.hasClaimable?'':'disabled'}>确认签名</button></div>`);
   }catch(error){target.disabled=false;target.textContent=currentLanguage==='zh-CN'?'检查奖励':'Check rewards';const code=String(error?.message||error);showToast(code.includes('BP_NOT_FOUND')?(currentLanguage==='zh-CN'?'未找到该 BP':'BP not found'):code.includes('CLAIM_UNSUPPORTED')?(currentLanguage==='zh-CN'?'当前合约尚未启用 BP 奖励领取':'BP reward claims are not enabled by the current contract'):code)}
 }
 async function submitBPClaim(target){
@@ -1068,7 +1087,7 @@ document.addEventListener('click',async event=>{
   if(action==='dao-advance')await submitDaoAction(target,target.dataset.governanceAction,target.dataset.proposalId);
   if(action==='claim')await confirmClaimRewards();
   if(action==='claim-sign')await submitClaimRewards(target);
-  if(action==='bp-claim')await openBPClaimSheet(target.dataset.producer);
+  if(action==='bp-claim')await openBPClaimSheet(target.dataset.producer,target.dataset.maxSteps);
   if(action==='bp-claim-check')await checkBPClaim(target);
   if(action==='bp-claim-sign')await submitBPClaim(target);
   if(action==='candidate')await prepareCandidate();
@@ -1104,7 +1123,7 @@ overlay.addEventListener('click',closeSheet);
 document.addEventListener('change',event=>{if(event.target.matches('.select-node input[type="checkbox"]')){voteDraftDirty=true;const amount=event.target.closest('.select-node')?.querySelector('[data-node-votes]');if(amount){amount.disabled=!event.target.checked;if(!event.target.checked)amount.value='';else amount.focus()}updateAllocation();applyNodeFilters()}if(event.target.matches('[data-node-votes]')){try{const units=decimalUnits(event.target.value||'0');if(units>0n)event.target.value=formatVoteInput(units)}catch{}}if(event.target.matches('[data-node-sort]'))applyNodeFilters();if(event.target.matches('[data-resume-confirm]')){const button=sheetContent.querySelector('[data-action="resume-producer-sign"]');if(button)button.disabled=!event.target.checked}});
 document.addEventListener('input',event=>{if(event.target.matches('[name="shareRatio"]')){const output=sheetContent.querySelector('[data-share-output]');if(output)output.textContent=`${event.target.value}%`}if(event.target.matches('[data-node-votes]')){voteDraftDirty=true;updateAllocation()}});
 document.addEventListener('click',event=>{if(!event.target.closest('.top-language'))closeLanguageMenu()});
-document.addEventListener('keydown',event=>{if(event.key==='Escape')closeLanguageMenu()});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){const menu=document.querySelector('[data-language-menu]');if(menu?.hidden===false){closeLanguageMenu();return}if(!sheet.hidden){event.preventDefault();closeSheet()}}});
 
 function selectedCount(){return [...document.querySelectorAll('.select-node input[type="checkbox"]:checked')].length}
 function allocationTotal(){try{return draftVoteAllocations().reduce((sum,item)=>sum+item.votes,0n)}catch{return 0n}}
