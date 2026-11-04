@@ -63,7 +63,7 @@ FLON 应借鉴：候选人最低自质押、委托容量与自质押挂钩、佣
 | --- | ---: |
 | 活跃 BP 数 | 21 |
 | 备用 BP 数 | 30 |
-| BP 最低自质押 | 首期 `500,000 FLON`，由 `setbpstake` 治理调整 |
+| BP 最低自质押 | 当前主网 `1,000,000 FLON`，由 `setbpstake` 治理调整 |
 | 用户最短投票锁定 | 7 天 |
 | BP 退出等待 | 21 天 |
 | 单账户最多投票 BP | 30 |
@@ -75,7 +75,7 @@ FLON 应借鉴：候选人最低自质押、委托容量与自质押挂钩、佣
 | 席位组成 | 15 个稳定 + 4 个竞争 + 2 个新秀 |
 | 新秀毕业期 | 180 天 |
 
-首期使用链上参数 `min_self_stake = 500,000 FLON`，不是编译期常量。DAO 应结合币价、流通量和候选数量定期评估；后续版本可升级为“绝对下限与流通量比例取大值”。
+首期使用链上参数 `min_self_stake = 1,000,000 FLON`，不是编译期常量。DAO 应结合币价、流通量和候选数量定期评估；后续版本可升级为“绝对下限与流通量比例取大值”。
 
 ### 3.2 投票权重
 
@@ -423,7 +423,7 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 已实现：
 
 - `regproducer` / `regproducer2` 共用内部 `check_min_bp_self_stake` 门限检查。
-- `setbpstake(enforce_schedule, min_self_stake, unstake_delay_sec)`：治理配置；默认建议 `500,000 FLON`、21 天。
+- `setbpstake(enforce_schedule, min_self_stake, unstake_delay_sec)`：治理配置；当前主网 `1,000,000 FLON`、21 天。
 - `stakebp` / `unstakebp` / `claimbpstake`：自质押、延迟退出和到期主动申领。
 - `bpstakecfg` / `bpstakes` / `bpstkrefund`：配置、本金和待退款链上状态表。
 - `update_elected_producers` 与 Standby 快照在 `enforce_schedule=true` 时共同排除自质押不足者。
@@ -443,7 +443,7 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 
 待新增表：`bpmetadata`、`penalties`、`evidence`；绩效、Epoch、奖励快照及自质押表已由当前系统合约维护。
 
-部署时采用两阶段迁移：先执行 `setbpstake(false, "500000.0000 FLON", 1814400)`，立即约束新注册或重新注册的候选人，同时允许现有排班成员补足自质押；宽限期结束后再由治理执行 `setbpstake(true, ...)`，从下一次排班与 Standby 快照开始过滤不足者，避免一次升级导致活跃集合骤减。
+2026-11-04 主网已完成门槛调整：`enforce_schedule=true`、`min_self_stake="1000000.00000000 FLON"`、退出等待 21 天。21 个现有 BP 均已实际质押 100 万 FLON，合计 2,100 万，无需关闭排班约束。交易 `1e1d76e397ad6b74541ef51d5edab85afeae0707d7102de47fd8fd3247d87032` 位于区块 `14985170`，已不可逆。后续若再次提高门槛，须另行评估存量 BP 补足与排班安全。
 
 ### 8.2 `voter.reward`
 
@@ -529,3 +529,8 @@ DAO 可治理：竞选参数、奖励比例、门限、国库支出、合约升�
 - FLON block rewards: `unittests/system_contracts/contracts/flon.system/src/producer_pay.cpp`
 - FLON voter rewards: `contracts/voter.reward/src/voter.reward.cpp`
 - mDAO reference: `/Users/ray/work/wasm.contracts/amc/mdao.contracts`
+
+
+## 主网质押与奖励测算更新
+
+[2026-11-04 更新](mainnet-stake-reward-update-20261104.md)区分已生效的 100 万门槛、21 个 BP 的实际质押，以及每年/每块/12 秒情景的奖励估算。现行曲线按奖励区块数减半，持续 12 秒时约 120 年，并非固定五个自然年。

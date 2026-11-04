@@ -87,3 +87,5 @@ flon.daogov/
 [链上日常维护操作指南：closeepoch 与 standbyproof](./docs/operations-guide.md)
 
 [DAO Governance Keeper（TypeScript）](./keeper/README.md)
+
+[主网 100 万 BP 自质押与 21-BP 奖励测算（2026-11-04）](docs/mainnet-stake-reward-update-20261104.md)
