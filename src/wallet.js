@@ -139,13 +139,25 @@ export function rewardPlanTableNames(abi){
   const tables=new Set((abi?.tables||[]).map(table=>String(table?.name||'')));
   return ['rewardplans','rewardcfgv2'].filter(name=>tables.has(name));
 }
-async function loadRewardPlans(){
-  const abi=await rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(()=>null);
+async function loadRewardPlans(strict=false){
+  const abi=await rpcPost('/v1/chain/get_abi',{account_name:'flon'}).catch(error=>{if(strict)throw error;return null});
   for(const table of rewardPlanTableNames(abi?.abi)){
-    const result=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table,limit:table==='rewardplans'?100:1}).catch(()=>({rows:[]}));
+    const result=await rpcPost('/v1/chain/get_table_rows',{json:true,code:'flon',scope:'flon',table,limit:table==='rewardplans'?100:1}).catch(error=>{if(strict)throw error;return {rows:[]}});
     if(result.rows?.length)return result.rows;
+    if(strict)throw new Error('EPOCH_STATE_UNAVAILABLE');
   }
   return [];
+}
+export function currentRewardEpoch(chainInfo,globalRow,rewardPlans=[]){
+  const headMs=utcMilliseconds(chainInfo?.head_block_time),startMs=utcMilliseconds(globalRow?.reward_started_time);
+  if(!Number.isFinite(headMs)||!Number.isFinite(startMs)||startMs<blockTimestampEpochMilliseconds||headMs<startMs)return null;
+  const headSlot=Math.floor((headMs-blockTimestampEpochMilliseconds)/500);
+  const plans=normalizeRewardPlans(rewardPlans);
+  const plan=plans.filter(item=>item.startSlot<=headSlot).sort((a,b)=>a.startSlot-b.startSlot).at(-1);
+  if(plans.length&&!plan)return null;
+  if(plan)return plan.firstEpoch+Math.floor((headSlot-plan.startSlot)/plan.epochSlots);
+  // Legacy system contracts use fixed six-hour slot epochs.
+  return Math.floor((headSlot-Math.floor((startMs-blockTimestampEpochMilliseconds)/500))/(rewardEpochMilliseconds/500));
 }
 export function epochTiming(chainInfo,globalRow,rewardPlans=[],nextEpochToClose=null,activationEpoch=null){
   const chainHeadMs=utcMilliseconds(chainInfo?.head_block_time);
@@ -378,12 +390,10 @@ export async function loadBPAccount(account){
   const globalRows=recoverySupported?results[cursor++]:null;
   const producer=producerRows.rows?.find(row=>row.owner===account)||null;
   const performance=statusRows?.rows?.find(row=>row.producer===account)||null;
-  const fallbackEpoch=Number(epochRows?.rows?.[0]?.next_epoch_to_close||0);
-  const rewardStart=globalRows?.rows?.[0]?.reward_started_time;
-  const startMs=rewardStart?Date.parse(String(rewardStart).endsWith('Z')?String(rewardStart):`${rewardStart}Z`):NaN;
+  const rewardPlans=recoverySupported?await loadRewardPlans(true):[];
+  const calculatedEpoch=currentRewardEpoch(chainInfo,globalRows?.rows?.[0],rewardPlans);
+  if(recoverySupported&&calculatedEpoch===null)throw new Error('EPOCH_STATE_UNAVAILABLE');
   const headTime=chainInfo.head_block_time;
-  const headMs=headTime?Date.parse(String(headTime).endsWith('Z')?String(headTime):`${headTime}Z`):NaN;
-  const calculatedEpoch=Number.isFinite(startMs)&&Number.isFinite(headMs)&&headMs>=startMs?Math.floor((headMs-startMs)/21600000):fallbackEpoch;
   let currentStats=null;
   if(recoverySupported&&tables.some(item=>item.name==='bpstats')){
     const statsRows=await optionalTableRows({json:true,code:'flon',scope:String(calculatedEpoch),table:'bpstats',lower_bound:account,upper_bound:account,limit:1});
